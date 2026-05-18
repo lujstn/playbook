@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/playbook-common.sh"
+_=$(cat 2>/dev/null || true)   # drain stdin; the hook reads nothing from it
+
+prompt="Uncertainty check (confidant gate): would a competent colleague bother flagging anything from this turn to the lead if they walked past? On almost every turn the answer is no and you log nothing. If yes, append one line to the uncertainty ledger via the documented append helper: a band slug (minorly-unsure, starting-unsure, medium-unsure, really-unsure, dangerously-unsure per the VB-4 mapping) and a single clause phrased as drift from the North Star. Standing override still applies: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode."
+
+playbook_emit_stop_nudge "$prompt"
+exit 0

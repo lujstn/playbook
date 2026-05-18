@@ -4,7 +4,7 @@
 
 **Goal:** Build the `@lujstn/playbook` Claude Code plugin exactly as specified in the locked `design.md`: a decision engine (`playbook:playbook`) plus a nine-tenet execution overlay enforced by two hooks and a pinned anchor file, with five team-mode routing and two moved-in skills.
 
-**Architecture:** A directory-discovered Claude Code plugin (`.claude-plugin/plugin.json` + `marketplace.json`, `skills/*/SKILL.md`, `hooks/hooks.json`) modelled exactly on the Superpowers packaging blueprint. Persistence of the nine-tenet overlay does not come from skill text (a skill fires once and does not follow subagents into fresh contexts) — it comes from a `SessionStart` bootstrap hook plus a pinned `.playbook/anchor.md` file, with a `take-a-beat` hook steering compaction and a `uncertainty` hook prompting an end-of-turn confidant test. The engine routes work to native Claude Code, native parallel `Agent` dispatch, native agent-teams, the Superpowers chain, or GSD — it builds no third runtime.
+**Architecture:** A directory-discovered Claude Code plugin (`.claude-plugin/plugin.json` + `marketplace.json`, `skills/*/SKILL.md`, `hooks/hooks.json`) modelled exactly on the Superpowers packaging blueprint. Persistence of the nine-tenet overlay does not come from skill text (a skill fires once and does not follow subagents into fresh contexts): it comes from a `SessionStart` bootstrap hook plus a pinned `.playbook/anchor.md` file, with a `take-a-beat` hook steering compaction and a `uncertainty` hook prompting an end-of-turn confidant test. The engine routes work to native Claude Code, native parallel `Agent` dispatch, native agent-teams, the Superpowers chain, or GSD. It builds no third runtime.
 
 **Tech Stack:** Markdown skills (Superpowers house style), POSIX/bash extensionless hook scripts behind a cross-platform `run-hook.cmd` polyglot wrapper, JSON manifests, `jq` for schema assertions, `bash -n` for hook syntax (shellcheck optional, not a dependency), the `claude` CLI with `--plugin-dir` + `--output-format stream-json` for behavioural skill-trigger tests.
 
@@ -15,21 +15,21 @@
 These come from `design.md` §12 and Appendix A. They are non-negotiable and apply to every task.
 
 1. **`design.md` is the single source of truth for all doctrine content.** Skill prose is *rendered faithfully from* the cited `design.md` section, not invented. Where a task says "verbatim", the exact words from `design.md` must appear in the artifact.
-2. **British English, no long dashes.** All generated skill and hook text uses British spelling ("behaviour", "minimise", "colour") and must not use the long dash character. Use commas, parentheses, or full stops instead. (Appendix A's own text is exempt and canonical — never alter quoted Appendix A text.)
+2. **British English, no long dashes.** All generated skill and hook text uses British spelling ("behaviour", "minimise", "colour") and must not use the long dash character. Use commas, parentheses, or full stops instead. (Appendix A's own text is exempt and canonical: never alter quoted Appendix A text.)
 3. **Improve adherence; do not re-explain native behaviour.** Skill/hook text must not re-teach native planning, TodoWrite, subagents, compaction, or code hygiene from scratch. It rides on top of native behaviour and closes the specific shortfall named in the `design.md` §3 table.
 4. **Appendix A is canonical.** The five states, nine tenets and framing note govern intent. Exactly three deliberate mechanism adaptations are permitted (`design.md` §12): tenet 3's external-manager check-in is gated by the uncertainty ledger; tenet 5's SMS becomes ntfy; tenet 7's "65% of the day" becomes ~65% context used. Any other conflict resolves in favour of Appendix A.
 5. **Less is more (tenet 8).** The common path is zero-dependency. Skill prose is short. No invented scope: every artifact maps to a `design.md` section. Do not add features, config wizards, or a third runtime.
-6. **Two-principles test.** Every artifact must satisfy "less is more" and "speed is not rushing" — complete, not partial; minimal, not bloated.
+6. **Two-principles test.** Every artifact must satisfy "less is more" and "speed is not rushing": complete, not partial; minimal, not bloated.
 
 ## Verbatim blocks (paste these exactly; never re-transcribe)
 
 `design.md` is the source of truth for all doctrine. To prevent independent re-transcription drift on the few invariants that must appear **identically and verbatim** across multiple generated artifacts, those exact strings are pinned here. Tasks that reference a block paste it byte-for-byte (it is already British English with no long dash, so no transformation is applied). Everything else is still rendered faithfully from the cited `design.md` section.
 
-**VB-1 — the standing North-Star override** (must appear identically in the engine skill, the offline-mode skill, the escalation-ladder doctrine, and `anchor-format.md`; `design.md` §5.1/§6/§8 use minor wording variants — this single canonical form is used everywhere):
+**VB-1, the standing North-Star override** (must appear identically in the engine skill, the offline-mode skill, the escalation-ladder doctrine, and `anchor-format.md`; `design.md` §5.1/§6/§8 use minor wording variants, and this single canonical form is used everywhere):
 
 > if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode.
 
-**VB-2 — the adjacent-mode tiebreaker** (`design.md` §5.1, paste verbatim into the engine skill):
+**VB-2, the adjacent-mode tiebreaker** (`design.md` §5.1, paste verbatim into the engine skill):
 
 > Adjacent-mode tiebreaker, applied in this order whenever more than one route seems to fit:
 > 1. If the work is separable into sub-tasks that do not need to communicate with each other, choose `intern-team`.
@@ -39,7 +39,7 @@ These come from `design.md` §12 and Appendix A. They are non-negotiable and app
 >
 > Separability decides step 1 versus 2 versus 3. Durability decides `superpowers-team` versus `gsd-team` within step 3. Size only decides whether to decompose first (decompose-as-judgement), never which mode runs the work.
 
-**VB-3 — the five-mode table** (`design.md` §2, paste verbatim into the engine skill):
+**VB-3, the five-mode table** (`design.md` §2, paste verbatim into the engine skill):
 
 > | Mode | When it is chosen | Substrate |
 > |---|---|---|
@@ -49,7 +49,7 @@ These come from `design.md` §12 and Appendix A. They are non-negotiable and app
 > | `superpowers-team` | One session-scoped milestone, separable into waves, no need for durable cross-session state | Superpowers `brainstorming`/`writing-plans` plus `playbook:modifying-plans` plus `playbook:synchronised-subagent-development` |
 > | `gsd-team` | Multi-milestone product; state must survive `/clear`; durable project memory required | GSD (`gsd-build/get-shit-done`) |
 
-**VB-4 — uncertainty band labels and their slugs** (`design.md` §6 uses prose labels; the ledger encodes them as slugs. This is a deliberate slugification, NOT "verbatim". The engine doctrine instructs the agent to write the slug; `anchor-format.md` carries this mapping table so ledger entries match callout-shape detection):
+**VB-4, uncertainty band labels and their slugs** (`design.md` §6 uses prose labels; the ledger encodes them as slugs. This is a deliberate slugification, NOT "verbatim". The engine doctrine instructs the agent to write the slug; `anchor-format.md` carries this mapping table so ledger entries match callout-shape detection):
 
 > | Slug (written to ledger) | design.md §6 prose label | What it instructs |
 > |---|---|---|
@@ -64,7 +64,7 @@ These come from `design.md` §12 and Appendix A. They are non-negotiable and app
 This plugin is markdown + bash + JSON, not application code. The red/green discipline is preserved but the test mechanism differs by artifact type. Each task states its own verification; the global mapping is:
 
 - **JSON manifests** (`plugin.json`, `marketplace.json`, `hooks.json`): assert with `jq -e` *before* writing the file (the assertion fails because the file is absent), then write, then the assertion passes. A malformed settings/hook JSON silently disables the whole file, so schema assertions are mandatory.
-- **Bash hooks**: write a pipe-test first that feeds synthesised stdin JSON and asserts the emitted stdout JSON (the test fails — script absent), then write the script, then it passes. Syntax-gate every hook with `bash -n` (always available). `shellcheck` is run if present but is never a hard dependency.
+- **Bash hooks**: write a pipe-test first that feeds synthesised stdin JSON and asserts the emitted stdout JSON (the test fails, script absent), then write the script, then it passes. Syntax-gate every hook with `bash -n` (always available). `shellcheck` is run if present but is never a hard dependency.
 - **Skills (behaviour-shaping prose)**: the "test" is a behavioural skill-trigger run (`claude -p` with `--plugin-dir` and `--output-format stream-json`, grep the emitted skill id) plus a written review checklist derived from the `design.md` section. Agent behaviour cannot be fully red/green unit-tested; where it cannot, the task says so explicitly and uses a concrete manual verification with expected observable output. This honesty is required by the project's own tenet 6/8 and by `superpowers:verification-before-completion`.
 
 ## File structure (decomposition lock-in)
@@ -131,7 +131,7 @@ Reference clones (read-only, retained for exact upstream citation): `/tmp/playbo
 - [ ] **Step 1: Prove the defect (failing observation)**
 
 Run: `git ls-files -s skills/ | awk '{print $1}' | sort -u`
-Expected now: `160000` (gitlink mode — the defect). Target after task: `100644` blob modes only.
+Expected now: `160000` (gitlink mode, the defect). Target after task: `100644` blob modes only.
 
 - [ ] **Step 2: Capture the real file content is on disk**
 
@@ -157,7 +157,7 @@ rm -rf skills/modifying-plans/.git skills/synchronised-subagent-development/.git
 git add skills/modifying-plans skills/synchronised-subagent-development
 git ls-files -s skills/ | awk '{print $1}' | sort -u
 ```
-Expected: only `100644` (and `100755` if any executable) — no `160000`.
+Expected: only `100644` (and `100755` if any executable), no `160000`.
 
 - [ ] **Step 6: Add runtime-state ignores to .gitignore**
 
@@ -190,7 +190,7 @@ git commit -m "fix: de-gitlink moved-in skills so plugin ships their content"
 - Create: `/Users/lucas/Developer/lujstn/playbook/.claude-plugin/marketplace.json`
 - Test: `tests/manifests.sh`
 
-Blueprint is the Superpowers manifest pair (`/tmp/playbook-research/superpowers/.claude-plugin/`), which is metadata-only — Claude Code discovers skills via `skills/*/SKILL.md` and hooks via `hooks/hooks.json`; do **not** add `skills`/`hooks` keys to `plugin.json`.
+Blueprint is the Superpowers manifest pair (`/tmp/playbook-research/superpowers/.claude-plugin/`), which is metadata-only: Claude Code discovers skills via `skills/*/SKILL.md` and hooks via `hooks/hooks.json`; do **not** add `skills`/`hooks` keys to `plugin.json`.
 
 - [ ] **Step 1: Write the failing manifest assertion**
 
@@ -426,7 +426,7 @@ git commit -m "feat: add cross-platform hook harness and shared lib"
 - [ ] **Step 1: Enumerate candidate signal sources (investigation, no code)**
 
 Inspect each and record findings in the decision doc:
-1. Hook stdin JSON — run a throwaway `PostToolUse` command hook that does `jq . > /tmp/pb-stdin.json` and inspect for any `tokens`/`context`/`usage` field.
+1. Hook stdin JSON: run a throwaway `PostToolUse` command hook that does `jq . > /tmp/pb-stdin.json` and inspect for any `tokens`/`context`/`usage` field.
 2. Environment variables visible to hooks (`env | grep -i -E 'token|context|claude'`).
 3. GSD's bridge pattern: `/tmp/playbook-research/gsd/hooks/gsd-statusline.js` writes `/tmp/claude-ctx-{session}.json`; `gsd-context-monitor.js` (a `PostToolUse` hook) reads it and warns at ≤35%/≤25% remaining. Read both files for the exact field names and the session-id source.
 4. Transcript file: the session `.jsonl` under the Claude projects dir contains token-usage system reminders that can be tailed.
@@ -468,7 +468,7 @@ Expected: FAIL (stub returns empty for the 70% case).
 
 - [ ] **Step 4: Implement `playbook_context_percent` per the decision**
 
-Replace the stub in `playbook-common.sh` with the chosen mechanism. It must: return an integer 0–100 when the signal is available; return empty string when it is not (caller treats empty as "do not beat"); never block or error the hook (wrap in `2>/dev/null || true`).
+Replace the stub in `playbook-common.sh` with the chosen mechanism. It must: return an integer 0 to 100 when the signal is available; return empty string when it is not (caller treats empty as "do not beat"); never block or error the hook (wrap in `2>/dev/null || true`).
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -488,14 +488,14 @@ git commit -m "feat: resolve context-usage signal for take-a-beat (~65% trigger)
 
 **Why a spike:** `design.md` §4 says the `uncertainty` hook fires at the end of every turn and asks the agent one question (the confidant test); it performs no computation, and the **default expected answer is "log nothing" and the turn ends normally**. The Hooks Configuration reference says `type: prompt`/`type: agent` are unavailable for `Stop` (command only). The documented model-visible Stop channels are `decision:"block"`+`reason` (surfaced via the "hook stopped continuation" reminder) and `systemMessage` (explicitly user-UI-only); `additionalContext` is documented generically but only worked-examples for tool/compact events show it injecting. This spike picks the channel empirically.
 
-HARD CONSTRAINT the spike must satisfy: the chosen mechanism MUST NOT prevent the turn from ending in the common (log-nothing) case. `decision:"block"` forces continuation with `reason` — emitting it every turn would trap the agent in infinite continuation and is therefore disqualified as the every-turn channel (it remains usable only if conditionally emitted, which the design forbids since the hook performs no computation). The viable outcome is a channel that injects a one-line nudge the agent sees on the next turn while the current turn still terminates. It blocks Task 8. Independent of Task 4; parallel-safe.
+HARD CONSTRAINT the spike must satisfy: the chosen mechanism MUST NOT prevent the turn from ending in the common (log-nothing) case. `decision:"block"` forces continuation with `reason`, so emitting it every turn would trap the agent in infinite continuation and is therefore disqualified as the every-turn channel (it remains usable only if conditionally emitted, which the design forbids since the hook performs no computation). The viable outcome is a channel that injects a one-line nudge the agent sees on the next turn while the current turn still terminates. It blocks Task 8. Independent of Task 4; parallel-safe.
 
 **Files:**
 - Create: `/Users/lucas/Developer/lujstn/playbook/docs/playbook/decisions/2026-05-16-stop-channel.md`
 
 - [ ] **Step 1: Build the probe hook**
 
-Temporarily add a `Stop` entry to `hooks/hooks.json` pointing at a throwaway script that emits, in successive trials: (a) `{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"PB-PROBE-A"}}`, (b) `{"systemMessage":"PB-PROBE-B"}`, (c) `{"decision":"block","reason":"PB-PROBE-C"}`, (d) `{}` (empty — control, confirms the turn ends cleanly with no output).
+Temporarily add a `Stop` entry to `hooks/hooks.json` pointing at a throwaway script that emits, in successive trials: (a) `{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"PB-PROBE-A"}}`, (b) `{"systemMessage":"PB-PROBE-B"}`, (c) `{"decision":"block","reason":"PB-PROBE-C"}`, (d) `{}` (empty, the control, confirms the turn ends cleanly with no output).
 
 - [ ] **Step 2: Observe channel AND termination**
 
@@ -522,7 +522,7 @@ git commit -m "docs: decide Stop-hook output channel for uncertainty prompt"
 - Create: `/Users/lucas/Developer/lujstn/playbook/docs/playbook/anchor-format.md`
 - Test: `tests/hooks/test-anchor.sh`
 
-Schemas come from `design.md` §6. Anchor: original user request verbatim; current one-line what-matters; lessons-and-wrong-turns ledger (including silent wrong turns); next work. Uncertainty ledger: append-only, one line per entry = `ISO-8601 timestamp | band-slug | single clause phrased as drift from the North Star`. The band slugs are NOT verbatim from §6 (review finding M6): §6 uses prose labels; the ledger encodes them as the slugs in **VB-4**. This is a deliberate, documented slugification — the engine doctrine (Task 9) must instruct the agent to write the exact slug so ledger entries match callout-shape detection. Location `.playbook/` in the working project (must not collide with GSD's `.planning/`).
+Schemas come from `design.md` §6. Anchor: original user request verbatim; current one-line what-matters; lessons-and-wrong-turns ledger (including silent wrong turns); next work. Uncertainty ledger: append-only, one line per entry = `ISO-8601 timestamp | band-slug | single clause phrased as drift from the North Star`. The band slugs are NOT verbatim from §6 (review finding M6): §6 uses prose labels; the ledger encodes them as the slugs in **VB-4**. This is a deliberate, documented slugification, so the engine doctrine (Task 9) must instruct the agent to write the exact slug so ledger entries match callout-shape detection. Location `.playbook/` in the working project (must not collide with GSD's `.planning/`).
 
 - [ ] **Step 1: Write the failing protocol test**
 
@@ -616,7 +616,7 @@ git commit -m "feat: add anchor file and uncertainty-ledger protocol"
 - Test: `tests/hooks/test-take-a-beat.sh`
 
 One extensionless script dispatched by event. Three responsibilities from `design.md` §3 tenet 7 and §6:
-1. **PreCompact**: emit `additionalContext` containing a `## Compact Instructions` block that steers native compaction to preserve the lessons-and-wrong-turns ledger verbatim and re-anchor on the original request (native compaction explicitly honours injected compact instructions — confirmed in research).
+1. **PreCompact**: emit `additionalContext` containing a `## Compact Instructions` block that steers native compaction to preserve the lessons-and-wrong-turns ledger verbatim and re-anchor on the original request (native compaction explicitly honours injected compact instructions, confirmed in research).
 2. **Post-compaction** (`SessionStart` matcher `compact`, or `PostCompact` per the harness): re-inject the anchor first so original intent outranks orchestration scaffolding.
 3. **Monitor** (the event chosen in Task 4, e.g. `PostToolUse`): when `playbook_context_percent` ≥ 65, emit a one-line announced "taking a beat" prompt that re-reads the anchor and lessons. Empty/unknown percent → emit nothing.
 
@@ -722,7 +722,7 @@ esac
 exit 0
 ```
 
-- [ ] **Step 3: Wire `hooks.json`** — add all three take-a-beat events, each dispatching `run-hook.cmd take-a-beat`:
+- [ ] **Step 3: Wire `hooks.json`**: add all three take-a-beat events, each dispatching `run-hook.cmd take-a-beat`:
   - `PreCompact` matcher `manual|auto` (the lessons-preserving compaction steer). Note: `manual` and `auto` are the two documented matcher VALUES for compaction events, combined as a regex alternation exactly as Superpowers combines `startup|clear|compact` for SessionStart; this is the correct matcher syntax, not free-form regex.
   - `PostCompact` matcher `manual|auto` (the documented "after compaction, receives summary" event, the primary post-compaction anchor restore).
   - The Task-4 monitor event (default `PostToolUse`, matcher `*`).
@@ -794,7 +794,7 @@ Expected: FAIL (script absent). After Step 2 the `<JQ EXPR FROM DECISION DOC>` p
 
 - [ ] **Step 2: Add `playbook_emit_stop_nudge` to `playbook-common.sh`, then write `hooks/uncertainty`**
 
-The Stop channel lives in ONE helper so the decided shape is changed in one place. Add to `playbook-common.sh` (body filled from the decision doc; the example below is the `additionalContext` outcome — replace the emit line if Task 5 chose otherwise):
+The Stop channel lives in ONE helper so the decided shape is changed in one place. Add to `playbook-common.sh` (body filled from the decision doc; the example below is the `additionalContext` outcome, replace the emit line if Task 5 chose otherwise):
 
 ```bash
 # Stop-turn nudge. Channel decided by docs/playbook/decisions/2026-05-16-stop-channel.md.
@@ -822,7 +822,7 @@ exit 0
 
 The slug list MUST match VB-4 and the engine doctrine (Task 9). The timestamp is written by `playbook_ledger_append` when the agent appends, not by this hook (the hook computes nothing, per `design.md` §4/§6; recorded in `anchor-format.md` per m6).
 
-- [ ] **Step 3: Wire `hooks.json`** — add a `Stop` entry dispatching `run-hook.cmd uncertainty`.
+- [ ] **Step 3: Wire `hooks.json`**: add a `Stop` entry dispatching `run-hook.cmd uncertainty`.
 
 - [ ] **Step 4: Make executable, run test, lint**
 
@@ -849,7 +849,7 @@ git commit -m "feat: add uncertainty hook (tenet 4: end-of-turn confidant gate)"
 **Files:**
 - Create: `/Users/lucas/Developer/lujstn/playbook/skills/playbook/SKILL.md`
 
-This is the largest artifact. It is rendered faithfully from `design.md` §2, §3, §5.1, §6, §7, §8, §9, §10 and Appendix A. House style follows Superpowers (`/tmp/playbook-research/superpowers/skills/*/SKILL.md`): frontmatter is exactly `name` + `description`; `description` is third-person, "Use when…", triggering-conditions only, never a workflow summary (the CSO rule — a description that summarises the workflow makes the model follow the description instead of the skill); body uses `## Overview`, a `**Core principle:**` line, an `**Announce at start:**` line, a `dot` process-flow graph, `## Red Flags` Never/Always, `## Integration`. British English, no long dashes. Must not re-explain native plan mode/subagents/compaction — it rides on them.
+This is the largest artifact. It is rendered faithfully from `design.md` §2, §3, §5.1, §6, §7, §8, §9, §10 and Appendix A. House style follows Superpowers (`/tmp/playbook-research/superpowers/skills/*/SKILL.md`): frontmatter is exactly `name` + `description`; `description` is third-person, "Use when…", triggering-conditions only, never a workflow summary (the CSO rule, a description that summarises the workflow makes the model follow the description instead of the skill); body uses `## Overview`, a `**Core principle:**` line, an `**Announce at start:**` line, a `dot` process-flow graph, `## Red Flags` Never/Always, `## Integration`. British English, no long dashes. Must not re-explain native plan mode/subagents/compaction; it rides on them.
 
 - [ ] **Step 1: Write the frontmatter and trigger (CSO-correct)**
 
@@ -878,7 +878,7 @@ Playbook is the front door for non-trivial work. It restates the one thing that 
 **Announce at start:** "I'm using the playbook skill to set the North Star and make the staffing call."
 ```
 
-- [ ] **Step 3: Write the engine flow** rendered faithfully from `design.md` §5.1 steps 1–7. Paste the standing North-Star override from **VB-1** verbatim (do not re-transcribe it).
+- [ ] **Step 3: Write the engine flow** rendered faithfully from `design.md` §5.1 steps 1 to 7. Paste the standing North-Star override from **VB-1** verbatim (do not re-transcribe it).
 
 Include a `dot` process-flow graph with the override path as an explicit node so the committed engine skill is internally complete at this task (review finding m4): `Restate North Star -> Batch questions -> Assess separability+durability -> Decompose? -> Staffing call -> Route -> [superpowers-team: writing-plans override] -> Overlay live -> Production sweep`, with a standing edge from every node to `Stop and ask user` guarded by the VB-1 condition. Questions = diamonds, actions = boxes, per the Superpowers graphviz conventions. Task 15 only enriches the GSD detection detail and the exact fork-prompt strings; the writing-plans override itself is stated here so the skill never contradicts §5.1 step 6 between Task 9 and Task 15.
 
@@ -888,7 +888,7 @@ Paste the `design.md` §2 mode table from **VB-3** verbatim and the §5.1 tiebre
 
 - [ ] **Step 5: Write the nine-tenet doctrine**
 
-For each tenet 1–9, render a short doctrine block from the `design.md` §3 table: the tenet, the native shortfall it closes, and the enforcing mechanism, phrased as instruction to the agent, not as a re-teaching of native behaviour. Cross-reference the hooks by name (`take-a-beat`, `uncertainty`) and the anchor protocol (`docs/playbook/anchor-format.md` lives in the plugin; the runtime files are `.playbook/anchor.md` and `.playbook/uncertainty-ledger.md`). Keep each block to a few sentences (tenet 8). For tenet 4, instruct the agent to write the exact band slug from **VB-4** (so ledger entries match callout-shape detection — review finding M6 consistency); reference the §6 confidant gate, three callout shapes, and one-hour window via the anchor-format doc rather than duplicating them.
+For each tenet 1 to 9, render a short doctrine block from the `design.md` §3 table: the tenet, the native shortfall it closes, and the enforcing mechanism, phrased as instruction to the agent, not as a re-teaching of native behaviour. Cross-reference the hooks by name (`take-a-beat`, `uncertainty`) and the anchor protocol (`docs/playbook/anchor-format.md` lives in the plugin; the runtime files are `.playbook/anchor.md` and `.playbook/uncertainty-ledger.md`). Keep each block to a few sentences (tenet 8). For tenet 4, instruct the agent to write the exact band slug from **VB-4** (so ledger entries match callout-shape detection, review finding M6 consistency); reference the §6 confidant gate, three callout shapes, and one-hour window via the anchor-format doc rather than duplicating them.
 
 - [ ] **Step 6: Write the escalation ladder and the prerequisite forks**
 
@@ -904,7 +904,7 @@ Run: `npx --yes js-yaml skills/playbook/SKILL.md 2>/dev/null || python3 -c "impo
 Expected: `frontmatter OK` and the description contains no workflow summary.
 
 Then run this checklist (fix inline; this is judgement, not automatable):
-- Every `design.md` §5.1 step 1–7 appears in the flow, including the writing-plans override node.
+- Every `design.md` §5.1 step 1 to 7 appears in the flow, including the writing-plans override node.
 - VB-1 (North-Star override) appears byte-for-byte: `grep -qF "stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode" skills/playbook/SKILL.md`.
 - VB-2 (tiebreaker) and VB-3 (mode table) appear byte-for-byte; routing is on separability/durability, not size.
 - All nine tenets present, each phrased as adherence improvement (not native re-teaching).
@@ -936,7 +936,7 @@ description: Use when coupled work in one shared codebase needs peers that talk 
 ---
 ```
 
-- [ ] **Step 2: Write the choreography body** covering, from §5.2: co-located peers in one shared working directory; peers message each other by name; the lead is a thin coordinator (partition by file ownership, assign once, step back, peers self-organise and call each other out); the lead-authority constraint stated openly (native agent-teams requires a mandatory non-delegable lead with task-assignment authority, so it cannot be a pure comms-only lead, honouring tenet 3 as closely as the primitive allows); conflict avoidance by strict file-ownership partition (two teammates never own the same file, because native agent-teams does not isolate teammates in worktrees); no shared memory (coordination is the shared task list plus direct messages); lifecycle (teammates persist until shut down, run in background, notify lead on idle; `/resume` and `/rewind` do not restore in-process teammates); sizing default conservative (native guidance 3–5; user-tunable per §12). Include a `dot` graph and Red Flags. Must not re-explain the native team primitive mechanics beyond what closes the tenet-3 gap.
+- [ ] **Step 2: Write the choreography body** covering, from §5.2: co-located peers in one shared working directory; peers message each other by name; the lead is a thin coordinator (partition by file ownership, assign once, step back, peers self-organise and call each other out); the lead-authority constraint stated openly (native agent-teams requires a mandatory non-delegable lead with task-assignment authority, so it cannot be a pure comms-only lead, honouring tenet 3 as closely as the primitive allows); conflict avoidance by strict file-ownership partition (two teammates never own the same file, because native agent-teams does not isolate teammates in worktrees); no shared memory (coordination is the shared task list plus direct messages); lifecycle (teammates persist until shut down, run in background, notify lead on idle; `/resume` and `/rewind` do not restore in-process teammates); sizing default conservative (native guidance 3 to 5; user-tunable per §12). Include a `dot` graph and Red Flags. Must not re-explain the native team primitive mechanics beyond what closes the tenet-3 gap.
 
 - [ ] **Step 3: Verify and commit**
 
@@ -973,7 +973,7 @@ description: Use only when explicitly run to enable offline behaviour for one se
 
 The skill specifies a single integration point: a documented `notify "<message>"` contract (what it receives, when it is called) and the fact that the example implementation script is supplied by the user during build and saved under `.claude`. The skill text must contain the exact behaviour and the exact `.claude` topic-file location, so wiring the user's script later is a drop-in. This is a complete interface specification, not a TODO.
 
-- [ ] **Step 4: Write `decision-log.html.tmpl`** — a clean, single-file, dependency-free HTML document (inline CSS, readable typography, a simple table of timestamp / event-type / detail, a header showing the North Star and the session date). Morning-readable per §5.3.
+- [ ] **Step 4: Write `decision-log.html.tmpl`**: a clean, single-file, dependency-free HTML document (inline CSS, readable typography, a simple table of timestamp / event-type / detail, a header showing the North Star and the session date). Morning-readable per §5.3.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -992,23 +992,23 @@ git commit -m "feat: add offline-mode skill (per-run picker, decision log, HTML 
 - Modify: `/Users/lucas/Developer/lujstn/playbook/skills/modifying-plans/SKILL.md`
 - Modify: `/Users/lucas/Developer/lujstn/playbook/skills/modifying-plans/prompts/transformer.md`
 
-Selective namespace correction only; behaviour is inherited as-is per `design.md` §5.4. The exact occurrences below were verified by `grep -n` against the current files (Pass-2 review found the earlier list missed the literal hand-off line and used unsatisfiable bare-token verification; this version is positive-count only). Three rules: (a) FLIP refs to skills now owned by Playbook to `playbook:`; (b) KEEP Superpowers-prerequisite refs as `superpowers:`; (c) DO NOT touch bare tokens that are dot-graph node/edge labels or descriptive prose — they are not skill invocations and prefixing them is noise that also breaks graph label-matching.
+Selective namespace correction only; behaviour is inherited as-is per `design.md` §5.4. The exact occurrences below were verified by `grep -n` against the current files (Pass-2 review found the earlier list missed the literal hand-off line and used unsatisfiable bare-token verification; this version is positive-count only). Three rules: (a) FLIP refs to skills now owned by Playbook to `playbook:`; (b) KEEP Superpowers-prerequisite refs as `superpowers:`; (c) DO NOT touch bare tokens that are dot-graph node/edge labels or descriptive prose, because they are not skill invocations and prefixing them is noise that also breaks graph label-matching.
 
 **FLIP to `playbook:synchronised-subagent-development`** (now owned here; exactly 5 in `SKILL.md` + 1 in `transformer.md`):
-- `SKILL.md:3` — frontmatter `description`, bare "hand off to synchronised-subagent-development" → `playbook:synchronised-subagent-development` (CSO-load-bearing; must be explicit).
+- `SKILL.md:3`: frontmatter `description`, bare "hand off to synchronised-subagent-development" → `playbook:synchronised-subagent-development` (CSO-load-bearing; must be explicit).
 - `SKILL.md:111` `superpowers:synchronised-subagent-development` → `playbook:`
-- `SKILL.md:123` — the LITERAL hand-off string `> "Mode = synchronised. Invoke skill \`synchronised-subagent-development\` with plan ..."`. This is behavioural: the receiving skill is now `playbook:synchronised-subagent-development`, so the literal must read ``playbook:synchronised-subagent-development`` for the hand-off to resolve once the skill is in the playbook package. The skill's own Red Flag ("Print the hand-off line literally; the next skill matches on it") makes this edit mandatory, not optional polish.
+- `SKILL.md:123`: the LITERAL hand-off string `> "Mode = synchronised. Invoke skill \`synchronised-subagent-development\` with plan ..."`. This is behavioural: the receiving skill is now `playbook:synchronised-subagent-development`, so the literal must read ``playbook:synchronised-subagent-development`` for the hand-off to resolve once the skill is in the playbook package. The skill's own Red Flag ("Print the hand-off line literally; the next skill matches on it") makes this edit mandatory, not optional polish.
 - `SKILL.md:181` `> For agentic workers: REQUIRED SUB-SKILL: superpowers:synchronised-subagent-development` → `playbook:`
 - `SKILL.md:266` `superpowers:synchronised-subagent-development` → `playbook:`
 - `prompts/transformer.md:222` `> For agentic workers: REQUIRED SUB-SKILL: superpowers:synchronised-subagent-development` → `playbook:`
 
 **NAMESPACE-FIX bare `subagent-driven-development` → `superpowers:subagent-driven-development`** (the upstream serial fallback; making it explicit so it resolves post-move, symmetric with the synchronised flip):
-- `SKILL.md:3` — description, bare "hand off to upstream subagent-driven-development". Line 3 therefore carries TWO edits: the synchronised flip above AND this namespace-fix.
-- `SKILL.md:131` — the LITERAL hand-off string `> "Mode = serial. Invoke skill \`subagent-driven-development\` ..."` → ``superpowers:subagent-driven-development`` (behavioural, parallel to line 123; the serial path resolves to the upstream Superpowers skill).
+- `SKILL.md:3`: description, bare "hand off to upstream subagent-driven-development". Line 3 therefore carries TWO edits: the synchronised flip above AND this namespace-fix.
+- `SKILL.md:131`: the LITERAL hand-off string `> "Mode = serial. Invoke skill \`subagent-driven-development\` ..."` → ``superpowers:subagent-driven-development`` (behavioural, parallel to line 123; the serial path resolves to the upstream Superpowers skill).
 
 **KEEP `superpowers:` unchanged** (prerequisites): `superpowers:writing-plans` at `SKILL.md:3,22,174,262`; `superpowers:subagent-driven-development` already-prefixed at `SKILL.md:24,61,127,269`; `superpowers:using-git-worktrees` at `SKILL.md:263`.
 
-**LEAVE BARE, DO NOT EDIT** (dot-graph node/edge labels — prefixing breaks graph label matching and is not a skill invocation): `SKILL.md:43,53` bare `synchronised-subagent-development` in `"Hand off to synchronised-subagent-development"`; `SKILL.md:44,49,52` bare `subagent-driven-development` in `"Hand off to upstream subagent-driven-development"`.
+**LEAVE BARE, DO NOT EDIT** (dot-graph node/edge labels, since prefixing breaks graph label matching and is not a skill invocation): `SKILL.md:43,53` bare `synchronised-subagent-development` in `"Hand off to synchronised-subagent-development"`; `SKILL.md:44,49,52` bare `subagent-driven-development` in `"Hand off to upstream subagent-driven-development"`.
 
 - [ ] **Step 1: Snapshot current refs (failing-state record)**
 
@@ -1017,7 +1017,7 @@ Expected now: `superpowers:synchronised…` at 111,181,266; the two literal hand
 
 - [ ] **Step 2: Apply the edits** via exact-string edits (never blanket-replace): the 5 `SKILL.md` synchronised flips (3, 111, 123, 181, 266) + transformer.md:222, and the 2 subagent-driven namespace-fixes (3, 131). On line 3, apply BOTH edits in that one description string. Do not touch lines 43/44/49/52/53 (graph labels) or any KEEP ref.
 
-- [ ] **Step 3: Verify the split (positive counts only — never "no bare token", which is unsatisfiable because graph labels and prose legitimately stay bare)**
+- [ ] **Step 3: Verify the split (positive counts only, never "no bare token", which is unsatisfiable because graph labels and prose legitimately stay bare)**
 
 ```bash
 S=skills/modifying-plans/SKILL.md ; T=skills/modifying-plans/prompts/transformer.md
@@ -1027,7 +1027,7 @@ S=skills/modifying-plans/SKILL.md ; T=skills/modifying-plans/prompts/transformer
 [ "$(grep -c 'superpowers:subagent-driven-development' "$S")" = 6 ] && echo "PASS: 6 superpowers:subagent-driven (24,61,127,269 + line3 + line131)" || echo FAIL
 [ "$(grep -c 'superpowers:writing-plans' "$S")" = 4 ] && echo "PASS: writing-plans intact (4)" || echo FAIL
 [ "$(grep -c 'superpowers:using-git-worktrees' "$S")" = 1 ] && echo "PASS: using-git-worktrees intact (1)" || echo FAIL
-# Graph labels deliberately remain bare — assert they are STILL THERE (not accidentally prefixed):
+# Graph labels deliberately remain bare, assert they are STILL THERE (not accidentally prefixed):
 [ "$(grep -c '"Hand off to synchronised-subagent-development"' "$S")" = 2 ] && echo "PASS: 2 synchronised graph labels left bare" || echo FAIL
 [ "$(grep -c '"Hand off to upstream subagent-driven-development"' "$S")" = 3 ] && echo "PASS: 3 subagent graph labels left bare" || echo FAIL
 # Long-dash gate scoped to ADDED lines only: modifying-plans is inherited as-is
@@ -1054,13 +1054,13 @@ git commit -m "refactor: re-point modifying-plans owned refs to playbook namespa
 
 Two changes: (a) selective namespace re-point per `design.md` §5.5, applying the SAME three rules as Task 12 (FLIP owned, KEEP prerequisite, LEAVE-BARE graph/prose) for symmetry; (b) add the agreed conductor-whistle extension. Verified by `grep -n` against the current file (Pass-2 review found the earlier KEEP list wrongly claimed line 3, omitted line 270, and used an unsatisfiable bare-token gate).
 
-**FLIP `superpowers:modifying-plans` → `playbook:modifying-plans`** (now owned here; exactly 6 sites): `SKILL.md:3` (frontmatter `description`, "produced by superpowers:modifying-plans" — CSO-load-bearing), `SKILL.md:39`, `SKILL.md:45` (this line ALSO contains `superpowers:subagent-driven-development` which is KEPT — edit ONLY the modifying-plans token), `SKILL.md:46`, `SKILL.md:268`, `SKILL.md:285`.
+**FLIP `superpowers:modifying-plans` → `playbook:modifying-plans`** (now owned here; exactly 6 sites): `SKILL.md:3` (frontmatter `description`, "produced by superpowers:modifying-plans", CSO-load-bearing), `SKILL.md:39`, `SKILL.md:45` (this line ALSO contains `superpowers:subagent-driven-development` which is KEPT, so edit ONLY the modifying-plans token), `SKILL.md:46`, `SKILL.md:268`, `SKILL.md:285`.
 
-**NAMESPACE-FIX bare `subagent-driven-development` → `superpowers:subagent-driven-development`** on `SKILL.md:3` (the description ends "Falls back to upstream subagent-driven-development if the plan is not wave-grouped" — bare). This is the exact symmetric fix Task 12 applies to its own line-3 description; doing it here keeps the two re-point tasks consistent and the CSO string unambiguous. Line 3 therefore carries TWO edits: the `modifying-plans` flip AND this namespace-fix.
+**NAMESPACE-FIX bare `subagent-driven-development` → `superpowers:subagent-driven-development`** on `SKILL.md:3` (the description ends "Falls back to upstream subagent-driven-development if the plan is not wave-grouped", bare). This is the exact symmetric fix Task 12 applies to its own line-3 description; doing it here keeps the two re-point tasks consistent and the CSO string unambiguous. Line 3 therefore carries TWO edits: the `modifying-plans` flip AND this namespace-fix.
 
-**KEEP `superpowers:` unchanged** (prerequisites; do NOT touch): `superpowers:subagent-driven-development` already-prefixed at `SKILL.md:8,45,47,102,270,271,296` and `prompts/spec-reviewer.md:3` (NOTE: line 3 is NOT in this list — it is the bare token fixed above; line 270 IS, contrary to the earlier draft); `superpowers:using-git-worktrees` (`SKILL.md:106,127,286`); `superpowers:requesting-code-review` (`SKILL.md:190,290`, `prompts/code-quality-reviewer.md:5,9,20`); `superpowers:finishing-a-development-branch` (`SKILL.md:82,96,192,293`); `superpowers:test-driven-development` (`SKILL.md:289`); `superpowers:writing-plans` (`SKILL.md:269,284`).
+**KEEP `superpowers:` unchanged** (prerequisites; do NOT touch): `superpowers:subagent-driven-development` already-prefixed at `SKILL.md:8,45,47,102,270,271,296` and `prompts/spec-reviewer.md:3` (NOTE: line 3 is NOT in this list, it is the bare token fixed above; line 270 IS, contrary to the earlier draft); `superpowers:using-git-worktrees` (`SKILL.md:106,127,286`); `superpowers:requesting-code-review` (`SKILL.md:190,290`, `prompts/code-quality-reviewer.md:5,9,20`); `superpowers:finishing-a-development-branch` (`SKILL.md:82,96,192,293`); `superpowers:test-driven-development` (`SKILL.md:289`); `superpowers:writing-plans` (`SKILL.md:269,284`).
 
-**LEAVE BARE, DO NOT EDIT**: `SKILL.md:2` `name: synchronised-subagent-development` (the skill's own frontmatter name — Superpowers skill names are unprefixed; the plugin applies the namespace); `SKILL.md:16` Announce line self-reference; dot-graph node/edge labels at `SKILL.md:24` (`"synchronised-subagent-development"`, `"subagent-driven-development (serial)"`), `25,31,32,33,35` (`"Run modifying-plans first"`, edges); descriptive prose bare `modifying-plans` at `SKILL.md:41,63,104,167,275,278`. None are skill invocations.
+**LEAVE BARE, DO NOT EDIT**: `SKILL.md:2` `name: synchronised-subagent-development` (the skill's own frontmatter name, since Superpowers skill names are unprefixed; the plugin applies the namespace); `SKILL.md:16` Announce line self-reference; dot-graph node/edge labels at `SKILL.md:24` (`"synchronised-subagent-development"`, `"subagent-driven-development (serial)"`), `25,31,32,33,35` (`"Run modifying-plans first"`, edges); descriptive prose bare `modifying-plans` at `SKILL.md:41,63,104,167,275,278`. None are skill invocations.
 
 - [ ] **Step 1: Snapshot current refs (record exact counts to compare in Step 4)**
 
@@ -1077,7 +1077,7 @@ grep -nE 'superpowers:|playbook:' "$S"                 # full ref list
 
 Insert a section so an implementer that discovers a wave-breaking problem mid-wave (a wrong contract, a broken shared assumption) raises a flag to the conductor; the conductor may halt the wave, re-plan, or broadcast a corrected constraint to the still-running siblings before merge; there is no peer-to-peer messaging, the conductor is the only hub; this closes the blind spot where a wave-breaking discovery would otherwise surface only at post-wave merge after parallel work was wasted. Place it adjacent to the existing wave-execution / failure-handling sections. British English, no long dashes. Do not re-specify the skill's other inherited mechanics.
 
-- [ ] **Step 4: Verify the split (positive counts only — never a "no bare token" gate; bare graph labels and prose legitimately remain)**
+- [ ] **Step 4: Verify the split (positive counts only, never a "no bare token" gate; bare graph labels and prose legitimately remain)**
 
 ```bash
 S=skills/synchronised-subagent-development/SKILL.md
@@ -1088,7 +1088,7 @@ S=skills/synchronised-subagent-development/SKILL.md
 [ "$(grep -c 'superpowers:finishing-a-development-branch' "$S")" = 4 ] && echo "PASS: finishing intact (4)" || echo FAIL
 [ "$(grep -c 'superpowers:requesting-code-review' "$S")" = 2 ] && echo "PASS: requesting-code-review intact (2 in SKILL)" || echo FAIL
 [ "$(grep -c 'superpowers:writing-plans' "$S")" = 2 ] && echo "PASS: writing-plans intact (2)" || echo FAIL
-# Graph/prose deliberately bare — assert STILL bare (not accidentally prefixed):
+# Graph/prose deliberately bare, assert STILL bare (not accidentally prefixed):
 grep -q '^name: synchronised-subagent-development$' "$S" && echo "PASS: frontmatter name unprefixed" || echo FAIL
 [ "$(grep -c '"Run modifying-plans first"' "$S")" = 4 ] && echo "PASS: 4 'Run modifying-plans first' occurrences left bare (lines 25,32,33,34)" || echo FAIL
 grep -qi 'conductor whistle\|wave-breaking' "$S" && echo "PASS: whistle added" || echo FAIL
@@ -1135,7 +1135,7 @@ out="$(printf '{"cwd":"%s","hook_event_name":"SessionStart","source":"startup"}'
 ctx="$(jq -r '.hookSpecificOutput.additionalContext // .additional_context // .additionalContext' <<<"$out")"
 [ -n "$ctx" ] && echo "PASS: overlay injected" || { echo FAIL; exit 1; }
 grep -q "PLAYBOOK_OVERLAY" <<<"$ctx" && echo "PASS: distinct sentinel tag (m2)" || { echo "FAIL: tag"; exit 1; }
-# M4: digest is self-contained — all nine tenets enumerated, not a skill pointer.
+# M4: digest is self-contained, all nine tenets enumerated, not a skill pointer.
 n=$(grep -cE '^[1-9]\. ' <<<"$ctx"); [ "$n" -eq 9 ] && echo "PASS: all nine tenets present" || { echo "FAIL: only $n tenets"; exit 1; }
 grep -q "stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode" <<<"$ctx" \
   && echo "PASS: standing override verbatim (VB-1)" || { echo "FAIL: VB-1 missing"; exit 1; }
@@ -1230,17 +1230,17 @@ git commit -m "feat: add SessionStart bootstrap (overlay primacy + anchor re-inj
 
 Encodes the detect-and-handoff contract from the GSD research and `design.md` §2/§7/§9. GSD is **not** a plugin: it is a global npm install owning `.planning/`. Playbook only detects and hands off; it never writes `.planning/`.
 
-- [ ] **Step 1: Add the `gsd-team` route block** to the engine skill, stating exactly (corrected per review finding M7 — GSD is a global npm tool, not a discoverable plugin):
+- [ ] **Step 1: Add the `gsd-team` route block** to the engine skill, stating exactly (corrected per review finding M7, since GSD is a global npm tool, not a discoverable plugin):
 - **What GSD is**: a global npm package installed by `npx get-shit-done-cc@latest`, NOT a Claude Code plugin. A global Claude install converts its commands into `~/.claude/skills/gsd-*/SKILL.md`; a local install exposes them as `/gsd-*` slash commands. Either way the user-facing entry points are the `/gsd-*` commands.
 - **Detect availability** (reliable signals, in order): `get-shit-done-cc` or `gsd-sdk` resolvable on `PATH`; or `~/.claude/get-shit-done/` exists; or `~/.claude/commands/gsd/` / `gsd-*` skills present. Do not rely on "gsd-* skills" alone (absent on local installs).
-- **Detect a GSD project**: `.planning/` at the project root (optionally read `.planning/STATE.md` YAML frontmatter — `milestone`, `active_phase`, `next_action` — for position).
-- **Route** (invoke the `/gsd-*` entry point; Claude Code resolves it whether GSD is installed as skills or slash commands — do NOT assert "the Skill tool exactly as ns-* routers", which only holds for global skill installs): no `.planning/` + a spec/PRD exists → `/gsd-new-project --auto @<spec>`; no `.planning/` + no spec → `/gsd-new-project` (brownfield: `/gsd-map-codebase` first); `.planning/` exists → `/gsd-progress --next` (self-routing, safe to call blindly, degrades gracefully to the bootstrap path).
-- **If GSD is absent**, do not fail; emit this exact fork prompt (m1): `> gsd-team needs GSD, which is a separate tool. Install it with: npx get-shit-done-cc@latest  — then re-run, or pick a different mode.`
+- **Detect a GSD project**: `.planning/` at the project root (optionally read `.planning/STATE.md` YAML frontmatter, `milestone`, `active_phase`, `next_action`, for position).
+- **Route** (invoke the `/gsd-*` entry point; Claude Code resolves it whether GSD is installed as skills or slash commands; do NOT assert "the Skill tool exactly as ns-* routers", which only holds for global skill installs): no `.planning/` + a spec/PRD exists → `/gsd-new-project --auto @<spec>`; no `.planning/` + no spec → `/gsd-new-project` (brownfield: `/gsd-map-codebase` first); `.planning/` exists → `/gsd-progress --next` (self-routing, safe to call blindly, degrades gracefully to the bootstrap path).
+- **If GSD is absent**, do not fail; emit this exact fork prompt (m1): `> gsd-team needs GSD, which is a separate tool. Install it with: npx get-shit-done-cc@latest. Then re-run, or pick a different mode.`
 - **Hard rule**: Playbook never writes into `.planning/`; it is GSD-owned durable state, read-only for routing.
 
 - [ ] **Step 2: Add the `superpowers-team` route block with the writing-plans override** (verbatim behaviour from `design.md` §7)
 
-State the chain `superpowers:brainstorming` then `superpowers:writing-plans` then `playbook:modifying-plans` then `playbook:synchronised-subagent-development`, and that the engine explicitly does **not** follow `writing-plans`' built-in next-step pointer to `superpowers:subagent-driven-development` (the pointer lives in two literal strings in the upstream `writing-plans` skill: the plan-document header `> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development …` and the `## Execution Handoff` section's "Subagent-Driven (recommended)" option). The override is orchestration-level (we do not fork Superpowers); the engine drives the chain and the SessionStart overlay asserts precedence. If Superpowers is absent, emit this exact fork prompt (m1): `> superpowers-team needs the Superpowers plugin. Install it: /plugin marketplace add obra/superpowers then /plugin install superpowers — then re-run, or pick a different mode.`
+State the chain `superpowers:brainstorming` then `superpowers:writing-plans` then `playbook:modifying-plans` then `playbook:synchronised-subagent-development`, and that the engine explicitly does **not** follow `writing-plans`' built-in next-step pointer to `superpowers:subagent-driven-development` (the pointer lives in two literal strings in the upstream `writing-plans` skill: the plan-document header `> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development …` and the `## Execution Handoff` section's "Subagent-Driven (recommended)" option). The override is orchestration-level (we do not fork Superpowers); the engine drives the chain and the SessionStart overlay asserts precedence. If Superpowers is absent, emit this exact fork prompt (m1): `> superpowers-team needs the Superpowers plugin. Install it: /plugin marketplace add obra/superpowers then /plugin install superpowers. Then re-run, or pick a different mode.`
 
 - [ ] **Step 3: Verify and commit**
 
@@ -1253,9 +1253,9 @@ git commit -m "feat: wire gsd-team detect-and-handoff and superpowers-team overr
 
 ---
 
-## Task 16: Test harness — skill-triggering, aggregate runner
+## Task 16: Test harness, skill-triggering, aggregate runner
 
-**Depends on:** Tasks 9–15 (skills + hooks exist).
+**Depends on:** Tasks 9 to 15 (skills + hooks exist).
 
 **Files:**
 - Create: `/Users/lucas/Developer/lujstn/playbook/tests/skill-triggering/run-test.sh`
@@ -1284,7 +1284,7 @@ fi
 
 - [ ] **Step 2: Write the prompt fixtures**
 
-`non-trivial-work.txt` — a realistic multi-part feature request that names no skill (must auto-trigger `playbook` via the engine trigger). `explicit-playbook.txt` — `/playbook help me ship a small fix` (explicit invocation).
+`non-trivial-work.txt`: a realistic multi-part feature request that names no skill (must auto-trigger `playbook` via the engine trigger). `explicit-playbook.txt`: `/playbook help me ship a small fix` (explicit invocation).
 
 - [ ] **Step 3: Write `tests/run-all.sh`** (aggregator)
 
@@ -1307,7 +1307,7 @@ exit $fail
 chmod +x tests/skill-triggering/run-test.sh tests/run-all.sh
 bash tests/run-all.sh
 ```
-Expected: lint `ok`, manifests PASS, hook pipe-tests PASS, long-dash sweep `ok`. The skill-trigger line PASSES if the `claude` CLI is authenticated; otherwise it prints the WARN (documented limitation — behavioural trigger cannot be asserted offline).
+Expected: lint `ok`, manifests PASS, hook pipe-tests PASS, long-dash sweep `ok`. The skill-trigger line PASSES if the `claude` CLI is authenticated; otherwise it prints the WARN (documented limitation, behavioural trigger cannot be asserted offline).
 
 - [ ] **Step 5: Commit**
 
@@ -1326,7 +1326,7 @@ git commit -m "test: add skill-trigger harness and aggregate runner"
 
 - [ ] **Step 1: Write `README.md`** covering: one-paragraph purpose (`design.md` §1); install (marketplace add + `/plugin install playbook`); the five modes table; the nine tenets one-line each; the two hooks; prerequisites and graceful degradation (§9: common path is zero-dependency; Superpowers needed only for `superpowers-team`, GSD only for `gsd-team`, prompted at the fork). Include an explicit "Runtime state" subsection: Playbook writes `.playbook/anchor.md` and `.playbook/uncertainty-ledger.md` into the working project; recommend the user add `.playbook/` to that project's `.gitignore`, and note the engine offers to add it once via AskUserQuestion on first use (this is where the M8-removed per-hook mutation responsibility now lives: documentation + one-time engine offer, never a per-turn hook side-effect). British English, no long dashes.
 
-- [ ] **Step 2: Write `docs/playbook/README.md`** — one short page: dogfood specs/plans live under `docs/playbook/`; decisions under `docs/playbook/decisions/`; the anchor format reference is `docs/playbook/anchor-format.md`.
+- [ ] **Step 2: Write `docs/playbook/README.md`**: one short page: dogfood specs/plans live under `docs/playbook/`; decisions under `docs/playbook/decisions/`; the anchor format reference is `docs/playbook/anchor-format.md`.
 
 - [ ] **Step 3: Production-ready sweep (tenet 6) across all shipped text**
 
@@ -1335,11 +1335,11 @@ Run:
 grep -rnP '\x{2014}' skills/ hooks/ README.md docs/playbook/ 2>/dev/null ; echo "expect: empty (no long dashes)"
 grep -rniE '\b(wave|mission|phase) [0-9]|per the plan|TODO|TBD|FIXME' skills/playbook skills/hackathon-team skills/offline-mode hooks/ README.md ; echo "expect: empty in engine/new skills/hooks"
 ```
-Note: `skills/synchronised-subagent-development` and `skills/modifying-plans` legitimately use "wave" as domain vocabulary (that is their subject) — exclude them from the scaffolding-vocabulary sweep but still confirm no `TODO/TBD`. Fix any hit inline.
+Note: `skills/synchronised-subagent-development` and `skills/modifying-plans` legitimately use "wave" as domain vocabulary (that is their subject), so exclude them from the scaffolding-vocabulary sweep but still confirm no `TODO/TBD`. Fix any hit inline.
 
 - [ ] **Step 4: Final spec-coverage review against `design.md`**
 
-Walk `design.md` §1–§12 and Appendix A; for each section name the task(s) that deliver it (see the Self-Review table below). Fix any gap inline by amending the relevant skill/hook.
+Walk `design.md` §1 to §12 and Appendix A; for each section name the task(s) that deliver it (see the Self-Review table below). Fix any gap inline by amending the relevant skill/hook.
 
 - [ ] **Step 5: Full suite + commit**
 
@@ -1353,13 +1353,13 @@ git commit -m "docs: add README and dogfood docs; final production-ready sweep"
 
 ## Self-Review (run after the plan, before execution)
 
-**1. Spec coverage** — every `design.md` section maps to a task:
+**1. Spec coverage**: every `design.md` section maps to a task:
 
 | design.md | Delivered by |
 |---|---|
 | §1 Purpose; two principles | Task 9 (Overview/Core principle), README (Task 17) |
 | §2 Five modes; synchronised-swimmer; decompose-as-judgement | Task 9 (routing table), Task 15 (gsd/superpowers routes) |
-| §3 Nine tenets + enforcing mechanism | Task 9 (doctrine), Tasks 7–8 (hooks 7 and 4), Task 14 (self-contained nine-tenet digest = the §3/§11 persistence carrier, M4) |
+| §3 Nine tenets + enforcing mechanism | Task 9 (doctrine), Tasks 7 and 8 (hooks 7 and 4), Task 14 (self-contained nine-tenet digest = the §3/§11 persistence carrier, M4) |
 | §4 Component inventory (5 skills, 2 hooks) | Tasks 9,10,11,12,13 (skills); Tasks 7,8,14 (hooks); Task 2 (packaging) |
 | §5.1 Engine flow + tiebreaker + standing override | Task 9 (pastes VB-1, VB-2, VB-3 verbatim) |
 | §5.2 hackathon-team | Task 10 |
@@ -1369,10 +1369,10 @@ git commit -m "docs: add README and dogfood docs; final production-ready sweep"
 | §6 Anchor file + uncertainty ledger | Task 6 (protocol; VB-4 slug mapping, m6 timestamp note), Task 9 (doctrine writes VB-4 slugs) |
 | §7 writing-plans override | Task 9 Step 3 (stated in engine skill so it never contradicts §5.1 step 6), Task 15 Step 2 (enriched, exact fork string) |
 | §8 Escalation ladder + ntfy | Task 9 Step 6: standing North-Star override (VB-1) pasted ABOVE the ladder, then the 7-rung ladder; Task 11 (ntfy seam + setup flow) |
-| Verbatim invariants (drift guard) | VB-1 North-Star override; VB-2 tiebreaker; VB-3 mode table; VB-4 band slugs — pinned once, pasted by Tasks 6, 9, 14 |
+| Verbatim invariants (drift guard) | VB-1 North-Star override; VB-2 tiebreaker; VB-3 mode table; VB-4 band slugs, pinned once, pasted by Tasks 6, 9, 14 |
 | §9 Prerequisites + graceful degradation | Task 9 Step 6, Task 15, README |
 | §10 End-to-end flow | Task 9 (flow), Task 16 (behavioural trigger test) |
-| §11 Rejected options | Honoured as constraints (no third runtime, overlay never a skill) — Task 9 Red Flags |
+| §11 Rejected options | Honoured as constraints (no third runtime, overlay never a skill), Task 9 Red Flags |
 | §12 Build constraints + open items | Binding-constraints section; Tasks 4,5 (spikes), Task 11 (ntfy open item), Task 6 (paths open item) |
 | Appendix A canonical | Binding constraint 4; verbatim renders in Tasks 9,11 |
 | Packaging blueprint (Superpowers) | Tasks 2,3,14 |
@@ -1381,10 +1381,10 @@ git commit -m "docs: add README and dogfood docs; final production-ready sweep"
 
 No gaps.
 
-**2. Placeholder scan** — the open items (`ntfy` script, anchor paths, agent-teams size cap, ~65% signal, Stop channel) are not placeholders: each is a concrete spike/decision/interface task (Tasks 4, 5, 6, 11) with explicit investigation steps, a decision doc, and a drop-in seam, exactly as `design.md` §12 mandates ("settled during build"). The spikes are hardened: Task 4 records the exact used = 100 - remaining arithmetic with an inversion regression test; Task 5 must prove the Stop channel both model-visible AND turn-terminating (no infinite-continuation); Task 8 is blocked on Task 5's decision doc and asserts the decided channel shape, never a hardcoded assumption. The single `<JQ EXPR FROM DECISION DOC>` token in Task 8 is a decision-driven fill (resolved by Task 5), not an unresolved plan placeholder. No `TBD`/`implement later` remain.
+**2. Placeholder scan**: the open items (`ntfy` script, anchor paths, agent-teams size cap, ~65% signal, Stop channel) are not placeholders: each is a concrete spike/decision/interface task (Tasks 4, 5, 6, 11) with explicit investigation steps, a decision doc, and a drop-in seam, exactly as `design.md` §12 mandates ("settled during build"). The spikes are hardened: Task 4 records the exact used = 100 - remaining arithmetic with an inversion regression test; Task 5 must prove the Stop channel both model-visible AND turn-terminating (no infinite-continuation); Task 8 is blocked on Task 5's decision doc and asserts the decided channel shape, never a hardcoded assumption. The single `<JQ EXPR FROM DECISION DOC>` token in Task 8 is a decision-driven fill (resolved by Task 5), not an unresolved plan placeholder. No `TBD`/`implement later` remain.
 
-**3. Type/name consistency** — names are stable across tasks: `playbook_context_percent`, `playbook_anchor_init`, `playbook_ledger_append`, `playbook_anchor_read`, `playbook_emit_context`, `playbook_emit_stop_nudge`, `playbook_ensure_dir` (defined Task 3/4/6/8, used Tasks 7,8,14); `playbook_emit_context` is the single platform-branching emitter (Cursor/Claude/Copilot, C3) used by all three hooks. Hook scripts `session-start`/`take-a-beat`/`uncertainty` (defined Tasks 7,8,14, wired in `hooks.json`, lint-aggregated Task 16). Skill ids `playbook:playbook|hackathon-team|offline-mode|modifying-plans|synchronised-subagent-development` consistent with `design.md` §4 and the verified re-point line lists in Tasks 12–13. Runtime paths `.playbook/anchor.md` and `.playbook/uncertainty-ledger.md` consistent Tasks 6,7,8,14. Fixture names `ctx-used-70.json`/`ctx-used-40.json`/`ctx-remaining-35.json` consistent Tasks 4,7.
+**3. Type/name consistency**: names are stable across tasks: `playbook_context_percent`, `playbook_anchor_init`, `playbook_ledger_append`, `playbook_anchor_read`, `playbook_emit_context`, `playbook_emit_stop_nudge`, `playbook_ensure_dir` (defined Task 3/4/6/8, used Tasks 7,8,14); `playbook_emit_context` is the single platform-branching emitter (Cursor/Claude/Copilot, C3) used by all three hooks. Hook scripts `session-start`/`take-a-beat`/`uncertainty` (defined Tasks 7,8,14, wired in `hooks.json`, lint-aggregated Task 16). Skill ids `playbook:playbook|hackathon-team|offline-mode|modifying-plans|synchronised-subagent-development` consistent with `design.md` §4 and the verified re-point line lists in Tasks 12 and 13. Runtime paths `.playbook/anchor.md` and `.playbook/uncertainty-ledger.md` consistent Tasks 6,7,8,14. Fixture names `ctx-used-70.json`/`ctx-used-40.json`/`ctx-remaining-35.json` consistent Tasks 4,7.
 
-**Execution dependency note for the executor:** Tasks 1→2→3 are strictly ordered (foundation). Tasks 4 and 5 are independent spikes (parallel-safe); each produces a decision doc under `docs/playbook/decisions/`. Task 6 depends on 3. Task 7 needs 4 and 6 and includes spike Step 3a (which post-compaction event fires). Task 8 is hard-blocked on Task 5's decision doc. Task 9 needs 6 and pastes VB-1/2/3. Tasks 10, 11 are independent of 7–9. Tasks 12, 13 are independent of everything after Task 1. Task 14 needs 3,6,7 and keeps BOTH PostCompact and SessionStart/compact restore paths (C2 — never delete PostCompact). Task 15 needs 9. Task 16 needs 9–15. Task 17 last.
+**Execution dependency note for the executor:** Tasks 1→2→3 are strictly ordered (foundation). Tasks 4 and 5 are independent spikes (parallel-safe); each produces a decision doc under `docs/playbook/decisions/`. Task 6 depends on 3. Task 7 needs 4 and 6 and includes spike Step 3a (which post-compaction event fires). Task 8 is hard-blocked on Task 5's decision doc. Task 9 needs 6 and pastes VB-1/2/3. Tasks 10, 11 are independent of 7 to 9. Tasks 12, 13 are independent of everything after Task 1. Task 14 needs 3,6,7 and keeps BOTH PostCompact and SessionStart/compact restore paths (C2: never delete PostCompact). Task 15 needs 9. Task 16 needs 9 to 15. Task 17 last.
 
-**Review pass note:** This plan has been through one adversarial fidelity-review pass against `design.md` and the transcript; 3 critical, 8 major and 7 minor findings were applied (C1 Stop-channel spike dependency; C2 PostCompact path; C3 platform-branch emitter; M1/M2 verified re-point lists; M3 used-vs-remaining inversion; M4 self-contained overlay digest; M5 pinned verbatim blocks; M6 slug mapping; M7 GSD-is-a-tool-not-a-plugin; M8 no .gitignore mutation; m1–m7).
+**Review pass note:** This plan has been through one adversarial fidelity-review pass against `design.md` and the transcript; 3 critical, 8 major and 7 minor findings were applied (C1 Stop-channel spike dependency; C2 PostCompact path; C3 platform-branch emitter; M1/M2 verified re-point lists; M3 used-vs-remaining inversion; M4 self-contained overlay digest; M5 pinned verbatim blocks; M6 slug mapping; M7 GSD-is-a-tool-not-a-plugin; M8 no .gitignore mutation; m1 to m7).

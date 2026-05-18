@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline decision log, {{SESSION_DATE}}</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding: 2.5rem 1.5rem 4rem;
+    background: #f6f7f9;
+    color: #1c2128;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .sheet {
+    max-width: 56rem;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid #e2e5ea;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  header {
+    padding: 2rem 2.25rem 1.75rem;
+    border-bottom: 1px solid #e2e5ea;
+    background: #fbfbfd;
+  }
+  header h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .session-date {
+    margin: 0 0 1.5rem;
+    color: #5b6470;
+    font-size: 0.95rem;
+  }
+  .north-star {
+    margin: 0;
+    padding: 1rem 1.25rem;
+    background: #eef4ff;
+    border: 1px solid #d3e0fb;
+    border-radius: 8px;
+  }
+  .north-star .label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #3a5cab;
+  }
+  .north-star .value {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .body {
+    padding: 1.75rem 2.25rem 2.25rem;
+  }
+  .body h2 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c3540;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  thead th {
+    text-align: left;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #5b6470;
+    border-bottom: 2px solid #e2e5ea;
+  }
+  tbody td {
+    padding: 0.8rem 0.75rem;
+    border-bottom: 1px solid #eef0f3;
+    vertical-align: top;
+  }
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .col-timestamp {
+    white-space: nowrap;
+    color: #5b6470;
+    font-variant-numeric: tabular-nums;
+    width: 12rem;
+  }
+  .col-event {
+    white-space: nowrap;
+    font-weight: 600;
+    width: 14rem;
+  }
+  .col-detail {
+    color: #2c3540;
+  }
+  .empty {
+    padding: 1.5rem 0.75rem;
+    color: #5b6470;
+    font-style: italic;
+  }
+  footer {
+    padding: 1.25rem 2.25rem 1.75rem;
+    border-top: 1px solid #e2e5ea;
+    color: #8a93a0;
+    font-size: 0.82rem;
+  }
+</style>
+</head>
+<body>
+  <main class="sheet">
+    <header>
+      <h1>Offline decision log</h1>
+      <p class="session-date">Session date: {{SESSION_DATE}}</p>
+      <div class="north-star">
+        <span class="label">North Star</span>
+        <p class="value">{{NORTH_STAR}}</p>
+      </div>
+    </header>
+
+    <section class="body">
+      <h2>Events recorded while offline mode was active</h2>
+      <table>
+        <thead>
+          <tr>
+            <th class="col-timestamp">Timestamp</th>
+            <th class="col-event">Event type</th>
+            <th class="col-detail">Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- BEGIN ROWS -->
+          <!-- Renderer: replace the single example <tr> below with one <tr> per logged event; do not emit this example row verbatim. -->
+          <tr>
+            <td class="col-timestamp">{{ROW_TIMESTAMP}}</td>
+            <td class="col-event">{{ROW_EVENT_TYPE}}</td>
+            <td class="col-detail">{{ROW_DETAIL}}</td>
+          </tr>
+          <!-- END ROWS -->
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      Produced by playbook offline mode. Events are limited to those that occurred because you were absent: forced-without-you decisions made after the wait window elapsed, CTO-subagent consultations, waits, and ntfy sends.
+    </footer>
+  </main>
+</body>
+</html>

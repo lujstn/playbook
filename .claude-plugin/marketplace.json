@@ -1,0 +1,20 @@
+{
+  "name": "playbook-dev",
+  "description": "Distribution marketplace for the Playbook workflow harness",
+  "owner": {
+    "name": "Lucas Johnston Kurilov",
+    "email": "lucas@buildin.london"
+  },
+  "plugins": [
+    {
+      "name": "playbook",
+      "description": "Personal Claude Code workflow harness: decision engine plus nine-tenet execution overlay.",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "Lucas Johnston Kurilov",
+        "email": "lucas@buildin.london"
+      }
+    }
+  ]
+}
