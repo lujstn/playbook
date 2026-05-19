@@ -17,19 +17,19 @@ This skill rides on top of native Claude Code, Superpowers and GSD. It does not 
 
 ## The engine flow
 
-Rendered faithfully from `design.md` section 5.1, steps 1 to 7.
+Rendered faithfully from `plan-a-design.md` section 5.1, steps 1 to 7.
 
-1. **Restate the North Star.** One line of what matters, written verbatim from the user's request into the anchor file (`.playbook/anchor.md`). For trivial work this is one line and there are zero questions.
+1. **Restate the North Star.** One line of what matters, derived verbatim from the user's request and kept load-bearing in the conversation. It is never written to a file. For trivial work this is one line and there are zero questions.
 2. **Batch the questions.** Ask all clarifying questions in one batched set. Do not proceed until confident or until the user declines to answer more. There are no stupid questions; prioritise them upfront, but per tenet 4 do not be afraid to stop and ask later.
 3. **Assess separability and durability.** Decide whether the work is too big and must be decomposed (decompose-as-judgement). If so, propose the cut and recurse into the engine per piece.
 4. **Make the staffing call.** One visible, vetoable sentence naming the mode and the reason. Never silently auto-pick.
-5. **Route to the chosen substrate.** Keep the tenets doctrine and the anchor file live throughout.
+5. **Route to the chosen substrate.** Keep the North Star, the unease sense and the tenets doctrine live in the conversation throughout.
 6. **On the `superpowers-team` route, apply the `writing-plans` override** (see Integration). The chain is `brainstorming` then `writing-plans` then `playbook:modifying-plans` then `playbook:synchronised-subagent-development`. Do not follow the built-in `subagent-driven-development` pointer that `writing-plans` ends on; the engine drives the chain at orchestration level and ignores that pointer (Superpowers is a declared prerequisite we do not fork or edit).
 7. **Production-ready sweep.** Before handing work back, run the tenet 6 sweep.
 
-Standing rule across every step (paste verbatim, `design.md` 5.1 and 8, tenet 4):
+Standing rule across every step (paste verbatim, `plan-a-design.md` 5.1 and 8, tenet 4):
 
-> if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode.
+> if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
 ```dot
 digraph engine {
@@ -74,7 +74,7 @@ digraph engine {
 
 ## The five-mode routing call
 
-Work is routed on **separability and durability, not size**. Size only answers whether to decompose at all. Separability decides the coordination topology. Durability decides whether the work needs state that outlives the session. Rendered faithfully from `design.md` section 2.
+Work is routed on **separability and durability, not size**. Size only answers whether to decompose at all. Separability decides the coordination topology. Durability decides whether the work needs state that outlives the session. Rendered faithfully from `plan-a-design.md` section 2.
 
 > | Mode | When it is chosen | Substrate |
 > |---|---|---|
@@ -88,7 +88,7 @@ The staffing call is one visible, vetoable sentence in plain language: the North
 
 ### Adjacent-mode tiebreaker
 
-Paste verbatim, `design.md` section 5.1:
+Paste verbatim, `plan-a-design.md` section 5.1:
 
 > Adjacent-mode tiebreaker, applied in this order whenever more than one route seems to fit:
 > 1. If the work is separable into sub-tasks that do not need to communicate with each other, choose `intern-team`.
@@ -143,43 +143,33 @@ The override is orchestration-level: we do not fork or edit Superpowers. The eng
 
 ## The nine-tenet overlay
 
-Doctrine that rides on top of whichever mode was chosen. Its always-on guarantee comes from the two hooks plus the pinned anchor file, not from this skill text being re-read; this is why the overlay is not a separate skill and must never be promoted back to one. Each tenet states the native shortfall it closes and the mechanism that improves adherence (`design.md` section 3).
+Doctrine that rides on top of whichever mode was chosen. Its always-on guarantee comes from the two hooks carrying state in-session, not from this skill text being re-read; this is why the overlay is not a separate skill and must never be promoted back to one. Each tenet states the native shortfall it closes and the mechanism that improves adherence (`plan-a-design.md` section 3).
 
-1. **Remember what's important.** Native compaction reconstructs intent from a flat, unweighted message list, so orchestration scaffolding can outrank the original request. Maintain the pinned anchor file (`.playbook/anchor.md`, format in `docs/playbook/anchor-format.md`): the original request verbatim plus the current one-line what-matters, restated at every checkpoint and re-injected with primacy after every compaction. When you initialise the anchor, first assign the user's original request prose to a shell variable and pass that variable to `playbook_anchor_init`; never inline a command substitution `$(...)` or backticks for the user's text at the call site, because the helper's heredoc is unquoted and would execute embedded `$(...)` or backticks. On first use in a project where `.playbook/` is not already listed in the project's `.gitignore`, offer once via `AskUserQuestion` to add `.playbook/` to the project's `.gitignore`; this offer is made exactly once, never repeated on subsequent turns, and the hooks never mutate `.gitignore` themselves.
+1. **Remember what's important.** Native compaction reconstructs intent from a flat, unweighted message list, so orchestration scaffolding can outrank the original request. The original request is the first human message in the transcript; the `take-a-beat` hook recovers it verbatim from `transcript_path` and re-injects it with primacy after every compaction. Keep the one-line North Star load-bearing at every decision and restate it at checkpoints. State your context window once as a single line of the form `playbook-window: <integer>` so `take-a-beat` can compute the context percent. Nothing is written into the user's working tree: the conversation is the store and the hooks steer it.
 2. **Ask stupid questions.** `AskUserQuestion` fires only on felt blockage; there is no upfront batched-clarification discipline outside plan mode. Batch all clarifying questions upfront, once, before the staffing call. There are no stupid questions; ask as many as needed until confident. Prioritise upfront questions, but per tenet 4 do not be afraid to stop and ask later. Not drip-fed by default.
-3. **Team alignment.** "Trust but verify" is unquantified and there is no peer or external-manager alignment step. In every multi-agent mode, treat the team as equals: a lead, conductor or orchestrator holds coordination authority only, not intellectual authority. Subagents push back with technical reasoning and the coordinator must not override correct judgement by fiat; its job is to route, unblock and rally. Use your own intellect before escalating to the user's. Peer sanity-check by subagent is the routine cheap path; external-manager escalation is gated by the uncertainty ledger so it never becomes ceremony. The one technically-forced exception is `hackathon-team`.
-4. **Uncertainty.** The model asks only when it feels blocked; there is no calibrated confidence signal and no rule tying a mandatory stop to the goal. Keep an append-only unease ledger (`.playbook/uncertainty-ledger.md`), not a numeric score. Append an entry only when you would flag the thing to a competent colleague in passing (the confidant gate, in `docs/playbook/anchor-format.md`). Append via `playbook_ledger_append`: each entry is a single pipe-delimited line `<timestamp> | <band-slug> | <clause>`, where the clause is a single clause phrased as drift from the North Star ("less sure I am still delivering X, because Y"), containing no literal `|` character and no embedded newline (both corrupt the one-line-per-entry contract that callout-shape detection depends on). The band must be the exact slug from the left column below:
-
-   > | Slug (written to ledger) | design.md §6 prose label | What it instructs |
-   > |---|---|---|
-   > | `minorly-unsure` | Minorly unsure | note it, carry on |
-   > | `starting-unsure` | Starting to become unsure | note it; glance at the ledger next time you pause |
-   > | `medium-unsure` | Medium unsure | glance now; if an earlier entry shares the theme, research or ask a subagent |
-   > | `really-unsure` | Really unsure | stop, re-read the North Star, take a beat or get a second pair of eyes before continuing |
-   > | `dangerously-unsure` | Dangerously unsure | stop now, escalate to the user or a CTO subagent; a single entry at this band trips escalation on its own |
-
-   Escalate up the ladder when the ledger forms one of the three callout shapes (a single top-band entry, a rising staircase, or a same-theme cluster within the window) as defined in `docs/playbook/anchor-format.md`; that doc also holds the confidant gate and the about-one-hour active-development window, which are not duplicated here. The `uncertainty` Stop hook is unconditional fire-and-forget: its only legitimate output is an `additionalContext` nudge prompting you to apply the confidant test. Never expect or rely on a `decision:block` from it; the logging is your own append action through the confidant gate, never the hook's. Standing override, independent of the ledger: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the ledger or the mode.
+3. **Team alignment.** "Trust but verify" is unquantified and there is no peer or external-manager alignment step. In every multi-agent mode, treat the team as equals: a lead, conductor or orchestrator holds coordination authority only, not intellectual authority. Subagents push back with technical reasoning and the coordinator must not override correct judgement by fiat; its job is to route, unblock and rally. Use your own intellect before escalating to the user's. Peer sanity-check by subagent is the routine cheap path; external-manager escalation is gated by your in-session unease so it never becomes ceremony. The one technically-forced exception is `hackathon-team`.
+4. **Unease.** The model asks only when it feels blocked; there is no calibrated confidence signal and no rule tying a mandatory stop to the goal. Unease is an in-session sense, not a file and not a score. After every agent action, restate your unease only if it changed: a level (one of `clear`, `settled`, `attentive`, `watchful`, `faintly_uneasy`, `uneasy`, `concerned`, `strained`, `troubled`, `alarmed`, `near_breaking`) and a last movement (one of `maintained`, `slightly_increased`, `increased`, `sharply_increased`, `barely_reduced`, `slightly_reduced`, `reduced`, `sharply_reduced`) then a colon and a reason of at most 50 characters. Silence means maintained with no movement. Unease is the whole project's, measured against the North Star, not just the current task; it can be high while you still choose not to escalate. Only when a restatement is an increase is the escalation ladder offered, as a second-order option you will usually decline. The `unease` hook is a stateless constant prompt that fires every action and computes nothing. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 5. **Offline mode.** Native has no offline path, no emergency channel and no wait-then-escalate behaviour. Offline behaviour is enabled explicitly via `playbook:offline-mode`, never implicitly: a per-run wait-window picker (default pre-filled at 10 minutes) or disable waiting. Notification is via ntfy (it replaces SMS because it is free). If still unreachable, escalate to an external manager, and log absent-decisions to an HTML document.
 6. **Ready for production.** YAGNI guidance exists but there is no explicit rule against shipping plan, wave or mission scaffolding and no comment-minimalism tenet. Ship no scaffolding vocabulary (plan, wave, mission) in shipped code, keep comments minimal, leave no plan references. Run a final sweep before handing work back.
-7. **Take a beat.** Native compaction is fixed-schema, fires only at the hard limit, has no lessons-learned slot and re-anchors weakly. The `take-a-beat` hook fires at ~65% context used. It announces, re-reads the anchor and lessons ledger, carries lessons-learned forward rather than discarding them as historical, and re-anchors on the original request and upcoming work with primacy over orchestration scaffolding.
+7. **Take a beat.** Native compaction is fixed-schema, fires only at the hard limit, has no lessons-learned slot and re-anchors weakly. The `take-a-beat` hook fires at about 65 percent context used, computed from the transcript usage sum over your declared window. It announces the beat, recovers the original request from the transcript, carries the lessons and wrong turns forward rather than discarding them as historical, and re-anchors on the original request and upcoming work with primacy over orchestration scaffolding. Nothing is read from or written to a file.
 8. **Less is more.** Plan mode and tooling bias toward thoroughness; nothing pushes toward the cheapest sufficient approach or shorter output. Longer thinking and shorter output is the goal and is what true intelligence looks like; resist the tendency to overproduce prose between thinking and output. Pick the cheapest sufficient mode; keep questions, plans and comments short; give subagents freedom rather than over-controlling them; keep the common path zero-dependency.
 9. **Speed via more hands, not rushing.** Native guidance discourages parallel fan-out and has no doctrine separating speed from rushing. When work is separable, fan it across agents for speed at the same completeness bar. Partial work to save time is forbidden. Rushing is permitted only if the user explicitly says to rush.
 
 ## The escalation ladder
 
-Standing override, independent of the uncertainty ledger and above the ladder (paste verbatim):
+Standing override, independent of the unease sense and above the ladder (paste verbatim):
 
-> if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode.
+> if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
-The ladder, ascending, used by tenets 3, 4 and 5 (`design.md` section 8):
+The ladder, ascending, used by tenets 3, 4 and 5 (`plan-a-design.md` section 8):
 
-1. **Self.** Take a breath, re-read the anchor.
+1. **Self.** Take a breath, re-read the original request and the North Star.
 2. **`take-a-beat`.** Deliberate pause and re-anchor.
 3. **Research.**
 4. **Fresh subagent** for a second pair of eyes (the routine, cheap alignment path).
 5. **Notify the user via ntfy** to come and steer, and wait. Online: the work is blocked and waits for the user. Offline (`playbook:offline-mode`): wait the per-run-declared window, default pre-filled at 10 minutes, unless disabled at that run.
-6. **External manager.** An external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step, and gated by the uncertainty ledger so it is never routine. It never precedes the notify-and-wait step.
-7. **Offline only.** If still no response after the window, proceed with the best call and log it to the offline HTML, having consulted the external manager first where the ledger warrants.
+6. **External manager.** An external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step, and gated by your in-session unease so it is never routine. It never precedes the notify-and-wait step.
+7. **Offline only.** If still no response after the window, proceed with the best call and log it to the offline HTML, having consulted the external manager first where your unease warrants.
 
 ntfy replaces SMS because it is free. The purpose of the notification is to pull the user back to their computer or the Claude app to steer.
 
@@ -198,20 +188,19 @@ If `superpowers-team` is chosen and Superpowers is not installed:
 ## Red Flags
 
 **Never:**
-- Silently auto-pick the mode. The staffing sentence must be visible and vetoable in plain language (`design.md` section 11).
+- Silently auto-pick the mode. The staffing sentence must be visible and vetoable in plain language (`plan-a-design.md` section 11).
 - Route on size. Routing is on separability and durability; size only triggers decompose-as-judgement.
-- Promote the overlay back into a separate skill. Persistence comes from the `take-a-beat` and `uncertainty` hooks plus the anchor file, not from skill text being re-read (`design.md` sections 3 and 11).
+- Promote the overlay back into a separate skill. Persistence comes from the `take-a-beat` and `unease` hooks carrying state in-session, not from a file and not from skill text being re-read (`plan-a-design.md` sections 3 and 11).
 - Ship scaffolding vocabulary (plan, wave, mission) or plan references in delivered code (tenet 6).
-- Add a sixth mode, a config wizard, or a third heavyweight workflow (`design.md` section 11; tenet 8).
+- Add a sixth mode, a config wizard, or a third heavyweight workflow (`plan-a-design.md` section 11; tenet 8).
 - Follow `writing-plans`' built-in `subagent-driven-development` pointer on the `superpowers-team` route; drive the chain into `playbook:modifying-plans` then `playbook:synchronised-subagent-development` instead.
-- Inline a `$(...)` or backticks for the user's request text at the `playbook_anchor_init` call site; assign to a variable first.
-- Expect a `decision:block` from the `uncertainty` hook; it is fire-and-forget and only nudges.
+- Expect a `decision:block` from the `unease` hook; it is a stateless constant prompt and only nudges.
 
 **Always:**
-- Restate the North Star into the anchor before anything else, and keep it load-bearing at every decision.
+- Restate the North Star before anything else, and keep it load-bearing at every decision.
 - Batch clarifying questions once, upfront, before the staffing call.
 - Make exactly one visible, vetoable staffing sentence and keep it vetoable throughout.
-- Apply the standing North-Star override at every step, independent of the ledger and the mode.
+- Apply the standing North-Star override at every step, independent of the unease sense and the mode.
 - Run the production-ready sweep before handing work back.
 - Fan separable work across agents for speed at the same completeness bar; never ship partial work to save time.
 
@@ -231,4 +220,4 @@ If `superpowers-team` is chosen and Superpowers is not installed:
 
 **Hooks that keep the overlay live (plugin extensions, not skills):**
 - `take-a-beat` (tenet 7) fires at ~65% context used.
-- `uncertainty` (tenet 4) fires at the end of every turn and nudges the confidant test; it never logs anything itself.
+- `unease` (tenet 4) fires after every agent action and prompts the unease restatement; it is stateless and writes nothing.
