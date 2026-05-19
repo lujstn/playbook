@@ -46,19 +46,19 @@ The user describes the work in a normal sentence. `playbook:playbook` responds w
 
 ## 3. The nine tenets and the mechanism that enforces each
 
-The tenets are doctrine written inside `playbook:playbook`. Their always-on guarantee does not come from skill text being re-read (a skill fires once and its text does not follow GSD or Superpowers subagents into fresh contexts). It comes from the hooks plus the pinned anchor file. This is why the overlay is not a separate skill and must never be promoted back to one.
+The tenets are doctrine written inside `playbook:playbook`. Their always-on guarantee does not come from skill text being re-read (a skill fires once and its text does not follow GSD or Superpowers subagents into fresh contexts). It comes from the hooks plus the in-session anchor carried in the conversation (section 6). This is why the overlay is not a separate skill and must never be promoted back to one.
 
 Each tenet exists because native Claude Code falls short of it in practice. The "Native shortfall it closes" column states the verified gap; the "Enforcing mechanism" column states the minimal harness that improves adherence. This is the lens the framing note in Appendix A requires.
 
 | # | Tenet | Native shortfall it closes | Enforcing mechanism |
 |---|---|---|---|
-| 1 | Remember what's important | Compaction reconstructs intent from a flat, unweighted message list, so the original request can be outranked by orchestration scaffolding | The pinned anchor file: original request verbatim plus current one-line what-matters, restated at every checkpoint and re-injected with primacy after every compaction |
+| 1 | Remember what's important | Compaction reconstructs intent from a flat, unweighted message list, so the original request can be outranked by orchestration scaffolding | The in-session anchor (section 6): original request verbatim plus current one-line what-matters, carried in the conversation, restated at every checkpoint, and re-injected with primacy after every compaction, the request recovered from the transcript rather than stored |
 | 2 | Ask stupid questions | AskUserQuestion fires only on felt blockage; there is no upfront batched-clarification discipline outside plan mode | `playbook:playbook` batches all clarifying questions upfront, once, before the staffing call. There are no stupid questions; ask as many as needed until confident. Prioritise upfront questions, but per tenet 4 do not be afraid to stop and ask later. Not drip-fed by default |
-| 3 | Team alignment | "Trust but verify" is an unquantified judgement call; there is no peer or external-manager alignment step and no equals-and-pushback doctrine | Overlay doctrine for every multi-agent mode: treat the team as equals; a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents push back with technical reasoning and the coordinator must not override correct judgment by fiat, its job is to route, unblock and rally. Use your own intellect before escalating to the user's. Peer sanity-check by subagent is the routine cheap path; external-manager escalation is gated by the uncertainty ledger so it never becomes ceremony. The one technically-forced exception is `hackathon-team` (section 5.2) |
-| 4 | Uncertainty | The model asks only when it feels blocked; there is no calibrated confidence signal and no rule tying a mandatory stop to the goal | An append-only unease ledger (section 6), not a numeric score. The agent logs an entry only when it would flag the thing to a colleague in passing (the confidant gate), tagging it with one of five bands and phrasing it as drift from the North Star. It escalates up the ladder (section 8) when the ledger forms one of three callout shapes: a single top-band entry, a rising staircase, or a cluster of small entries on one theme within the window. Standing override, independent of the ledger: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the ledger or the mode |
+| 3 | Team alignment | "Trust but verify" is an unquantified judgement call; there is no peer or external-manager alignment step and no equals-and-pushback doctrine | Overlay doctrine for every multi-agent mode: treat the team as equals; a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents push back with technical reasoning and the coordinator must not override correct judgment by fiat, its job is to route, unblock and rally. Use your own intellect before escalating to the user's. Peer sanity-check by subagent is the routine cheap path; external-manager escalation is gated by the in-session unease sense so it never becomes ceremony. The one technically-forced exception is `hackathon-team` (section 5.2) |
+| 4 | Unease | The model asks only when it feels blocked; there is no calibrated confidence signal and no rule tying a mandatory stop to the goal | The in-session unease sense (section 6), not a numeric score and not a file. The agent maintains one current unease level and last movement, restated against the North Star only when something changes, and escalates up the ladder (section 8) on its own judgement when its unease has risen. Standing override, independent of the unease level: if an unease or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode |
 | 5 | Offline mode | Native has no offline path, no emergency channel, and no wait-then-escalate behaviour | `playbook:offline-mode`. Explicit per-run picker for the wait window (default pre-filled at 10 minutes) or to disable waiting. ntfy notification replaces SMS. If still unreachable, escalate to an external manager: an external-model LLM with control powers over this running instance. Absent-decisions logged to an HTML doc |
 | 6 | Ready for production | YAGNI guidance exists but there is no explicit rule against shipping plan/wave/mission scaffolding and no comment-minimalism tenet | A shipping reflex in the engine doctrine: no scaffolding vocabulary (plan, wave, mission) in shipped code, minimal comments, no plan references. A final sweep before handing work back |
-| 7 | Take a beat | Compaction is fixed-schema, fires only at the hard limit, has no lessons-learned slot, and re-anchors weakly | The `take-a-beat` hook fires at ~65% context used. It announces, re-reads the anchor and lessons ledger, carries lessons-learned forward rather than discarding them as historical, and re-anchors on the original request and upcoming work with primacy over orchestration scaffolding |
+| 7 | Take a beat | Compaction is fixed-schema, fires only at the hard limit, has no lessons-learned slot, and re-anchors weakly | The `take-a-beat` hook fires at ~65% context used. It announces, re-establishes the in-session anchor and the carried lessons, carries lessons-learned forward rather than discarding them as historical, and re-anchors on the original request and upcoming work with primacy over orchestration scaffolding |
 | 8 | Less is more | Plan mode and tooling bias toward thoroughness; nothing pushes toward the cheapest sufficient approach or shorter output | Longer thinking and shorter output is the goal, and is what true intelligence looks like; resist the model tendency to overproduce prose between the thinking and output stages. Encoded as engine defaults: pick the cheapest sufficient mode; short questions, plans and comments; give subagents freedom rather than over-controlling them; keep the common path zero-dependency |
 | 9 | Speed via more hands, not rushing | Native guidance discourages parallel fan-out ("should not be used excessively") and has no doctrine separating speed from rushing | When work is separable the engine fans it across agents for speed at the same completeness bar. Partial work to save time is forbidden. "Rushing" is permitted only if the user explicitly says to rush |
 
@@ -75,11 +75,11 @@ Each tenet exists because native Claude Code falls short of it in practice. The 
 ### Hooks (2, plugin extensions, not skills)
 
 - **`take-a-beat`**: tenet 7. Context-monitor and pre-compaction hook, fires at ~65% context used.
-- **`uncertainty`**: tenet 4. Fires at the end of every turn and asks the agent one thing: does anything want to go in the unease ledger? The default and expected answer is almost always no; logging is the rare exception, gated by the confidant test (section 6). It writes a wall-clock timestamp on any entry that is added. It performs no computation and maintains no score; the judgement lives in the doctrine (section 6).
+- **`unease`**: tenet 4. Fires on every agent action and asks the agent one thing: restate the unease level and last movement, with a reason, only if something changed. The default and expected answer is silence: nothing changed, so nothing is emitted. It performs no computation and maintains no state; the judgement lives in the doctrine (section 6).
 
 ### Described inside `playbook:playbook`, not separate skills
 
-The five routes (`lone-wolf`, `intern-team`, `hackathon-team`, `superpowers-team`, `gsd-team`), the nine tenets, the pinned anchor file protocol, the escalation ladder including the ntfy step, the `writing-plans` override, and decompose-as-judgement.
+The five routes (`lone-wolf`, `intern-team`, `hackathon-team`, `superpowers-team`, `gsd-team`), the nine tenets, the in-session anchor protocol, the escalation ladder including the ntfy step, the `writing-plans` override, and decompose-as-judgement.
 
 ### External prerequisites
 
@@ -92,15 +92,15 @@ The five routes (`lone-wolf`, `intern-team`, `hackathon-team`, `superpowers-team
 
 Triggers at the start of any non-trivial work. Flow:
 
-1. Restate the North Star: one line of what matters, written verbatim from the user's request into the anchor file.
+1. Restate the North Star: one line of what matters, taken verbatim from the user's request and carried in the conversation as part of the in-session anchor (section 6).
 2. Ask all clarifying questions in one batched set. Do not proceed until confident or until the user declines to answer more.
 3. Assess separability and durability. Decide whether the work is too big and must be decomposed (decompose-as-judgement); if so, propose the cut and recurse into the engine per piece.
 4. Make the staffing call: one visible, vetoable sentence naming the mode and the reason.
-5. Route to the chosen substrate. Keep the tenets doctrine and the anchor file live throughout.
+5. Route to the chosen substrate. Keep the tenets doctrine and the in-session anchor live throughout.
 6. On the `superpowers-team` route, apply the `writing-plans` override (section 7).
 7. Before handing work back, run the production-ready sweep (tenet 6).
 
-Standing rule across every step: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode (tenet 4).
+Standing rule across every step: if an unease or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode (tenet 4).
 
 Routing rules:
 
@@ -150,34 +150,42 @@ Owned and distributed by this package. It executes a wave-grouped plan as a sync
 
 Agreed extension beyond inherited behaviour, the conductor whistle: an implementer that discovers a wave-breaking problem mid-wave (a wrong contract, a broken shared assumption) raises a flag to the conductor. The conductor may halt the wave, re-plan, or broadcast a corrected constraint to the still-running siblings before merge. There is no peer-to-peer messaging; the conductor is the only hub. This recovers the "call each other out" and "the lead should intervene or rally the team" parts of the original mode-4 definition, and closes the blind spot where a wave-breaking discovery would otherwise surface only at post-wave merge, after parallel work was already wasted. All other internal mechanics are the skill's own and are not re-specified here.
 
-## 6. The pinned anchor file and the uncertainty ledger
+## 6. The in-session anchor and the unease sense
 
-A single file maintained by the engine and the hooks, holding:
+Nothing here is written to disk. There is no file, no `.playbook/` directory, no anchor file and no ledger. A person does not write down their goal, their unease or how full their head is; they carry these things and let them colour the next decision. Playbook makes the model behave that way. The conversation is the store. The hooks steer the compaction seam and prompt the working pulse; they never persist anything into the user's working tree.
 
-- The original user request, verbatim.
+### The anchor: carried, not stored
+
+The anchor is the working state the engine keeps live throughout, carried in the conversation rather than saved:
+
+- The original user request, verbatim. This alone is recoverable deterministically: it is the first human user message in the transcript, and every hook is given `transcript_path`, so it is recovered and re-asserted rather than stored.
 - The current one-line statement of what matters.
-- A running lessons-and-wrong-turns ledger (including silent wrong turns, not only errors that produced a stack trace).
+- The running lessons and wrong turns, including silent wrong turns, not only errors that produced a stack trace.
 - The next work.
 
-The `take-a-beat` hook feeds the lessons ledger into the compaction prompt and re-injects the anchor first after compaction so the original intent outranks orchestration scaffolding. Proposed location is a `.playbook/` directory in the working project; the exact path is an implementation detail to be settled during build.
+Only the original request is recoverable by a hook. The North Star, the lessons and wrong turns, the current unease, and the declared context window are restated working state that rides the conversation and is re-derived if a compaction loses it. At the compaction seam the pre-compaction steer instructs the summary to preserve these verbatim and ahead of orchestration scaffolding; the post-compaction path re-injects the original request, recovered from the transcript's first human message, with primacy, and prompts the agent to re-establish the North Star and the unease from that recovered request and the live work, so the original intent outranks orchestration scaffolding. If the transcript is unreadable or no user message is found, the hook emits nothing rather than a wrong anchor: a wrong value is always worse than no value.
 
-### The uncertainty ledger
+### The unease sense
 
-A second engine-maintained plain-text file, sibling to the anchor. It is how tenet 4 is realised: not a numeric score, but a human-style record of accumulating unease measured against the North Star.
+Tenet 4 is realised as an in-session sense the agent maintains and observes, not a file, not a numeric score, and not a per-turn nag. It is the sense that, as work proceeds, an agent grows a little uneasy about several things, and that can build to the point where it stops and asks, even though looking at any one event alone it would do nothing.
 
-- **What it is.** An append-only log. Each entry is one line: a wall-clock timestamp (written by the `uncertainty` hook), one of five severity bands, and a single clause phrased as drift from the North Star ("less sure I am still delivering X, because Y"). Nothing else. There is no score and nothing is summed.
-- **When to log (the confidant gate).** Before adding an entry, one test: would a competent colleague bother flagging this to the lead if they walked past? If no, log nothing. On almost every turn this means zero entries. The `uncertainty` hook asks at the end of every turn whether anything should be logged; the default and expected answer is almost always no, and on the large majority of turns nothing is logged. The hook is only a prompt to apply the confidant test; it never logs anything by itself.
-- **The five bands and what each one means to do.**
-  - Minorly unsure: note it, carry on.
-  - Starting to become unsure: note it; glance at the ledger next time you pause.
-  - Medium unsure: glance now; if an earlier entry shares the theme, research or ask a subagent.
-  - Really unsure: stop, re-read the North Star, take a beat or get a second pair of eyes before continuing.
-  - Dangerously unsure: stop now, escalate to the user or a CTO subagent. A single entry at this band trips escalation on its own.
-- **When to escalate (the three callout shapes).** When the agent glances, it reads the ledger as a human would and moves up the escalation ladder (section 8) if it sees any one of: a single top-band entry; a rising staircase, where each new entry is a higher band than the last; or a cluster of small entries on the same theme close together. It is quantity plus severity plus trajectory, judged, never calculated.
-- **The window: about one hour of active development time.** The hook's timestamps give elapsed wall-clock. The agent discounts from that only the stretches that were plainly not active development (idle, or waiting on the user), so the window tracks effort rather than the clock. Within that hour every entry still counts, even if it feels stale. An entry is deliberately not dropped early on the judgement that its concern is no longer relevant: that judgement is itself unreliable, a model can decide something no longer matters when it still does, and a still-live worry would then be lost. One hour of active development is the deliberately safe and simple measure. Compaction and take-a-beat are explicitly not the boundary. There is no timer and no accumulator; the window is a reading-time judgement applied to timestamped lines.
-- **Proposed location.** Alongside the anchor in the `.playbook/` directory; the exact path is an implementation detail to be settled during build.
+- **What the agent maintains.** Two values it has most recently stated, and nothing else: a current unease level, exactly one of the eleven fixed words whose meanings are fixed by the unease specification (from `clear` through `near_breaking`), and a last movement, exactly one of the eight fixed words (from `maintained` through `sharply_reduced`) followed by a brief reason. There is no history, no trail, no timestamp and no accumulator. The agent sees only the last values it stated.
+- **The pulse.** The `unease` hook fires on every agent action and asks one thing: restate the unease level and the last movement, with a short reason, only if something changed, measured against the North Star.
+- **Silence is the default.** When nothing changed the agent emits no unease line at all; absence means the level is maintained and there is no movement. This is the minimum token cost on the overwhelmingly common path and it inherently biases towards taking no escalation action.
+- **Escalation is pure judgement.** Unease may influence an escalation decision but is a separate thing from it: the agent observes the North Star, the options on the ladder (section 8) and how uneasy it has recently felt, and makes the call itself. Nothing mechanical forces it. The escalation prompt appears only when the agent's own restatement was an increase.
+- **No file-model artefacts.** There is no ledger, no severity band slug, no callout-shape detection, no one-hour window and no timestamp. Those were artefacts of the rejected file model and are removed. The eleven-level and eight-movement enums and their meanings are fixed exactly as the unease specification states them.
 
-The standing North-Star override sits above all of this and is independent of the ledger: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the ledger or the mode.
+### The context signal
+
+Tenet 7 needs to know how full the head is, and it derives this without owning or reading any file. The signal is the transcript usage sum over the window the agent itself declares:
+
+- **Used** is read from the transcript. The latest assistant record carries its usage, and used is the sum `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`. This is Claude Code's own formula, reproduced exactly rather than estimated.
+- **Window** is the nominal model window the agent states once into the conversation, because a hook is given only the bare model id, which does not encode the window variant, so the agent is the reliable source. It is restated working state, carried like the North Star, preserved by the pre-compaction steer, and re-declared if a compaction loses it. Each session declares its own, so a subagent or teammate holds its own window just as it holds its own unease.
+- **Percent used** is used divided by window, and `take-a-beat` fires at about sixty-five percent of context used. If the latest usage record is briefly absent immediately after a compaction, or no declared window can be found, the hook emits no beat rather than a false one.
+
+This deliberately does not track the user's status bar, which applies an auto-compact-buffer rescale Playbook does not own; coupling to it would reintroduce exactly the third-party dependency the design removes.
+
+The standing North-Star override sits above all of this and is independent of the unease level: if an unease or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
 ## 7. The `writing-plans` override
 
@@ -185,16 +193,16 @@ Superpowers' `writing-plans` skill terminates by pointing at `subagent-driven-de
 
 ## 8. The escalation ladder and ntfy
 
-Standing override, independent of the uncertainty ledger and above the ladder: if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the ledger or mode.
+Standing override, independent of the unease level and above the ladder: if an unease or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or mode.
 
 The ladder, ascending, used by tenets 3, 4 and 5:
 
-1. Self: take a breath, re-read the anchor.
+1. Self: take a breath, re-establish the in-session anchor.
 2. `take-a-beat`: deliberate pause and re-anchor.
 3. Research.
 4. Fresh subagent for a second pair of eyes (the routine, cheap alignment path).
 5. Notify the user via ntfy to come and steer, and wait. Online: the work is blocked and waits for the user. Offline (`playbook:offline-mode`): wait the per-run-declared window, default pre-filled at 10 minutes, unless disabled at that run.
-6. External manager: an external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step, and gated by the uncertainty ledger so it is never routine.
+6. External manager: an external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step, and gated by the unease sense so it is never routine.
 7. Offline only: if still no response after the window, proceed with the best call and log it to the offline HTML, having consulted the external manager first where the ledger warrants.
 
 The external manager never precedes the notify-and-wait step.
@@ -215,38 +223,45 @@ ntfy replaces SMS because it is free. Setup flow: the user creates a topic via t
    - `hackathon-team`: `playbook:hackathon-team`, thin-coordinator lead, overlay live.
    - `superpowers-team`: `brainstorming` then `writing-plans` then `playbook:modifying-plans` then `playbook:synchronised-subagent-development`, overlay live.
    - `gsd-team`: GSD, overlay live (lighter, GSD owns its own state).
-4. Throughout, the tenets doctrine plus the `take-a-beat` and `uncertainty` hooks keep all nine tenets live regardless of mode. Tenet 2 is applied at the front by the engine; the rest persist through execution and compaction. The staffing sentence stays visible and vetoable.
+4. Throughout, the tenets doctrine plus the `take-a-beat` and `unease` hooks keep all nine tenets live regardless of mode. Tenet 2 is applied at the front by the engine; the rest persist through execution and compaction. The staffing sentence stays visible and vetoable.
 5. The engine runs the production-ready sweep (tenet 6) and ships clean.
 
 ## 11. Rejected options (for the record)
 
 - A third heavyweight workflow competing with GSD and Superpowers. Rejected: it is the bloat tenet 8 forbids and reinvents engines that already work.
-- The nine tenets as prose in `CLAUDE.md`. Rejected: paid every turn, cannot trigger at 65% context, cannot hold persistent state such as the anchor or the unease ledger, and prose-in-context gets skipped versus behaviour invoked at the right moment.
+- The nine tenets as prose in `CLAUDE.md`. Rejected: paid every turn, cannot trigger at 65% context, cannot steer the compaction seam to keep the carried anchor and unease sense alive across it, and prose-in-context gets skipped versus behaviour invoked at the right moment.
 - Forking or wrapping GSD or Superpowers. Rejected: no upstream fork, and it inherits their ceremony.
 - A config wizard for mode selection. Rejected: a form is ceremony; the staffing call is one vetoable sentence.
 - Always routing into a framework. Rejected: `lone-wolf` and `intern-team` must be native with the overlay only.
 - Silently auto-picking the mode. Rejected: violates tenets 1 and 3; the staffing sentence must be visible.
 - Routing on size. Rejected: separability and durability are the correct primitives; size only triggers decompose.
 - A separate decompose skill. Rejected: decompose-as-judgement is a decision the engine already makes; the mechanics already live in `modifying-plans` and the `gsd-team` route.
-- `rules` as a separate skill. Rejected: persistence comes from the hooks plus the anchor file, not from skill text being re-read.
+- `rules` as a separate skill. Rejected: always-on adherence comes from the hooks plus the in-session anchor carried in the conversation, not from skill text being re-read.
 
 ## 12. Build constraints and open items
 
 Build constraints (binding):
 
-- Appendix A (the user's original five states, nine tenets and framing note) is canonical and verbatim. This spec adapts on top of it and must never replace or contradict its intent or the lens it sets. Canonicity governs intent and lens, not literal mechanism: where this spec deliberately adapts a tenet's mechanism by explicit agreement in the design conversation, the adaptation governs implementation. There are exactly three such adaptations: tenet 3's external-manager check-in is gated by the uncertainty ledger rather than routine; tenet 5's SMS emergency channel becomes ntfy; tenet 7's "65% of the day" becomes a context-only threshold at ~65% context used. Any conflict that is not one of these three deliberate adaptations is resolved in favour of Appendix A. This carve-out works the same way as the British-English carve-out stated in Appendix A.
+- Appendix A (the user's original five states, nine tenets and framing note) is canonical and verbatim. This spec adapts on top of it and must never replace or contradict its intent or the lens it sets. Canonicity governs intent and lens, not literal mechanism: where this spec deliberately adapts a tenet's mechanism by explicit agreement in the design conversation, the adaptation governs implementation. There are exactly three such adaptations: tenet 3's external-manager check-in is gated by the unease sense rather than routine; tenet 5's SMS emergency channel becomes ntfy; tenet 7's "65% of the day" becomes a context-only threshold at ~65% context used. Any conflict that is not one of these three deliberate adaptations is resolved in favour of Appendix A.
 - The harness must improve adherence to the tenets where native Claude Code falls short (the section 3 lens). It must not re-explain native planning, todos, subagents, compaction or code hygiene from scratch.
-- Generated skill and hook text must follow British English and must not use long dashes.
+- This specification and all generated skill and hook text must follow British English and must not use long dashes, with no inherited exemption.
 
 Open items:
 
 - The ntfy example implementation script will be provided by the user during build.
-- Exact on-disk paths for the anchor file and the uncertainty ledger, to be settled during build.
 - Native agent-teams size cap tuning for all teams to be decided by user during build.
+
+## 13. For the avoidance of doubt
+
+Playbook writes no file into the user's working tree. There is no `.playbook/` directory, no anchor file, no unease or ledger file, and no bridge file that Playbook owns. Nothing in this specification implies, requires or permits any state file in the user's project.
+
+Reading the transcript is not persistence. The transcript is Claude Code's own data under `~/.claude`, authored by Claude Code, not by Playbook and not in the user's working tree. Playbook only reads it through the `transcript_path` every hook is already given.
+
+What matters, the unease sense, the North Star and the declared window are held in-session: carried in the conversation, restated as the work proceeds, steered through compaction in-session, never written to disk. A fresh session begins without them: unease at its lowest level with no movement, the North Star re-established from the recovered original request, the window re-declared from the environment.
 
 ## Appendix A. The user's original mental model (verbatim, canonical)
 
-This appendix reproduces the user's original five states, nine tenets and framing note exactly as written. It is canonical: the rest of this spec adapts on top of it and must not contradict it. The punctuation, including the user's own long dashes, is preserved verbatim and is not subject to the British-English and no-long-dash build constraint, which governs only generated skill and hook text.
+This appendix reproduces the user's original five states, nine tenets and framing note exactly as written. It is canonical: the rest of this spec adapts on top of it and must not contradict it.
 
 ### A.1 Mental model: the five states
 
@@ -262,9 +277,9 @@ This appendix reproduces the user's original five states, nine tenets and framin
 ### A.2 The nine tenets
 
 > 1. Remembering what's important: Repeating the core of the user's request/plan, and carrying that through with every single decision point and question.
-> 2. Ask stupid questions: Ask as many questions upfront as you need to, until you're confident with your approach. There's no such thing as "stupid questions"! Prioritise upfront questions, but per §4 below ('Uncertainty'), you should not be afraid of stopping to ask for help.
+> 2. Ask stupid questions: Ask as many questions upfront as you need to, until you're confident with your approach. There's no such thing as "stupid questions"! Prioritise upfront questions, but per §4 below ('Unease'), you should not be afraid of stopping to ask for help.
 > 3. Team alignment: Check-in with external "manager" LLMs to ensure they agree with you, then sync with your whole team to have group communication to ensure everyone is onboard with the plan. Treat your team as equals - a team lead has authority only for the purposes of communication, not intellect. Pushback is okay - ask the user as many as needed until you are confident and everybody agrees, although you should try to use your own intellect before escalating to user's intellect.
-> 4. Uncertainty: If we feel we are increasingly unsure during development, check if we should pause to ask for help. Maybe all we need is to take a breath, then continue. Maybe we need to do some research. Maybe ask a new subagent for help. Or maybe, we should pause to grill user (which they are explicitly okay with). And if the risk of uncertainty/decision point could negatively affect the "what's important" statement to the point that our work would no longer effectively meet this criteria, then we must stop and ask the user before proceeding.
+> 4. Unease: If we feel we are increasingly unsure during development, check if we should pause to ask for help. Maybe all we need is to take a breath, then continue. Maybe we need to do some research. Maybe ask a new subagent for help. Or maybe, we should pause to grill user (which they are explicitly okay with). And if the risk of unease/decision point could negatively affect the "what's important" statement to the point that our work would no longer effectively meet this criteria, then we must stop and ask the user before proceeding.
 > 5. Offline mode: If we want to ask the user but they have explicitly stated they are offline, we should get pause for 10mins to try and wait for a response via an emergency channel like SMS. If we can't get through, at that point we should seek external help from friendly "managers" (external-model LLMs with control powers over this running instance).
 > 6. Ready for production: Always ensuring we leave minimal comments, and never leave references to "plans"/"waves"/"missions" etc.
 > 7. Take a beat: After running past 65% of the day (whether that is LLM context space reaching 65% or humans working until 2.30pm without a break), the quality of output degrades. It's essential at this point to breathe out, look at what you've done, take a breather, then restart with a fresh head. For humans this is a lunch break, for LLMs this is compaction. We should proactively trigger this behaviour and be set-up to ride the wave of compaction, seeing this as good headspace as opposed to opportunity for context loss.
@@ -281,6 +296,6 @@ This appendix reproduces the user's original five states, nine tenets and framin
 >
 > Concrete example: Tenet 7 ("take a beat"): Native compaction exists, but what I want is something that triggers automatically at ~65% context (e.g. 650k/1m, or 195k/300k tokens), explicitly carries forward lessons learned from what went wrong (native compaction often discards these as "historical"), re-anchors on the original user request and upcoming work rather than letting planning/orchestration scaffolding dominate the summary, and stops Claude losing sight of the actual task amid rules/waves/plans/references. Native compaction is a fixed-schema continuation summary. What I want is a steered, threshold-triggered, lesson-preserving, user-intent-reanchoring variant. Same family, different requirements. The same logic applies across the other tenets.
 >
-> One additional idea worth considering: an edit-file hook that prompts Claude to continually update an uncertainty score (e.g. 0 to 100). Minimal context cost, just a number, but useful as a signal for when to escalate to a CTO subagent or the user.
+> One additional idea worth considering: an edit-file hook that prompts Claude to continually update an unease score (e.g. 0 to 100). Minimal context cost, just a number, but useful as a signal for when to escalate to a CTO subagent or the user.
 >
 > Bias: trust my experience here. If your instinct is "the user is probably wrong about this being a problem," you're misunderstanding the request. Push back on specifics where you genuinely disagree, but don't dismiss the tenets wholesale on the grounds that Claude Code "already does this", the whole reason I'm building this is that, in practice, it doesn't do it well enough.
