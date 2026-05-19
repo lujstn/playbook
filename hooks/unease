@@ -3,7 +3,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"   # computes nothing; only reads the event name to label the output
-event="$(jq -r '.hook_event_name // "Stop"' 2>/dev/null <<<"$stdin")"
+event="$(jq -r '.hook_event_name // "Stop"' 2>/dev/null <<<"$stdin" || true)"
 [ -n "$event" ] || event="Stop"
 
 prompt="Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via ntfy and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."

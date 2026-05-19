@@ -25,6 +25,15 @@ grep -q "regardless of the unease level or the mode" <<<"$ctx" \
 ! grep -qi "ledger" <<<"$ctx" \
   && echo "PASS: no ledger vocabulary" || { echo "FAIL: ledger word present"; exit 1; }
 
+for bad in '' 'not json at all' '{"hook_event_name":"Stop"' 'true'; do
+  if bo="$(printf '%s' "$bad" | bash "$H" 2>/dev/null)"; then :; else
+    echo "FAIL: stdin [$bad] aborted the hook (exit non-zero)"; exit 1; fi
+  jq -e '.hookSpecificOutput.additionalContext' <<<"$bo" >/dev/null \
+    && jq -e '.hookSpecificOutput.hookEventName == "Stop"' <<<"$bo" >/dev/null \
+    || { echo "FAIL: stdin [$bad] did not yield a valid Stop envelope"; exit 1; }
+done
+echo "PASS: empty and non-JSON stdin still yield a valid Stop envelope"
+
 d_tmp="$(mktemp -d)"
 printf '{"hook_event_name":"Stop","cwd":"%s"}' "$d_tmp" | bash "$H" >/dev/null 2>&1 || true
 [ ! -e "$d_tmp/.playbook" ] && echo "PASS: writes no file into the project" \
