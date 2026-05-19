@@ -27,8 +27,8 @@ chk "grep -qi 'external manager' '$D'" "tenet 3 external-manager adaptation pres
 # Appendix A canonical clause.
 chk "grep -q 'Appendix A' '$D' && grep -qi 'canonical' '$D'" "Appendix A marked canonical"
 
-# The shipped subagent and window mechanism must not silently drift from the
-# code: these are the load-bearing claims this work made true.
+# The shipped subagent and window mechanism must not silently drift from
+# the code: these are load-bearing invariants the spec must keep asserting.
 chk "grep -q 'SubagentStart' '$D'" "SubagentStart overlay carrier documented"
 chk "grep -q 'playbook-northstar' '$D'" "project North Star dispatch line documented"
 chk "grep -qi 'self-healing notice' '$D'" "self-healing undeclared-window notice documented"

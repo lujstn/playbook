@@ -14,6 +14,12 @@ playbook_transcript_path() {
   jq -r '.transcript_path // empty' 2>/dev/null <<<"${1:-}" || printf ''
 }
 
+# The dispatched subagent's id from hook stdin. Empty on the main thread,
+# which is how callers distinguish a helper from the steering thread.
+playbook_agent_id() {
+  jq -r '.agent_id // empty' 2>/dev/null <<<"${1:-}" || printf ''
+}
+
 # The verbatim original request: the complete content of the first transcript
 # record that is the human's own user message, with multi-line content
 # preserved. Skips system/hook records (.type!="user"), records whose role is
@@ -35,30 +41,28 @@ playbook_original_request() {
   } 2>/dev/null || printf ''
 }
 
+# The value of the most recent `playbook-northstar: <text>` line in a block
+# of recovered text. The whole line, after optional leading space, must be
+# the declaration; the last occurrence wins; trailing space is trimmed.
+# Empty if absent. Empty, never a wrong value.
+playbook_northstar_line() {
+  { printf '%s\n' "${1:-}" \
+      | grep -E '^[[:space:]]*playbook-northstar:[[:space:]]*.' \
+      | tail -n1 \
+      | sed -E 's/^[[:space:]]*playbook-northstar:[[:space:]]*//; s/[[:space:]]+$//'
+  } 2>/dev/null || printf ''
+}
+
 # The project North Star a dispatcher passed into this run: the
 # `playbook-northstar: <text>` line carried in the first genuine human or
-# dispatch message. Recovered from the same record playbook_original_request
-# uses (the first non-tool user message), so a later doc read cannot poison
-# it. Empty on the main thread (the engine does not inject the line into the
-# user's own request) and empty if absent. Empty, never a wrong value.
+# dispatch message. Read off playbook_original_request so it is anchored to
+# the exact same record (one parse, no second slurp, and a later doc read
+# cannot poison it). Empty on the main thread (the engine does not inject
+# the line into the user's own request) and empty if absent.
 playbook_project_northstar() {
-  { local f; f="$(playbook_transcript_path "${1:-}")"
-    [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
-    jq -rs 'map(select(.type=="user" and (.message.role=="user")
-                       and ((.message.content|type)=="string"
-                            or ((.message.content|type)=="array"
-                                and (.message.content[0].type? != "tool_result")))))
-            | (.[0] // empty)
-            | .message.content
-            | if type=="string" then .
-              elif type=="array" then (map(select(.type=="text")|.text)|join("\n"))
-              else "" end
-            | split("\n")
-            | map(select(test("^[[:space:]]*playbook-northstar:[[:space:]]*.")))
-            | (.[-1] // empty)
-            | (capture("playbook-northstar:[[:space:]]*(?<n>.+)$").n // empty)
-            | sub("[[:space:]]+$";"")' "$f" 2>/dev/null
-  } 2>/dev/null || printf ''
+  local orig; orig="$(playbook_original_request "${1:-}")"
+  [ -n "$orig" ] || { printf ''; return 0; }
+  playbook_northstar_line "$orig"
 }
 
 # The labelled anchor block to inject. Subagent-aware: on the main thread the
@@ -69,11 +73,11 @@ playbook_project_northstar() {
 # to anchor on. Never fabricates a North Star.
 playbook_anchor_block() {
   local s="${1:-}" aid orig ns
-  aid="$(jq -r '.agent_id // empty' 2>/dev/null <<<"$s" || true)"
+  aid="$(playbook_agent_id "$s")"
   orig="$(playbook_original_request "$s")"
   [ -n "$orig" ] || { printf ''; return 0; }
   if [ -n "$aid" ]; then
-    ns="$(playbook_project_northstar "$s")"
+    ns="$(playbook_northstar_line "$orig")"
     if [ -n "$ns" ]; then
       local task
       task="$(printf '%s' "$orig" | grep -vE '^[[:space:]]*playbook-northstar:[[:space:]]' || true)"
@@ -130,17 +134,27 @@ playbook_declared_window() {
   } 2>/dev/null || printf ''
 }
 
-# Integer percent of context used, or empty when either input is unavailable.
-# Same return contract the take-a-beat caller already expects.
-playbook_context_percent() {
-  { local u w; u="$(playbook_context_used "${1:-}")"
-    w="$(playbook_declared_window "${1:-}")"
+# Integer percent of a used/window pair, clamped to 0..100. Empty unless
+# both are non-negative integers and the window is positive. The single
+# source of the beat formula, so the hook and playbook_context_percent
+# cannot drift.
+playbook_percent() {
+  { local u="${1:-}" w="${2:-}"
     case "$u" in ''|*[!0-9]*) printf ''; return 0 ;; esac
     case "$w" in ''|*[!0-9]*) printf ''; return 0 ;; esac
     [ "$w" -gt 0 ] 2>/dev/null || { printf ''; return 0; }
     local p=$(( (u * 100 + w / 2) / w ))
     [ "$p" -lt 0 ] && p=0; [ "$p" -gt 100 ] && p=100
     printf '%s' "$p"
+  } 2>/dev/null || printf ''
+}
+
+# Integer percent of context used, or empty when either input is unavailable.
+# Same return contract the take-a-beat caller already expects.
+playbook_context_percent() {
+  { playbook_percent \
+      "$(playbook_context_used "${1:-}")" \
+      "$(playbook_declared_window "${1:-}")"
   } 2>/dev/null || printf ''
 }
 
