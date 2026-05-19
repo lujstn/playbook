@@ -7,7 +7,7 @@ description: Use only when explicitly run to enable offline behaviour for one se
 
 ## Overview
 
-Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalate path, an ntfy emergency channel, and a morning-readable HTML decision log. It is reached only when the user runs it explicitly. It is never enabled implicitly, never inferred, and never carried over from a previous run. Rendered faithfully from `design.md` section 5.3 and section 8.
+Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalate path, an ntfy emergency channel, and a morning-readable HTML decision log. It is reached only when the user runs it explicitly. It is never enabled implicitly, never inferred, and never carried over from a previous run. Rendered faithfully from `plan-a-design.md` section 5.3 and section 8.
 
 **Core principle:** Absence is not permission. When the user is away, wait the window the user declared this run, escalate up the ladder, and only then proceed on the best call, logging every absent-decision so the user can read exactly what happened in the morning.
 
@@ -26,7 +26,7 @@ The choice is not persisted and is not inferred from any previous run. The user 
 
 ## Decision log
 
-While offline mode is active, accumulate a running ledger of events that occur specifically because the user was absent. The event set, verbatim from `design.md` section 5.3, is:
+While offline mode is active, accumulate a running ledger of events that occur specifically because the user was absent. The event set, verbatim from `plan-a-design.md` section 5.3, is:
 
 - Forced-without-you decisions made after the wait window elapsed.
 - CTO-subagent consultations.
@@ -41,24 +41,24 @@ At the end of the session, render the accumulated ledger to a clean, simple-to-r
 
 ## The escalation ladder position
 
-Offline mode occupies the offline branches of the shared escalation ladder (`design.md` section 8). The standing override sits above the entire ladder and is independent of the uncertainty ledger and the mode:
+Offline mode occupies the offline branches of the shared escalation ladder (`plan-a-design.md` section 8). The standing override sits above the entire ladder and is independent of the unease sense and the mode:
 
-> if an uncertainty or decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the uncertainty ledger or the mode.
+> if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
 Within the ladder, when the work blocks while offline mode is active, the declared option this run decides the path:
 
-- **Option A (a wait window was declared).** Do the ntfy notify-and-wait: send through the ntfy seam (below) and hold for a response for the wait window declared this run, default pre-filled at 10 minutes. If a response arrives within the window, the user steers and the work continues. If the window elapses with no response, proceed on the best call and log the forced decision to the offline HTML, having consulted the external manager first where the uncertainty ledger warrants.
-- **Option B (waiting was disabled this run).** The ntfy notify-and-wait step is skipped entirely. Proceed on the best call and log the forced decision to the offline HTML, having consulted the external manager first where the uncertainty ledger warrants. The standing North-Star override above the ladder still applies.
+- **Option A (a wait window was declared).** Do the ntfy notify-and-wait: send through the ntfy seam (below) and hold for a response for the wait window declared this run, default pre-filled at 10 minutes. If a response arrives within the window, the user steers and the work continues. If the window elapses with no response, proceed on the best call and log the forced decision to the offline HTML, having consulted the external manager first where your in-session unease warrants.
+- **Option B (waiting was disabled this run).** The ntfy notify-and-wait step is skipped entirely. Proceed on the best call and log the forced decision to the offline HTML, having consulted the external manager first where your in-session unease warrants. The standing North-Star override above the ladder still applies.
 
 The ladder steps that govern the proceed-and-log path under either option:
 
 1. **Notify the user via ntfy and wait the declared window (option A only).** Send through the ntfy seam (below) and hold for a response for the declared window. Under option B this step is skipped entirely; the work does not ping "come and steer" and then proceed without waiting.
-2. **External manager.** An external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step (option A) or, under option B where the step is skipped, only before the forced call. Gated by the uncertainty ledger so it is never routine. It never precedes the notify-and-wait step under option A.
-3. **Forced call, logged.** Proceed with the best call and log it to the offline HTML: under option A if the declared window elapses with no response, under option B directly. The external manager is consulted first where the ledger warrants.
+2. **External manager.** An external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step (option A) or, under option B where the step is skipped, only before the forced call. Gated by your in-session unease so it is never routine. It never precedes the notify-and-wait step under option A.
+3. **Forced call, logged.** Proceed with the best call and log it to the offline HTML: under option A if the declared window elapses with no response, under option B directly. The external manager is consulted first where your in-session unease warrants.
 
 ## The ntfy setup flow
 
-ntfy replaces SMS because it is free. The purpose of the notification is to pull the user back to their computer or the Claude app to steer. The setup flow, verbatim from `design.md` section 8, is:
+ntfy replaces SMS because it is free. The purpose of the notification is to pull the user back to their computer or the Claude app to steer. The setup flow, verbatim from `plan-a-design.md` section 8, is:
 
 1. The user creates a topic via the ntfy URL.
 2. The user downloads the ntfy app.
@@ -91,7 +91,7 @@ digraph offline_mode {
     "ntfy notify-and-wait the declared window" [shape=box];
     "Waiting disabled (option B)?" [shape=diamond];
     "Response from user within window?" [shape=diamond];
-    "External manager, gated by the uncertainty ledger" [shape=box];
+    "External manager, gated by in-session unease" [shape=box];
     "Proceed on best call; log forced decision to HTML" [shape=box];
     "User steers; continue" [shape=box];
     "Could this degrade the North Star below meeting it?" [shape=diamond];
@@ -108,11 +108,11 @@ digraph offline_mode {
     "Work blocked while offline?" -> "Waiting disabled (option B)?" [label="yes"];
     "Work blocked while offline?" -> "Session end: export HTML to runtime-chosen folder" [label="no, work complete"];
     "Waiting disabled (option B)?" -> "ntfy notify-and-wait the declared window" [label="no (option A)"];
-    "Waiting disabled (option B)?" -> "External manager, gated by the uncertainty ledger" [label="yes (option B): skip ntfy"];
+    "Waiting disabled (option B)?" -> "External manager, gated by in-session unease" [label="yes (option B): skip ntfy"];
     "ntfy notify-and-wait the declared window" -> "Response from user within window?";
     "Response from user within window?" -> "User steers; continue" [label="yes"];
-    "Response from user within window?" -> "External manager, gated by the uncertainty ledger" [label="no"];
-    "External manager, gated by the uncertainty ledger" -> "Proceed on best call; log forced decision to HTML";
+    "Response from user within window?" -> "External manager, gated by in-session unease" [label="no"];
+    "External manager, gated by in-session unease" -> "Proceed on best call; log forced decision to HTML";
     "User steers; continue" -> "Do the work; accumulate offline decision log";
     "Proceed on best call; log forced decision to HTML" -> "Do the work; accumulate offline decision log";
 
@@ -126,12 +126,12 @@ digraph offline_mode {
 ## Red Flags
 
 **Never:**
-- Enable offline mode implicitly, by inference, or by carrying over a previous run. It is explicit, per run, every time (`design.md` section 5.3).
+- Enable offline mode implicitly, by inference, or by carrying over a previous run. It is explicit, per run, every time (`plan-a-design.md` section 5.3).
 - Remember or persist the picker choice across runs, or infer it from a previous run. The user must declare it fresh every invocation.
 - Produce a decision log on an online run. Online absence means blocked and we wait; the log accumulates only while offline mode is active.
 - Treat the ntfy seam as optional under option A. When a wait window was declared, the notify-and-wait is the offline block path and every ntfy send is a logged event.
 - Fire the ntfy notify-and-wait under option B. When waiting was disabled this run, that step is skipped entirely; proceed on the best call and log the forced decision.
-- Reach the external manager before the notify-and-wait step under option A, or treat it as routine. It is gated by the uncertainty ledger.
+- Reach the external manager before the notify-and-wait step under option A, or treat it as routine. It is gated by your in-session unease.
 - Fix the HTML export destination in advance or persist it. The folder is chosen at runtime, project root or an external logs folder.
 - Bypass the standing North-Star override because a wait window is running. The override sits above the entire ladder.
 
@@ -139,17 +139,17 @@ digraph offline_mode {
 - Declare the wait behaviour fresh every run via the per-run picker, option A custom window (default pre-filled 10 minutes) or option B disable waiting.
 - Log every forced-without-you decision, CTO-subagent consultation, wait, and ntfy send while offline mode is active.
 - Notify via ntfy and wait the declared window before any external-manager step, unless waiting was disabled this run.
-- Consult the external manager first, where the uncertainty ledger warrants, before a forced call.
+- Consult the external manager first, where your in-session unease warrants, before a forced call.
 - Export the HTML decision log to the folder the user chooses at runtime at session end, morning-readable.
-- Apply the standing North-Star override at every step, independent of the ledger and the mode.
+- Apply the standing North-Star override at every step, independent of the unease sense and the mode.
 
 ## Integration
 
 **Before this skill:**
 - `playbook:playbook` is the front door. It restates the North Star, batches questions, and makes the visible staffing call. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
 
-**The shared escalation ladder (`design.md` section 8):**
-- Offline mode occupies the offline branches of the same ladder used by tenets 3, 4 and 5: ntfy notify-and-wait the declared window, then the external manager gated by the uncertainty ledger, then the forced call logged to the offline HTML.
+**The shared escalation ladder (`plan-a-design.md` section 8):**
+- Offline mode occupies the offline branches of the same ladder used by tenets 3, 4 and 5: ntfy notify-and-wait the declared window, then the external manager gated by your in-session unease, then the forced call logged to the offline HTML.
 
 **The ntfy seam:**
 - A single `notify "<message>"` contract sending to the user's ntfy topic saved under `.claude`. The example implementation script is supplied by the user during build and saved under `.claude`, so wiring it is a drop-in against the contract specified above.
