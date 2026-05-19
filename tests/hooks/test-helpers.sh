@@ -12,6 +12,14 @@ req="$(playbook_original_request "$stdin_b")"
   && echo "PASS: original request recovered, system record skipped" \
   || { echo "FAIL: original request was [$req]"; exit 1; }
 
+M="$root/tests/hooks/fixtures/transcript-multiline.jsonl"
+stdin_m="$(printf '{"transcript_path":"%s"}' "$M")"
+mreq="$(playbook_original_request "$stdin_m")"
+mexp="$(printf 'First paragraph of the ask.\nSecond paragraph with detail.\nThird line.')"
+[ "$mreq" = "$mexp" ] \
+  && echo "PASS: full multi-line original request recovered verbatim, later turn skipped" \
+  || { echo "FAIL: multi-line request was [$mreq]"; exit 1; }
+
 used="$(playbook_context_used "$stdin_b")"
 [ "$used" = "10020" ] && echo "PASS: usage sum = last assistant input+cache" \
   || { echo "FAIL: used was [$used], expected 10020"; exit 1; }

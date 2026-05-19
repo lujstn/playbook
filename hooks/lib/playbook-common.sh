@@ -14,22 +14,24 @@ playbook_transcript_path() {
   jq -r '.transcript_path // empty' 2>/dev/null <<<"${1:-}" || printf ''
 }
 
-# The verbatim original request: the first transcript record that is the
-# human's own user message. Skips system/hook records (.type!="user"), records
-# whose role is not "user", and tool-result turns (content is an array whose
-# first element type is "tool_result"). Returns the text, or empty on any
-# failure. Silent degradation is mandatory: empty, never a wrong value.
+# The verbatim original request: the complete content of the first transcript
+# record that is the human's own user message, with multi-line content
+# preserved. Skips system/hook records (.type!="user"), records whose role is
+# not "user", and tool-result turns (content is an array whose first element
+# type is "tool_result"). Returns the full text, or empty on any failure.
+# Silent degradation is mandatory: empty, never a wrong value.
 playbook_original_request() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
-    jq -r 'select(.type=="user" and (.message.role=="user"))
-           | .message.content
-           | if type=="string" then .
-             elif type=="array" then
-               (if (.[0].type? == "tool_result") then empty
-                else (map(select(.type=="text")|.text)|join("\n")) end)
-             else empty end' "$f" 2>/dev/null \
-      | awk 'NF{print; exit}'
+    jq -rs 'map(select(.type=="user" and (.message.role=="user")
+                       and ((.message.content|type)=="string"
+                            or ((.message.content|type)=="array"
+                                and (.message.content[0].type? != "tool_result")))))
+            | (.[0] // empty)
+            | .message.content
+            | if type=="string" then .
+              elif type=="array" then (map(select(.type=="text")|.text)|join("\n"))
+              else empty end' "$f" 2>/dev/null
   } 2>/dev/null || printf ''
 }
 
