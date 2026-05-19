@@ -38,7 +38,8 @@ missing="$(playbook_context_percent '{"transcript_path":"/no/such/file"}')"
 
 removed=0
 for fn in playbook_dir playbook_anchor playbook_ledger playbook_ensure_dir \
-          playbook_anchor_init playbook_ledger_append playbook_anchor_read; do
+          playbook_anchor_init playbook_ledger_append playbook_anchor_read \
+          playbook_emit_stop_nudge; do
   if declare -F "$fn" >/dev/null 2>&1; then echo "FAIL: $fn still defined"; removed=1; fi
 done
-[ "$removed" -eq 0 ] && echo "PASS: rejected file helpers removed" || exit 1
+[ "$removed" -eq 0 ] && echo "PASS: rejected file and Stop-channel helpers removed" || exit 1

@@ -87,10 +87,9 @@ playbook_json_escape() {
 }
 
 # Emit the context-injection envelope. Replicates the Superpowers session-start
-# 3-platform branch VERBATIM (proven at /tmp/playbook-research/superpowers/hooks/
-# session-start lines 46-56, comment 38-45): Claude Code reads BOTH additional_context and the
-# nested form without dedup, so exactly one field is emitted per platform.
-# Without this branch the overlay+anchor silently never inject on Cursor/Copilot.
+# three-platform branch: Claude Code reads BOTH additional_context and the nested
+# form without dedup, so exactly one field is emitted per platform. Without this
+# branch the overlay and anchor silently never inject on Cursor or Copilot.
 playbook_emit_context() {
   local event="${1:-}" body="${2:-}" escaped
   escaped="$(playbook_json_escape "$body")"
@@ -101,11 +100,4 @@ playbook_emit_context() {
   else
     printf '{\n  "additionalContext": "%s"\n}\n' "$escaped"
   fi
-}
-
-# Stop-turn nudge. Channel decided by docs/playbook/decisions/2026-05-16-stop-channel.md.
-# MUST be a model-visible, turn-terminating channel (never unconditional decision:block).
-playbook_emit_stop_nudge() {
-  local body="$1"
-  playbook_emit_context "Stop" "$body"   # replace with decided carrier if not additionalContext
 }
