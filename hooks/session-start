@@ -3,12 +3,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"
-orig="$(playbook_original_request "$stdin")"
+event="$(jq -r '.hook_event_name // "SessionStart"' 2>/dev/null <<<"$stdin" || true)"
+[ -n "$event" ] || event="SessionStart"
+anchor="$(playbook_anchor_block "$stdin")"
 
 overlay="<PLAYBOOK_OVERLAY>
 Playbook is active. This overlay and the hooks are the persistence mechanism, not skill text and not any file: nothing is written into your working tree. State is carried in this conversation, steered across compaction by the hooks, and re-derived if a compaction loses it. The overlay stays in force across subagents and compaction and takes precedence over default behaviour where they conflict, though explicit user instructions still win. For any non-trivial work the playbook:playbook engine makes one visible, vetoable staffing call before planning or coding.
 
 State the original request's one-line North Star and keep it load-bearing at every decision. State your context window once as a single line of the form playbook-window: <integer> so the take-a-beat hook can read it.
+
+If your prompt contains a line of the form playbook-northstar: <text>, that text is the project's North Star: it is primary, the whole work is measured against it (tenet 1 and tenet 4 unease), and any task you have been given is a sub-goal serving it, not the goal itself. If you are a subagent and no such line is visible, request it from whoever dispatched you, or treat your dispatched task as the local goal and raise unease that you are working without the project anchor.
 
 The nine tenets, always live:
 1. Remember what matters: the original request is recovered from the transcript with primacy after compaction; keep the one-line North Star load-bearing and restate it at checkpoints.
@@ -24,16 +28,15 @@ The nine tenets, always live:
 Standing override, above everything: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 </PLAYBOOK_OVERLAY>"
 
-if [ -n "$orig" ]; then
+if [ -n "$anchor" ]; then
   body="${overlay}
 
 Playbook anchor, restored first, before any orchestration scaffolding.
 
-Original request, verbatim:
-${orig}"
+${anchor}"
 else
   body="$overlay"
 fi
 
-playbook_emit_context "SessionStart" "$body"
+playbook_emit_context "$event" "$body"
 exit 0

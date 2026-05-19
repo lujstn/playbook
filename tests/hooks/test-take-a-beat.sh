@@ -26,9 +26,40 @@ grep -q "Build me a widget that does X. Original request text." <<<"$out" \
 out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$B" | bash "$H")"
 [ -z "$out" ] && echo "PASS: no beat under 65 percent" || { echo FAIL spurious; exit 1; }
 
-# At/over threshold: announces the beat (beat fixture is 70 percent).
+# Undeclared window with real usage: one self-healing notice, not silence,
+# and not a (false) beat.
+NW="$root/tests/hooks/fixtures/transcript-no-window.jsonl"
+out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$NW" | bash "$H")"
+{ grep -q "Playbook context meter is off" <<<"$out" \
+  && ! grep -qi "taking a beat" <<<"$out"; } \
+  && echo "PASS: self-healing notice on undeclared window" \
+  || { echo "FAIL notice: [$out]"; exit 1; }
+
+# Notice already carried in the transcript: stay silent (once per session).
+NWN="$root/tests/hooks/fixtures/transcript-no-window-noticed.jsonl"
+out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$NWN" | bash "$H")"
+[ -z "$out" ] && echo "PASS: notice not repeated once carried" \
+  || { echo "FAIL notice repeated: [$out]"; exit 1; }
+
+# At/over threshold on the main thread: beat, still labelled original request.
 out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$T" | bash "$H")"
-grep -qi "taking a beat" <<<"$out" && echo "PASS: beat at 70 percent" || { echo FAIL nobeat; exit 1; }
+{ grep -qi "taking a beat" <<<"$out" && grep -q "Original request, verbatim:" <<<"$out" \
+  && ! grep -q "Overall goal" <<<"$out"; } \
+  && echo "PASS: main-thread beat at 70 percent, original-request label" \
+  || { echo "FAIL nobeat/mislabel: [$out]"; exit 1; }
+
+# Subagent beat (agent_id present): drift-check framed, North Star primary,
+# task relabelled, no "Original request, verbatim:".
+SB="$root/tests/hooks/fixtures/transcript-subagent-beat.jsonl"
+out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s","agent_id":"a1"}' "$SB" | bash "$H")"
+{ grep -q "check your work still serves the goal" <<<"$out" \
+  && grep -q "Overall goal (what success means for the whole project):" <<<"$out" \
+  && grep -q "Ship a zero-dependency context anchor" <<<"$out" \
+  && grep -q "Your part of it, verbatim:" <<<"$out" \
+  && grep -q "If your part has drifted from the overall goal" <<<"$out" \
+  && ! grep -q "Original request, verbatim:" <<<"$out"; } \
+  && echo "PASS: subagent beat is drift-check framed with North Star primacy" \
+  || { echo "FAIL subagent beat: [$out]"; exit 1; }
 
 # Unrelated event: silent.
 out="$(printf '{"hook_event_name":"Stop","transcript_path":"%s"}' "$B" | bash "$H")"

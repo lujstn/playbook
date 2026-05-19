@@ -17,17 +17,17 @@ This skill rides on top of native Claude Code, Superpowers and GSD. It does not 
 
 ## The engine flow
 
-Rendered faithfully from `plan-a-design.md` section 5.1, steps 1 to 7.
+Rendered faithfully from `DESIGN.md` section 5.1, steps 1 to 7.
 
 1. **Restate the North Star.** One line of what matters, derived verbatim from the user's request and kept load-bearing in the conversation. It is never written to a file. For trivial work this is one line and there are zero questions.
 2. **Batch the routing questions.** Ask only the questions the staffing call needs: enough to judge separability, durability and rough size. Ask them in one batched set. There are no stupid questions; ask as many as the routing decision needs, but do not gather requirements or design here. Deep clarification of what to build is deferred to the routed substrate (`superpowers:brainstorming`, `/gsd-new-project`, or the chosen custom mode), which owns it. Per tenet 4, you may still stop and ask later.
 3. **Assess separability and durability.** Decide whether the work is too big and must be decomposed (decompose-as-judgement). If so, propose the cut and recurse into the engine per piece.
 4. **Make the staffing call.** One visible, vetoable sentence naming the mode and the reason. Never silently auto-pick.
-5. **Route to the chosen substrate.** Keep the North Star, the unease sense and the tenets doctrine live in the conversation throughout.
+5. **Route to the chosen substrate.** Keep the North Star, the unease sense and the tenets doctrine live in the conversation throughout. Whenever you dispatch any helper, in any mode (native `Agent`, hackathon teammate, a Superpowers or GSD subagent, or a synchronised wave implementer), include the project North Star verbatim as a single labelled line in the dispatch prompt, of the form `playbook-northstar: <one-line North Star>`. The overlay reaches the helper through the `SubagentStart` hook; this data line is the one piece of carried state the hook cannot recover for it, because a helper's transcript starts with its dispatch prompt, not your request. It is a value, not pasted doctrine.
 6. **On the `superpowers-team` route, apply the `writing-plans` override** (see Integration). The chain is `brainstorming` then `writing-plans` then `playbook:modifying-plans` then `playbook:synchronised-subagent-development`. Do not follow the built-in `subagent-driven-development` pointer that `writing-plans` ends on; the engine drives the chain at orchestration level and ignores that pointer (Superpowers is a declared prerequisite we do not fork or edit).
 7. **Production-ready sweep.** Before handing work back, run the tenet 6 sweep.
 
-Standing rule across every step (paste verbatim, `plan-a-design.md` 5.1 and 8, tenet 4):
+Standing rule across every step (paste verbatim, `DESIGN.md` 5.1 and 8, tenet 4):
 
 > if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
@@ -74,7 +74,7 @@ digraph engine {
 
 ## The five-mode routing call
 
-Work is routed on **separability and durability, not size**. Size only answers whether to decompose at all. Separability decides the coordination topology. Durability decides whether the work needs state that outlives the session. Rendered faithfully from `plan-a-design.md` section 2.
+Work is routed on **separability and durability, not size**. Size only answers whether to decompose at all. Separability decides the coordination topology. Durability decides whether the work needs state that outlives the session. Rendered faithfully from `DESIGN.md` section 2.
 
 > | Mode | When it is chosen | Substrate |
 > |---|---|---|
@@ -88,7 +88,7 @@ The staffing call is one visible, vetoable sentence in plain language: the North
 
 ### Adjacent-mode tiebreaker
 
-Paste verbatim, `plan-a-design.md` section 5.1:
+Paste verbatim, `DESIGN.md` section 5.1:
 
 > Adjacent-mode tiebreaker, applied in this order whenever more than one route seems to fit:
 > 1. If the work is separable into sub-tasks that do not need to communicate with each other, choose `intern-team`.
@@ -143,7 +143,7 @@ The override is orchestration-level: we do not fork or edit Superpowers. The eng
 
 ## The nine-tenet overlay
 
-Doctrine that rides on top of whichever mode was chosen. Its always-on guarantee comes from the two hooks carrying state in-session, not from this skill text being re-read; this is why the overlay is not a separate skill and must never be promoted back to one. Each tenet states the native shortfall it closes and the mechanism that improves adherence (`plan-a-design.md` section 3).
+Doctrine that rides on top of whichever mode was chosen. Its always-on guarantee comes from the hooks carrying state in-session (including `SubagentStart`, which carries the overlay into every helper), not from this skill text being re-read; this is why the overlay is not a separate skill and must never be promoted back to one. Each tenet states the native shortfall it closes and the mechanism that improves adherence (`DESIGN.md` section 3).
 
 1. **Remember what's important.** Native compaction reconstructs intent from a flat, unweighted message list, so orchestration scaffolding can outrank the original request. The original request is the first human message in the transcript; the `take-a-beat` hook recovers it verbatim from `transcript_path` and re-injects it with primacy after every compaction. Keep the one-line North Star load-bearing at every decision and restate it at checkpoints. State your context window once as a single line of the form `playbook-window: <integer>` so `take-a-beat` can compute the context percent. Nothing is written into the user's working tree: the conversation is the store and the hooks steer it.
 2. **Ask stupid questions.** `AskUserQuestion` fires only on felt blockage; there is no upfront batched-clarification discipline outside plan mode. At the front door, batch only the questions the staffing call needs, once, before it: enough to judge separability, durability and rough size. There are no stupid questions; ask as many as the routing decision needs. Requirements and design clarification is not done here; it is deferred to the routed substrate (`superpowers:brainstorming`, `/gsd-new-project`, or the chosen custom mode), which asks as many questions as it needs there. Per tenet 4, you may still stop and ask later. Not drip-fed by default.
@@ -161,7 +161,7 @@ Standing override, independent of the unease sense and above the ladder (paste v
 
 > if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
-The ladder, ascending, used by tenets 3, 4 and 5 (`plan-a-design.md` section 8):
+The ladder, ascending, used by tenets 3, 4 and 5 (`DESIGN.md` section 8):
 
 1. **Self.** Take a breath, re-read the original request and the North Star.
 2. **`take-a-beat`.** Deliberate pause and re-anchor.
@@ -188,11 +188,11 @@ If `superpowers-team` is chosen and Superpowers is not installed:
 ## Red Flags
 
 **Never:**
-- Silently auto-pick the mode. The staffing sentence must be visible and vetoable in plain language (`plan-a-design.md` section 11).
+- Silently auto-pick the mode. The staffing sentence must be visible and vetoable in plain language (`DESIGN.md` section 11).
 - Route on size. Routing is on separability and durability; size only triggers decompose-as-judgement.
-- Promote the overlay back into a separate skill. Persistence comes from the `take-a-beat` and `unease` hooks carrying state in-session, not from a file and not from skill text being re-read (`plan-a-design.md` sections 3 and 11).
+- Promote the overlay back into a separate skill. Persistence comes from the `take-a-beat` and `unease` hooks carrying state in-session, not from a file and not from skill text being re-read (`DESIGN.md` sections 3 and 11).
 - Ship scaffolding vocabulary (plan, wave, mission) or plan references in delivered code (tenet 6).
-- Add a sixth mode, a config wizard, or a third heavyweight workflow (`plan-a-design.md` section 11; tenet 8).
+- Add a sixth mode, a config wizard, or a third heavyweight workflow (`DESIGN.md` section 11; tenet 8).
 - Follow `writing-plans`' built-in `subagent-driven-development` pointer on the `superpowers-team` route; drive the chain into `playbook:modifying-plans` then `playbook:synchronised-subagent-development` instead.
 - Expect a `decision:block` from the `unease` hook; it is a stateless constant prompt and only nudges.
 
@@ -203,6 +203,7 @@ If `superpowers-team` is chosen and Superpowers is not installed:
 - Apply the standing North-Star override at every step, independent of the unease sense and the mode.
 - Run the production-ready sweep before handing work back.
 - Fan separable work across agents for speed at the same completeness bar; never ship partial work to save time.
+- Pass the project North Star into every helper dispatch as a `playbook-northstar: <one-line>` data line, in every mode; a helper measures unease against the whole project, not just its task.
 
 ## Integration
 

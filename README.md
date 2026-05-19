@@ -27,7 +27,7 @@ The staffing call is one visible, vetoable sentence in plain language. There is 
 
 ## The nine tenets
 
-The overlay improves adherence to nine tenets, enforced by the engine doctrine plus the two hooks carrying state in-session rather than by skill text being re-read.
+The overlay improves adherence to nine tenets, enforced by the engine doctrine plus the hooks carrying state in-session rather than by skill text being re-read. The overlay reaches helpers in every multi-agent mode through the `SubagentStart` hook (a `Task()` subagent fires `SubagentStart`, not `SessionStart`), and the project North Star travels to each helper as a value on its dispatch prompt.
 
 1. **Remember what's important.** The original request, verbatim, plus the current one-line of what matters, restated at every checkpoint and re-injected with primacy after every compaction.
 2. **Ask stupid questions.** Only the questions the staffing call needs are batched upfront, once, before it; deeper requirements clarification is deferred to the routed substrate.
@@ -39,10 +39,11 @@ The overlay improves adherence to nine tenets, enforced by the engine doctrine p
 8. **Less is more.** Longer thinking and shorter output; pick the cheapest sufficient mode; short questions, plans and comments; keep the common path zero-dependency.
 9. **Speed via more hands, not rushing.** When work is separable the engine fans it across agents for speed at the same completeness bar; partial work to save time is forbidden.
 
-## The two hooks
+## The hooks
 
-- **`take-a-beat`** (tenet 7): a context-monitor and pre-compaction hook that fires at about 65% context used, recovers the original request from the transcript and re-anchors with primacy over orchestration scaffolding.
-- **`unease`** (tenet 4): fires after every agent action and prompts the unease restatement. It is stateless, computes nothing, and writes nothing.
+- **`session-start`** (tenets 1, 3): emits the overlay. Registered on `SessionStart` for the main thread and `SubagentStart` for every spawned helper, so the doctrine reaches subagents in every mode, including substrates Playbook does not own, without re-reading skill text. Inside a helper it labels the dispatch prompt as the assigned task and gives the dispatcher-passed project North Star primacy.
+- **`take-a-beat`** (tenet 7): a context-monitor and pre-compaction hook that fires at about 65% context used, recovers the original request from the transcript and re-anchors with primacy over orchestration scaffolding. The window parse is role-anchored to the agent's own declaration; when no window is declared but work is under way it emits one self-healing notice per session instead of going silent.
+- **`unease`** (tenet 4): fires after every agent action and prompts the unease restatement. It is stateless, computes nothing, and writes nothing. Inside a subagent the platform converts `Stop` to `SubagentStop`, which cannot carry context, so the reply-only-turn pulse there degrades to the per-tool-use pulse plus the lead holding project unease; it never emits a wrong value.
 
 ## Session modes
 

@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Do some work; never declare a window."}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":50,"cache_creation_input_tokens":5000,"cache_read_input_tokens":20000,"output_tokens":40},"content":[{"type":"text","text":"Working, no window declared."}]}}
+{"type":"system","subtype":"hook","content":"Playbook context meter is off: no context window has been declared this session, so the take-a-beat pause at about 65 percent context used cannot fire."}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":60,"cache_creation_input_tokens":6000,"cache_read_input_tokens":25000,"output_tokens":20},"content":[{"type":"text","text":"Still working, still no window."}]}}

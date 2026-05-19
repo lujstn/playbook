@@ -5,16 +5,16 @@ source "${SCRIPT_DIR}/lib/playbook-common.sh"
 
 stdin="$(cat 2>/dev/null || true)"
 event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
-orig="$(playbook_original_request "$stdin")"
+aid="$(jq -r '.agent_id // empty' 2>/dev/null <<<"$stdin" || true)"
+anchor="$(playbook_anchor_block "$stdin")"
 
 reanchor() {
-  [ -n "$orig" ] || return 0
+  [ -n "$anchor" ] || return 0
   playbook_emit_context "$1" "Playbook anchor, restored first, before any orchestration scaffolding.
 
-Original request, verbatim:
-${orig}
+${anchor}
 
-Re-establish the one-line North Star and your current unease from this original request and the live work. Re-state your context window as a single line of the form playbook-window: <integer> if it is not already visible."
+Re-establish the one-line North Star and your current unease from the anchor above and the live work. Re-state your context window as a single line of the form playbook-window: <integer> if it is not already visible."
 }
 
 case "$event" in
@@ -22,8 +22,7 @@ case "$event" in
     playbook_emit_context "PreCompact" "## Compact Instructions
 When summarising, preserve verbatim and ahead of orchestration scaffolding: the original request, the current one-line North Star, the Lessons and wrong turns (including silent wrong turns, not only errors with a stack trace), the current unease level and last movement, and the most recent playbook-window line. Re-anchor the summary on the original request and the next work.
 
-Original request, verbatim:
-${orig}"
+${anchor}"
     ;;
   PostCompact)            reanchor "PostCompact" ;;
   SessionStart)
@@ -33,10 +32,33 @@ ${orig}"
   PostToolUse)
     pct="$(playbook_context_percent "$stdin" || true)"
     if [ -n "$pct" ] && [ "$pct" -ge 65 ] 2>/dev/null; then
-      playbook_emit_context "PostToolUse" "Taking a beat: context is at ${pct} percent used. Pause, re-read the original request and the North Star, carry the lessons and wrong turns forward rather than discarding them as historical, then continue with a fresh head.
+      if [ -n "$aid" ]; then
+        playbook_emit_context "PostToolUse" "Taking a beat: context is at ${pct} percent used. Before continuing, check your work still serves the goal.
 
-Original request, verbatim:
-${orig}"
+${anchor}
+
+If your part has drifted from the overall goal, say so now rather than continuing."
+      else
+        playbook_emit_context "PostToolUse" "Taking a beat: context is at ${pct} percent used. Pause, re-read the original request and the North Star, carry the lessons and wrong turns forward rather than discarding them as historical, then continue with a fresh head.
+
+${anchor}"
+      fi
+    elif [ -z "$pct" ]; then
+      # No percent means no declared window. If real work is under way
+      # (usage records exist) emit one self-healing notice so the missing
+      # context meter is visible rather than silent. Once per session:
+      # gated on the transcript already carrying the notice sentinel, so a
+      # compliant agent that then declares its window clears the condition
+      # and never sees it again.
+      used="$(playbook_context_used "$stdin" || true)"
+      win="$(playbook_declared_window "$stdin" || true)"
+      if [ -n "$used" ] && [ -z "$win" ]; then
+        tp="$(playbook_transcript_path "$stdin")"
+        if [ -z "$tp" ] || [ ! -f "$tp" ] \
+           || ! grep -qF 'Playbook context meter is off' "$tp" 2>/dev/null; then
+          playbook_emit_context "PostToolUse" "Playbook context meter is off: no context window has been declared this session, so the take-a-beat pause at about 65 percent context used cannot fire. Re-enable it by stating your window once as a single line of the form playbook-window: <integer> (for the one-million window state playbook-window: 1000000; for the standard window state playbook-window: 200000), or watch context manually."
+        fi
+      fi
     fi
     ;;
   *) : ;;

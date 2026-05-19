@@ -14,3 +14,23 @@ grep -q "regardless of the unease level or the mode" <<<"$ctx" \
   && echo "PASS: no file-persistence claim" || { echo "FAIL: still claims a file persists"; exit 1; }
 ! grep -qi 'uncertainty' <<<"$ctx" && echo "PASS: unease naming" || { echo "FAIL: uncertainty word present"; exit 1; }
 jq -e . <<<"$out" >/dev/null && echo "PASS: valid JSON" || { echo FAIL json; exit 1; }
+
+# SubagentStart: the same overlay must reach a spawned subagent, and the
+# envelope must carry the actual event name so Claude Code routes it (a
+# hardcoded "SessionStart" would be ignored for a SubagentStart firing).
+export CLAUDE_PLUGIN_ROOT="$root"
+unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
+sout="$(printf '{"hook_event_name":"SubagentStart","agent_id":"a1","agent_type":"general-purpose"}' | bash "$H")"
+sev="$(jq -r '.hookSpecificOutput.hookEventName' <<<"$sout")"
+sctx="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$sout")"
+[ "$sev" = "SubagentStart" ] && echo "PASS: SubagentStart envelope event name" \
+  || { echo "FAIL: envelope event was [$sev]"; exit 1; }
+grep -q "PLAYBOOK_OVERLAY" <<<"$sctx" && echo "PASS: overlay reaches subagent" \
+  || { echo FAIL subagent overlay; exit 1; }
+{ grep -q "playbook-northstar" <<<"$sctx" && grep -qi "sub-goal serving it" <<<"$sctx"; } \
+  && echo "PASS: overlay carries the project North Star precedence clause" \
+  || { echo FAIL northstar clause; exit 1; }
+mout="$(printf '{"hook_event_name":"SessionStart","source":"startup"}' | bash "$H")"
+[ "$(jq -r '.hookSpecificOutput.hookEventName' <<<"$mout")" = "SessionStart" ] \
+  && echo "PASS: SessionStart envelope event name unchanged" \
+  || { echo FAIL sessionstart event name; exit 1; }

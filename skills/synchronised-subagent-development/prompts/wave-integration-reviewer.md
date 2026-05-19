@@ -111,6 +111,16 @@ Task tool (general-purpose):
     - Task A's code calls a function from Task B's file, even though A and B were declared
       file-disjoint. The wave-disjointness assumption was incomplete.
 
+    ### Scaffolding comment leak (promotion gate, not single-task style)
+
+    - Any comment in the merged wave diff that references a plan, a wave, a phase, a
+      mission, a task number, or this delivery effort (for example `// Wave 2: ...`,
+      `// added in Phase A`, `// per Task 5`). This is the last gate before the wave
+      is promoted to the integration branch; such comments must never ship. This is a
+      delivery-artefact leak, not a re-litigation of single-task style: flag it even
+      though per-task review should have caught it, because the merged state is what
+      gets promoted.
+
     ## What NOT to Check
 
     Per-task correctness was already reviewed. Do not re-litigate:
@@ -167,7 +177,8 @@ Task tool (general-purpose):
     - **Issues (if REJECT):** for each issue, give:
       - Severity: critical | important
       - Category: shared_infra | type_drift | fixture_collision | contract_drift |
-        wave_0_footprint_violation | mesh_violation | hidden_runtime_dep
+        wave_0_footprint_violation | mesh_violation | hidden_runtime_dep |
+        scaffolding_comment_leak
       - Tasks involved: which task IDs collided
       - File:line references
       - Suggested resolution: which task should change, and how (one sentence)

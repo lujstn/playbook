@@ -7,7 +7,7 @@ description: Use only when explicitly run to enable offline behaviour for one se
 
 ## Overview
 
-Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalate path, an ntfy emergency channel, and a morning-readable HTML decision log. It is reached only when the user runs it explicitly. It is never enabled implicitly, never inferred, and never carried over from a previous run. Rendered faithfully from `plan-a-design.md` section 5.3 and section 8.
+Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalate path, an ntfy emergency channel, and a morning-readable HTML decision log. It is reached only when the user runs it explicitly. It is never enabled implicitly, never inferred, and never carried over from a previous run. Rendered faithfully from `DESIGN.md` section 5.3 and section 8.
 
 **Core principle:** Absence is not permission. When the user is away, wait the window the user declared this run, escalate up the ladder, and only then proceed on the best call, logging every absent-decision so the user can read exactly what happened in the morning.
 
@@ -26,7 +26,7 @@ The choice is not persisted and is not inferred from any previous run. The user 
 
 ## Decision log
 
-While offline mode is active, accumulate a running ledger of events that occur specifically because the user was absent. The event set, verbatim from `plan-a-design.md` section 5.3, is:
+While offline mode is active, accumulate a running ledger of events that occur specifically because the user was absent. The event set, verbatim from `DESIGN.md` section 5.3, is:
 
 - Forced-without-you decisions made after the wait window elapsed.
 - CTO-subagent consultations.
@@ -41,7 +41,7 @@ At the end of the session, render the accumulated ledger to a clean, simple-to-r
 
 ## The escalation ladder position
 
-Offline mode occupies the offline branches of the shared escalation ladder (`plan-a-design.md` section 8). The standing override sits above the entire ladder and is independent of the unease sense and the mode:
+Offline mode occupies the offline branches of the shared escalation ladder (`DESIGN.md` section 8). The standing override sits above the entire ladder and is independent of the unease sense and the mode:
 
 > if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
 
@@ -58,7 +58,7 @@ The ladder steps that govern the proceed-and-log path under either option:
 
 ## The ntfy setup flow
 
-ntfy replaces SMS because it is free. The purpose of the notification is to pull the user back to their computer or the Claude app to steer. The setup flow, verbatim from `plan-a-design.md` section 8, is:
+ntfy replaces SMS because it is free. The purpose of the notification is to pull the user back to their computer or the Claude app to steer. The setup flow, verbatim from `DESIGN.md` section 8, is:
 
 1. The user creates a topic via the ntfy URL.
 2. The user downloads the ntfy app.
@@ -126,7 +126,7 @@ digraph offline_mode {
 ## Red Flags
 
 **Never:**
-- Enable offline mode implicitly, by inference, or by carrying over a previous run. It is explicit, per run, every time (`plan-a-design.md` section 5.3).
+- Enable offline mode implicitly, by inference, or by carrying over a previous run. It is explicit, per run, every time (`DESIGN.md` section 5.3).
 - Remember or persist the picker choice across runs, or infer it from a previous run. The user must declare it fresh every invocation.
 - Produce a decision log on an online run. Online absence means blocked and we wait; the log accumulates only while offline mode is active.
 - Treat the ntfy seam as optional under option A. When a wait window was declared, the notify-and-wait is the offline block path and every ntfy send is a logged event.
@@ -148,7 +148,7 @@ digraph offline_mode {
 **Before this skill:**
 - `playbook:playbook` is the front door. It restates the North Star, batches questions, and makes the visible staffing call. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
 
-**The shared escalation ladder (`plan-a-design.md` section 8):**
+**The shared escalation ladder (`DESIGN.md` section 8):**
 - Offline mode occupies the offline branches of the same ladder used by tenets 3, 4 and 5: ntfy notify-and-wait the declared window, then the external manager gated by your in-session unease, then the forced call logged to the offline HTML.
 
 **The ntfy seam:**
