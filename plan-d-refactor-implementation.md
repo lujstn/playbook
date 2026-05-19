@@ -16,6 +16,8 @@
 
 **Deviation D1 (errexit jq guard, applied during execution):** The Task 2 `unease` and Task 3 `take-a-beat` hook bodies as first drafted ran `event="$(jq ... <<<"$stdin")"` (and the Task 3 `src="$(jq ...)"`) with no failure guard. Under `set -euo pipefail` a non-JSON or truncated stdin makes that command substitution non-zero and aborts the hook before the `event="Stop"`/empty fallback can run, so the hook emits nothing and exits with an error. That silently disables the tenet on that turn and contradicts plan-c's mandatory silent-degradation contract. The sanctioned correction, recorded here so the text reads as though always written this way, is the trailing `|| true` on those `jq` substitutions plus an empty-and-non-JSON-stdin regression assertion in the Task 2 and Task 3 tests. Behaviour for every valid hook JSON payload is unchanged.
 
+**Deviation D2 (full verbatim original-request recovery, applied during execution):** Task 1's `playbook_original_request` as first drafted ended its pipeline with `awk 'NF{print; exit}'`, returning only the first non-empty line of the first human message, so a multi-paragraph original request was truncated to a single line. That defeats Tenet 1's verbatim recovery, the reason the no-file design exists, and stays green against single-line fixtures, the same silent class as D1. The sanctioned correction, recorded here so the text reads as though always written this way, replaces the streaming `jq -r ... | awk` with a slurped `jq -rs` that selects the first genuine human message (skipping system and hook records and tool-result turns) and emits its complete content with multi-line preserved, plus a multi-line fixture and an assertion proving full verbatim recovery. Behaviour for single-line requests is unchanged.
+
 **Retained, not deleted:** `plan-b-implementation.md` is the superseded build plan for the rejected model. Per `plan-c-refactor.md` section 0 this plan supersedes it; it stays in the repository as historical record, like `archived-docs-for-context/`, and no task removes it.
 
 ---
@@ -67,6 +69,15 @@ Create `tests/hooks/fixtures/transcript-beat.jsonl` (last usage sums to 700020 o
 {"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":20,"cache_creation_input_tokens":120000,"cache_read_input_tokens":580000,"output_tokens":10},"content":[{"type":"text","text":"playbook-window: 1000000"}]}}
 ```
 
+Create `tests/hooks/fixtures/transcript-multiline.jsonl` (a system record, then a genuine first human message whose content is a multi-line string, then a later tool-result user turn that must be skipped, proving the recovery returns the complete first human message verbatim and not a later turn):
+
+```jsonl
+{"type":"system","subtype":"hook","content":"noise"}
+{"type":"user","message":{"role":"user","content":"First paragraph of the ask.\nSecond paragraph with detail.\nThird line."}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"tool noise"}]}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","content":[{"type":"text","text":"ok"}]}}
+```
+
 - [ ] **Step 2: Write the failing helper test**
 
 Create `tests/hooks/test-helpers.sh`:
@@ -85,6 +96,14 @@ req="$(playbook_original_request "$stdin_b")"
 [ "$req" = "Build me a widget that does X. Original request text." ] \
   && echo "PASS: original request recovered, system record skipped" \
   || { echo "FAIL: original request was [$req]"; exit 1; }
+
+M="$root/tests/hooks/fixtures/transcript-multiline.jsonl"
+stdin_m="$(printf '{"transcript_path":"%s"}' "$M")"
+mreq="$(playbook_original_request "$stdin_m")"
+mexp="$(printf 'First paragraph of the ask.\nSecond paragraph with detail.\nThird line.')"
+[ "$mreq" = "$mexp" ] \
+  && echo "PASS: full multi-line original request recovered verbatim, later turn skipped" \
+  || { echo "FAIL: multi-line request was [$mreq]"; exit 1; }
 
 used="$(playbook_context_used "$stdin_b")"
 [ "$used" = "10020" ] && echo "PASS: usage sum = last assistant input+cache" \
@@ -125,22 +144,24 @@ playbook_transcript_path() {
   jq -r '.transcript_path // empty' 2>/dev/null <<<"${1:-}" || printf ''
 }
 
-# The verbatim original request: the first transcript record that is the
-# human's own user message. Skips system/hook records (.type!="user"), records
-# whose role is not "user", and tool-result turns (content is an array whose
-# first element type is "tool_result"). Returns the text, or empty on any
-# failure. Silent degradation is mandatory: empty, never a wrong value.
+# The verbatim original request: the complete content of the first transcript
+# record that is the human's own user message, with multi-line content
+# preserved. Skips system/hook records (.type!="user"), records whose role is
+# not "user", and tool-result turns (content is an array whose first element
+# type is "tool_result"). Returns the full text, or empty on any failure.
+# Silent degradation is mandatory: empty, never a wrong value.
 playbook_original_request() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
-    jq -r 'select(.type=="user" and (.message.role=="user"))
-           | .message.content
-           | if type=="string" then .
-             elif type=="array" then
-               (if (.[0].type? == "tool_result") then empty
-                else (map(select(.type=="text")|.text)|join("\n")) end)
-             else empty end' "$f" 2>/dev/null \
-      | awk 'NF{print; exit}'
+    jq -rs 'map(select(.type=="user" and (.message.role=="user")
+                       and ((.message.content|type)=="string"
+                            or ((.message.content|type)=="array"
+                                and (.message.content[0].type? != "tool_result")))))
+            | (.[0] // empty)
+            | .message.content
+            | if type=="string" then .
+              elif type=="array" then (map(select(.type=="text")|.text)|join("\n"))
+              else empty end' "$f" 2>/dev/null
   } 2>/dev/null || printf ''
 }
 
@@ -195,7 +216,7 @@ Expected: every line `PASS`. Then `bash -n hooks/lib/playbook-common.sh` exits 0
 - [ ] **Step 6: Commit**
 
 ```bash
-git add hooks/lib/playbook-common.sh tests/hooks/test-helpers.sh tests/hooks/fixtures/transcript-basic.jsonl tests/hooks/fixtures/transcript-beat.jsonl
+git add hooks/lib/playbook-common.sh tests/hooks/test-helpers.sh tests/hooks/fixtures/transcript-basic.jsonl tests/hooks/fixtures/transcript-beat.jsonl tests/hooks/fixtures/transcript-multiline.jsonl
 git commit -m "refactor: replace file/GSD helpers with transcript-derived helpers"
 ```
 
