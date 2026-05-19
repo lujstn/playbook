@@ -22,6 +22,8 @@
 
 **Deviation D4 (aggregate long-dash sweep silently false-green on BSD grep, applied during execution):** Task 10 Step 2 first mandated the aggregate sweep detector `LC_ALL=C grep -rln $'\xe2\x80\x94\|\xe2\x80\x93'`, asserting it matches on both BSD and GNU grep. Empirically it does not: under BSD grep, the primary dev platform, with a C locale, the BRE `\|` alternation over multibyte byte-operands silently fails to match, so the gate stays green even when a long dash is present. That is exactly the silent-no-op class this gate exists to eliminate, one layer deeper than the original `grep -rlnP` it replaced, and the project memory's blessed recursive form was itself this unsound construct. The sanctioned correction, recorded here so the text reads as though always written this way, splits the single fragile alternation into two single-codepoint byte scans combined by shell `||` (no `\|` operand), proven sound on BSD grep under both a C and a UTF-8 locale and on GNU grep, with the FAIL and success polarity and message unchanged.
 
+**Deviation D5 (dead rejected-Stop-channel surface in the shared library, applied during execution):** Task 1 Step 4 first instructed keeping `playbook_emit_stop_nudge` exactly as it was. That function is dead rejected-Stop-channel vestige: it is called by no hook, skill or test, is asserted by none, and its comment references the non-shipped `docs/playbook/decisions/2026-05-16-stop-channel.md` and carries a "replace with decided carrier" decide-later marker, while the live `playbook_emit_context` comment above it points at a non-existent `/tmp/playbook-research/...` scratch path. Keeping it carries removed-model surface and comment sludge into the shipped library, contrary to plan-c section 0 and section 7 (purge the rejected model) and plan-c tenet 6 (no comment sludge in shipped code; sweep before handing back). The sanctioned correction, recorded here so the text reads as though always written this way, deletes `playbook_emit_stop_nudge` and its comment, drops the dead scratch-path pointer from the `playbook_emit_context` comment while preserving its substantive rationale, and adds `playbook_emit_stop_nudge` to the removed-helpers assertion so the gate proves it gone. No live behaviour changes and the full suite stays green.
+
 **Retained, not deleted:** `plan-b-implementation.md` is the superseded build plan for the rejected model. Per `plan-c-refactor.md` section 0 this plan supersedes it; it stays in the repository as historical record, like `archived-docs-for-context/`, and no task removes it.
 
 ---
@@ -127,10 +129,11 @@ missing="$(playbook_context_percent '{"transcript_path":"/no/such/file"}')"
 
 removed=0
 for fn in playbook_dir playbook_anchor playbook_ledger playbook_ensure_dir \
-          playbook_anchor_init playbook_ledger_append playbook_anchor_read; do
+          playbook_anchor_init playbook_ledger_append playbook_anchor_read \
+          playbook_emit_stop_nudge; do
   if declare -F "$fn" >/dev/null 2>&1; then echo "FAIL: $fn still defined"; removed=1; fi
 done
-[ "$removed" -eq 0 ] && echo "PASS: rejected file helpers removed" || exit 1
+[ "$removed" -eq 0 ] && echo "PASS: rejected file and Stop-channel helpers removed" || exit 1
 ```
 
 - [ ] **Step 3: Run it to verify it fails**
@@ -140,7 +143,7 @@ Expected: FAIL on the first assertion (`playbook_original_request: command not f
 
 - [ ] **Step 4: Refactor `hooks/lib/playbook-common.sh`**
 
-Keep `playbook_project_dir`, `playbook_json_escape`, `playbook_emit_context` and `playbook_emit_stop_nudge` exactly as they are. Delete `playbook_dir`, `playbook_anchor`, `playbook_ledger`, `playbook_ensure_dir`, `playbook_anchor_init`, `playbook_ledger_append`, `playbook_anchor_read`, and the GSD-bridge `playbook_context_percent`. Add the following (place after `playbook_project_dir`):
+Keep `playbook_project_dir`, `playbook_json_escape` and `playbook_emit_context` exactly as they are, except that the `playbook_emit_context` comment must not point at any scratch path: drop the dead `(proven at /tmp/playbook-research/...)` parenthetical while preserving the substantive rationale (the three-platform branch, both fields read without dedup, the silent-non-injection failure mode on Cursor/Copilot). Delete `playbook_dir`, `playbook_anchor`, `playbook_ledger`, `playbook_ensure_dir`, `playbook_anchor_init`, `playbook_ledger_append`, `playbook_anchor_read`, the GSD-bridge `playbook_context_percent`, and `playbook_emit_stop_nudge` together with its comment: it is dead rejected-Stop-channel surface, called by nothing and asserted by no test, whose comment references a non-shipped decision document and carries a decide-later marker, contrary to plan-c tenet 6, so it is removed rather than kept (Deviation D5). Add the following (place after `playbook_project_dir`):
 
 ```bash
 # Resolve the transcript path from hook stdin JSON. Empty if absent.
