@@ -7,7 +7,7 @@ description: Use when coupled work in one shared codebase needs peers that talk 
 
 ## Overview
 
-A thin choreography over Claude Code's native agent-teams primitive (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). It is reached only when the `playbook:playbook` engine has made the staffing call for the `hackathon-team` route: coupled work in one shared codebase where peers must talk to each other and coordination should stay lightweight. It adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below). Rendered faithfully from `design.md` section 5.2.
+A thin choreography over Claude Code's native agent-teams primitive (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). It is reached only when the `playbook:playbook` engine has made the staffing call for the `hackathon-team` route: coupled work in one shared codebase where peers must talk to each other and coordination should stay lightweight. It adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below). Rendered faithfully from `plan-a-design.md` section 5.2.
 
 **Core principle:** Co-located peers, partitioned once by file ownership, then left to self-organise. The lead coordinates and steps back; it does not think for the team. Less is more (tenet 8): the smallest team that fits the partition.
 
@@ -19,7 +19,7 @@ Co-located peers in one shared working directory. There are no isolated worktree
 
 ## The lead-authority limitation, stated openly
 
-Native agent-teams requires a mandatory, non-delegable lead that holds task-assignment authority. The choreography therefore cannot cast a pure comms-only, fully equal-peer lead the way tenet 3 would otherwise prefer. This is the one technically-forced exception to the equals doctrine, and `design.md` section 5.2 and tenet 3 both name it openly rather than hiding it.
+Native agent-teams requires a mandatory, non-delegable lead that holds task-assignment authority. The choreography therefore cannot cast a pure comms-only, fully equal-peer lead the way tenet 3 would otherwise prefer. This is the one technically-forced exception to the equals doctrine, and `plan-a-design.md` section 5.2 and tenet 3 both name it openly rather than hiding it.
 
 The choreography honours tenet 3 as closely as the primitive allows:
 
@@ -43,7 +43,7 @@ Teammates run in the background and persist until they are explicitly shut down.
 
 ## Sizing
 
-Default to a small team. Native guidance recommends roughly 3 to 5 peers. The choreography may go modestly higher when the file-ownership partition is clean, but it defaults conservative per tenet 8. The exact size cap is user-tunable per `design.md` section 12; do not hardcode a hard ceiling, prefer the conservative default and let the user widen it deliberately.
+Default to a small team. Native guidance recommends roughly 3 to 5 peers. The choreography may go modestly higher when the file-ownership partition is clean, but it defaults conservative per tenet 8. The exact size cap is user-tunable per `plan-a-design.md` section 12; do not hardcode a hard ceiling, prefer the conservative default and let the user widen it deliberately.
 
 ## Process
 
@@ -86,7 +86,7 @@ digraph hackathon_team {
 - Pretend the lead is comms-only or fully equal when native agent-teams forbids that. State the limitation honestly instead.
 - Re-explain the native agent-teams API mechanically beyond the lead-authority gap that closes the tenet 3 exception (tenet 8).
 - Assume `/resume` or `/rewind` brings in-process teammates back, or leave a finished team running.
-- Hardcode a hard size ceiling. The cap is user-tunable per `design.md` section 12.
+- Hardcode a hard size ceiling. The cap is user-tunable per `plan-a-design.md` section 12.
 
 **Always:**
 - Partition by file ownership before spawning, with exactly one owner per in-scope file.

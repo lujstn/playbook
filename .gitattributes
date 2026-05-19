@@ -2,6 +2,6 @@
 hooks/run-hook.cmd text eol=lf
 hooks/session-start text eol=lf
 hooks/take-a-beat text eol=lf
-hooks/uncertainty text eol=lf
+hooks/unease text eol=lf
 *.md text eol=lf
 *.json text eol=lf

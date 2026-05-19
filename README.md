@@ -30,7 +30,7 @@ The staffing call is one visible, vetoable sentence in plain language. There is 
 The overlay improves adherence to nine tenets, enforced by the engine doctrine plus the two hooks carrying state in-session rather than by skill text being re-read.
 
 1. **Remember what's important.** The original request, verbatim, plus the current one-line of what matters, restated at every checkpoint and re-injected with primacy after every compaction.
-2. **Ask stupid questions.** All clarifying questions are batched upfront, once, before the staffing call; ask as many as needed until confident.
+2. **Ask stupid questions.** Only the questions the staffing call needs are batched upfront, once, before it; deeper requirements clarification is deferred to the routed substrate.
 3. **Team alignment.** Every multi-agent mode treats the team as equals; a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents push back with technical reasoning.
 4. **Unease.** An in-session unease pulse restated after every agent action, never a file or a score; the escalation ladder is offered only on an increase; a standing override stops and asks the user whenever the North Star would no longer be met.
 5. **Offline mode.** `playbook:offline-mode` adds an explicit per-run wait picker, an ntfy notification channel, an external-manager fallback, and an absent-decisions log.
@@ -43,6 +43,16 @@ The overlay improves adherence to nine tenets, enforced by the engine doctrine p
 
 - **`take-a-beat`** (tenet 7): a context-monitor and pre-compaction hook that fires at about 65% context used, recovers the original request from the transcript and re-anchors with primacy over orchestration scaffolding.
 - **`unease`** (tenet 4): fires after every agent action and prompts the unease restatement. It is stateless, computes nothing, and writes nothing.
+
+## Session modes
+
+Alongside the engine and the tenets, the plugin bundles three opt-in session modes. Each is entered by typing a literal token and stays active until you type `[close]`, `[end]`, `[exit]`, or `[done]`. They are orthogonal to the staffing call: they change how the current session behaves, not which team runs the work, and none of them activate by inference or from memory.
+
+| Mode | Token | What it does |
+|---|---|---|
+| `playbook:fix-mode` | `[fix]` | Enters a strict fix protocol for a named set of errors, under production-ready rules with strong types and Zod schemas, planning and critiquing each fix before writing code. |
+| `playbook:debug-mode` | `[debug]` | Enters a strict debugging workflow with a read, summarise, diagnose, confirm cycle for every file, user confirmation before each modification, and compaction checkpoints. |
+| `playbook:reduce-cost-mode` | `[budget]` | Applies session-scoped, cost-saving model selection: lighter tiers and lower reasoning effort for low-risk work while keeping the parent model for judgment work. |
 
 ## Prerequisites and graceful degradation
 

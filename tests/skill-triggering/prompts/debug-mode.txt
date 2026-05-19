@@ -1,0 +1,1 @@
+[debug] the login button does nothing when clicked, no console error
