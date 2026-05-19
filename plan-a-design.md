@@ -203,7 +203,7 @@ The ladder, ascending, used by tenets 3, 4 and 5:
 4. Fresh subagent for a second pair of eyes (the routine, cheap alignment path).
 5. Notify the user via ntfy to come and steer, and wait. Online: the work is blocked and waits for the user. Offline (`playbook:offline-mode`): wait the per-run-declared window, default pre-filled at 10 minutes, unless disabled at that run.
 6. External manager: an external-model LLM with control powers over this running instance, not a same-model peer. Reached only after the notify-and-wait step, and gated by the unease sense so it is never routine.
-7. Offline only: if still no response after the window, proceed with the best call and log it to the offline HTML, having consulted the external manager first where the ledger warrants.
+7. Offline only: if still no response after the window, proceed with the best call and log it to the offline HTML, having consulted the external manager first where your in-session unease warrants.
 
 The external manager never precedes the notify-and-wait step.
 

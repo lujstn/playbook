@@ -8,6 +8,7 @@ chk "! grep -qi 'uncertainty' '$P'" "concept renamed to unease everywhere includ
 chk "! grep -qE '\.playbook/[A-Za-z._-]' '$P'" "no .playbook/ path references"
 chk "! grep -qi 'uncertainty-ledger\\|pinned anchor file' '$P'" "section 6 no longer file-based"
 chk "! grep -qiE 'unease ledger|the unease ledger' '$P'" "plan-a no surviving ledger-mechanism phrasing"
+chk "! grep -qiE 'the ledger warrants|gated by the [a-z ]*ledger' '$P'" "plan-a no surviving positive ledger-gate phrasing (D3)"
 chk "grep -q 'ntfy' '$P'" "tenet 5 ntfy adaptation preserved"
 chk "grep -qi '65% context\\|65 percent context\\|sixty-five percent' '$P'" "tenet 7 context adaptation preserved"
 chk "grep -qi 'external manager' '$P'" "tenet 3 external-manager adaptation preserved"
