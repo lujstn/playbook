@@ -4,49 +4,41 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 
 stdin="$(cat 2>/dev/null || true)"
-event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin")"
-anchor="$(playbook_anchor_read "$stdin")"
+event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
+orig="$(playbook_original_request "$stdin")"
 
-MONITOR_EVENT="PostToolUse"   # the monitor event chosen in Task 4; change here only
+reanchor() {
+  [ -n "$orig" ] || return 0
+  playbook_emit_context "$1" "Playbook anchor, restored first, before any orchestration scaffolding.
+
+Original request, verbatim:
+${orig}
+
+Re-establish the one-line North Star and your current unease from this original request and the live work. Re-state your context window as a single line of the form playbook-window: <integer> if it is not already visible."
+}
 
 case "$event" in
   PreCompact)
-    body="## Compact Instructions
-When summarising this conversation, preserve the Playbook anchor's Lessons and wrong turns section verbatim (silent wrong turns included, not only errors that produced a stack trace). Re-anchor the summary on the original user request and the next work, so the original intent outranks planning and orchestration scaffolding. The anchor follows:
+    playbook_emit_context "PreCompact" "## Compact Instructions
+When summarising, preserve verbatim and ahead of orchestration scaffolding: the original request, the current one-line North Star, the Lessons and wrong turns (including silent wrong turns, not only errors with a stack trace), the current unease level and last movement, and the most recent playbook-window line. Re-anchor the summary on the original request and the next work.
 
-${anchor}"
-    playbook_emit_context "PreCompact" "$body"
+Original request, verbatim:
+${orig}"
     ;;
-  PostCompact)
-    # First-class post-compaction event ("receives summary" per the hooks
-    # reference). Re-inject the anchor with primacy regardless of matcher.
-    [ -n "$anchor" ] && playbook_emit_context "PostCompact" \
-      "Playbook anchor (restored first, before orchestration scaffolding):
-
-${anchor}"
-    ;;
+  PostCompact)            reanchor "PostCompact" ;;
   SessionStart)
-    # Belt-and-braces: if the harness re-runs SessionStart after auto-compaction
-    # (source=compact) rather than PostCompact, restore the anchor here too.
-    src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin")"
-    if [ "$src" = "compact" ] && [ -n "$anchor" ]; then
-      playbook_emit_context "SessionStart" \
-        "Playbook anchor (restored first, before orchestration scaffolding):
-
-${anchor}"
-    fi
+    src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
+    [ "$src" = "compact" ] && reanchor "SessionStart"
     ;;
-  "$MONITOR_EVENT")
-    pct="$(playbook_context_percent || true)"
+  PostToolUse)
+    pct="$(playbook_context_percent "$stdin" || true)"
     if [ -n "$pct" ] && [ "$pct" -ge 65 ] 2>/dev/null; then
-      playbook_emit_context "$MONITOR_EVENT" \
-        "Taking a beat: context is at ${pct}% used. Pause, re-read the Playbook anchor and its lessons ledger, then continue with a fresh head. Carry the lessons forward; do not treat them as historical. Anchor:
+      playbook_emit_context "PostToolUse" "Taking a beat: context is at ${pct} percent used. Pause, re-read the original request and the North Star, carry the lessons and wrong turns forward rather than discarding them as historical, then continue with a fresh head.
 
-${anchor}"
+Original request, verbatim:
+${orig}"
     fi
     ;;
-  *)
-    : # any other event: emit nothing (m3: no broad wildcard monitor)
-    ;;
+  *) : ;;
 esac
 exit 0

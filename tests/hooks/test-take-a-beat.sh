@@ -2,47 +2,48 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/take-a-beat"
-tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-# Exercise the Claude Code platform path: the harness always sets
-# CLAUDE_PLUGIN_ROOT for plugin hooks (mirrors Superpowers session-start
-# lines 49-50; see playbook-common.sh playbook_emit_context). The assertions
-# below test the Claude shape (.hookSpecificOutput.additionalContext), so the
-# Claude platform branch must be selected; clear the other platforms' markers
-# so selection is deterministic regardless of the ambient shell.
 export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
-source "$root/hooks/lib/playbook-common.sh"
-printf '{"cwd":"%s"}' "$tmp" > "$tmp/in.json"
-playbook_anchor_init "ORIG-REQ" "WHAT-MATTERS" "$(cat "$tmp/in.json")"
+B="$root/tests/hooks/fixtures/transcript-basic.jsonl"
+T="$root/tests/hooks/fixtures/transcript-beat.jsonl"
 
-# PreCompact: must inject compact instructions naming the lessons ledger.
-out="$(jq -c '. + {hook_event_name:"PreCompact"}' "$tmp/in.json" | bash "$H")"
+# PreCompact: steer that names the carried items, no file read.
+out="$(printf '{"hook_event_name":"PreCompact","transcript_path":"%s"}' "$B" | bash "$H")"
 jq -e '.hookSpecificOutput.additionalContext | test("Compact Instructions")' <<<"$out" >/dev/null \
-  && echo "PASS: precompact steers" || { echo "FAIL precompact"; exit 1; }
-grep -q "Lessons and wrong turns" <<<"$out" && echo "PASS: lessons preserved" || { echo "FAIL lessons"; exit 1; }
+  && echo "PASS: precompact steers" || { echo FAIL precompact; exit 1; }
+grep -q "Lessons and wrong turns" <<<"$out" && echo "PASS: lessons named" || { echo FAIL lessons; exit 1; }
+grep -q "playbook-window" <<<"$out" && echo "PASS: declared window carried" || { echo FAIL window; exit 1; }
 
-# Post-compaction: anchor re-injected with primacy.
-out="$(jq -c '. + {hook_event_name:"SessionStart",source:"compact"}' "$tmp/in.json" | bash "$H")"
-grep -q "ORIG-REQ" <<<"$out" && echo "PASS: anchor re-injected" || { echo "FAIL reanchor"; exit 1; }
+# Post-compaction: original request recovered from the transcript with primacy.
+out="$(printf '{"hook_event_name":"PostCompact","transcript_path":"%s"}' "$B" | bash "$H")"
+grep -q "Build me a widget that does X. Original request text." <<<"$out" \
+  && echo "PASS: original request re-injected from transcript" || { echo FAIL reanchor; exit 1; }
+out="$(printf '{"hook_event_name":"SessionStart","source":"compact","transcript_path":"%s"}' "$B" | bash "$H")"
+grep -q "Build me a widget that does X. Original request text." <<<"$out" \
+  && echo "PASS: SessionStart/compact also recovers" || { echo FAIL reanchor2; exit 1; }
 
-# Monitor below threshold: silent.
-# NB: a `VAR=val name=$(...)` line is an assignment, not a simple command, so
-# the env prefix is NOT exported into the command-substitution subshell (POSIX
-# applies the prefix only to simple commands). The fixture must reach the hook
-# subprocess for this to be a real test, so export it on its own statement and
-# unset it after to keep each block hermetic.
-export PLAYBOOK_CTX_FIXTURE="$root/tests/hooks/fixtures/ctx-used-40.json"
-out="$(jq -c '. + {hook_event_name:"PostToolUse"}' "$tmp/in.json" | bash "$H")"
-[ -z "$out" ] || [ "$(jq -r '.hookSpecificOutput.additionalContext // ""' <<<"$out")" = "" ] \
-  && echo "PASS: no beat under 65%" || { echo "FAIL spurious beat"; exit 1; }
-unset PLAYBOOK_CTX_FIXTURE
+# Below threshold: silent (basic fixture is ~1 percent of 1,000,000).
+out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$B" | bash "$H")"
+[ -z "$out" ] && echo "PASS: no beat under 65 percent" || { echo FAIL spurious; exit 1; }
 
-# Monitor at/over threshold: announces the beat.
-export PLAYBOOK_CTX_FIXTURE="$root/tests/hooks/fixtures/ctx-used-70.json"
-out="$(jq -c '. + {hook_event_name:"PostToolUse"}' "$tmp/in.json" | bash "$H")"
-grep -qi "taking a beat" <<<"$out" && echo "PASS: beat at 70%" || { echo "FAIL no beat"; exit 1; }
-unset PLAYBOOK_CTX_FIXTURE
+# At/over threshold: announces the beat (beat fixture is 70 percent).
+out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$T" | bash "$H")"
+grep -qi "taking a beat" <<<"$out" && echo "PASS: beat at 70 percent" || { echo FAIL nobeat; exit 1; }
 
-# Unrelated event (e.g. Stop) must produce nothing (regression for m3).
-out="$(jq -c '. + {hook_event_name:"Stop"}' "$tmp/in.json" | bash "$H")"
-[ -z "$out" ] && echo "PASS: silent on non-handled events" || { echo "FAIL: spurious output on Stop"; exit 1; }
+# Unrelated event: silent.
+out="$(printf '{"hook_event_name":"Stop","transcript_path":"%s"}' "$B" | bash "$H")"
+[ -z "$out" ] && echo "PASS: silent on non-handled events" || { echo FAIL stop; exit 1; }
+
+# Malformed or empty stdin: silent, no abort, exit 0.
+for bad in '' 'not json' '{"hook_event_name":"PostToolUse"'; do
+  if mo="$(printf '%s' "$bad" | bash "$H" 2>/dev/null)"; then :; else
+    echo "FAIL: stdin [$bad] aborted take-a-beat"; exit 1; fi
+  [ -z "$mo" ] || { echo "FAIL: stdin [$bad] was not silent: [$mo]"; exit 1; }
+done
+echo "PASS: malformed or empty stdin is silent, no abort"
+
+# Never creates a file in the project.
+d="$(mktemp -d)"
+printf '{"hook_event_name":"PostToolUse","cwd":"%s","transcript_path":"%s"}' "$d" "$T" | bash "$H" >/dev/null 2>&1 || true
+[ ! -e "$d/.playbook" ] && echo "PASS: no file written" || { rm -rf "$d"; echo FAIL wrotefile; exit 1; }
+rm -rf "$d"
