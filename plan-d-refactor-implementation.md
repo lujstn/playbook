@@ -14,6 +14,8 @@
 
 **Commit rule:** one commit per task, message in British English, no `Co-Authored-By` line, on branch `build-playbook-plugin`.
 
+**Deviation D1 (errexit jq guard, applied during execution):** The Task 2 `unease` and Task 3 `take-a-beat` hook bodies as first drafted ran `event="$(jq ... <<<"$stdin")"` (and the Task 3 `src="$(jq ...)"`) with no failure guard. Under `set -euo pipefail` a non-JSON or truncated stdin makes that command substitution non-zero and aborts the hook before the `event="Stop"`/empty fallback can run, so the hook emits nothing and exits with an error. That silently disables the tenet on that turn and contradicts plan-c's mandatory silent-degradation contract. The sanctioned correction, recorded here so the text reads as though always written this way, is the trailing `|| true` on those `jq` substitutions plus an empty-and-non-JSON-stdin regression assertion in the Task 2 and Task 3 tests. Behaviour for every valid hook JSON payload is unchanged.
+
 **Retained, not deleted:** `plan-b-implementation.md` is the superseded build plan for the rejected model. Per `plan-c-refactor.md` section 0 this plan supersedes it; it stays in the repository as historical record, like `archived-docs-for-context/`, and no task removes it.
 
 ---
@@ -246,6 +248,15 @@ grep -q "regardless of the unease level or the mode" <<<"$ctx" \
 ! grep -qi "ledger" <<<"$ctx" \
   && echo "PASS: no ledger vocabulary" || { echo "FAIL: ledger word present"; exit 1; }
 
+for bad in '' 'not json at all' '{"hook_event_name":"Stop"' 'true'; do
+  if bo="$(printf '%s' "$bad" | bash "$H" 2>/dev/null)"; then :; else
+    echo "FAIL: stdin [$bad] aborted the hook (exit non-zero)"; exit 1; fi
+  jq -e '.hookSpecificOutput.additionalContext' <<<"$bo" >/dev/null \
+    && jq -e '.hookSpecificOutput.hookEventName == "Stop"' <<<"$bo" >/dev/null \
+    || { echo "FAIL: stdin [$bad] did not yield a valid Stop envelope"; exit 1; }
+done
+echo "PASS: empty and non-JSON stdin still yield a valid Stop envelope"
+
 d_tmp="$(mktemp -d)"
 printf '{"hook_event_name":"Stop","cwd":"%s"}' "$d_tmp" | bash "$H" >/dev/null 2>&1 || true
 [ ! -e "$d_tmp/.playbook" ] && echo "PASS: writes no file into the project" \
@@ -268,7 +279,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"   # computes nothing; only reads the event name to label the output
-event="$(jq -r '.hook_event_name // "Stop"' 2>/dev/null <<<"$stdin")"
+event="$(jq -r '.hook_event_name // "Stop"' 2>/dev/null <<<"$stdin" || true)"
 [ -n "$event" ] || event="Stop"
 
 prompt="Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via ntfy and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
@@ -339,6 +350,14 @@ grep -qi "taking a beat" <<<"$out" && echo "PASS: beat at 70 percent" || { echo 
 out="$(printf '{"hook_event_name":"Stop","transcript_path":"%s"}' "$B" | bash "$H")"
 [ -z "$out" ] && echo "PASS: silent on non-handled events" || { echo FAIL stop; exit 1; }
 
+# Malformed or empty stdin: silent, no abort, exit 0.
+for bad in '' 'not json' '{"hook_event_name":"PostToolUse"'; do
+  if mo="$(printf '%s' "$bad" | bash "$H" 2>/dev/null)"; then :; else
+    echo "FAIL: stdin [$bad] aborted take-a-beat"; exit 1; fi
+  [ -z "$mo" ] || { echo "FAIL: stdin [$bad] was not silent: [$mo]"; exit 1; }
+done
+echo "PASS: malformed or empty stdin is silent, no abort"
+
 # Never creates a file in the project.
 d="$(mktemp -d)"
 printf '{"hook_event_name":"PostToolUse","cwd":"%s","transcript_path":"%s"}' "$d" "$T" | bash "$H" >/dev/null 2>&1 || true
@@ -368,7 +387,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 
 stdin="$(cat 2>/dev/null || true)"
-event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin")"
+event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
 orig="$(playbook_original_request "$stdin")"
 
 reanchor() {
@@ -391,7 +410,7 @@ ${orig}"
     ;;
   PostCompact)            reanchor "PostCompact" ;;
   SessionStart)
-    src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin")"
+    src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
     [ "$src" = "compact" ] && reanchor "SessionStart"
     ;;
   PostToolUse)
