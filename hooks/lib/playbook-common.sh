@@ -9,17 +9,70 @@ playbook_project_dir() {
   printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}"
 }
 
-playbook_dir()        { printf '%s/.playbook' "$(playbook_project_dir "${1:-}")"; }
-playbook_anchor()     { printf '%s/anchor.md' "$(playbook_dir "${1:-}")"; }
-playbook_ledger()     { printf '%s/uncertainty-ledger.md' "$(playbook_dir "${1:-}")"; }
+# Resolve the transcript path from hook stdin JSON. Empty if absent.
+playbook_transcript_path() {
+  jq -r '.transcript_path // empty' 2>/dev/null <<<"${1:-}" || printf ''
+}
 
-playbook_ensure_dir() {
-  # Only creates the runtime directory. It MUST NOT mutate the consuming
-  # project's .gitignore: that is an unsolicited side-effect, races under
-  # parallel Stop-hook fire, and is not authorised by design.md. The README
-  # documents .playbook/ and the engine proposes the ignore once (Task 11/17),
-  # never a per-turn hook.
-  mkdir -p "$(playbook_dir "${1:-}")" 2>/dev/null || true
+# The verbatim original request: the first transcript record that is the
+# human's own user message. Skips system/hook records (.type!="user"), records
+# whose role is not "user", and tool-result turns (content is an array whose
+# first element type is "tool_result"). Returns the text, or empty on any
+# failure. Silent degradation is mandatory: empty, never a wrong value.
+playbook_original_request() {
+  { local f; f="$(playbook_transcript_path "${1:-}")"
+    [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
+    jq -r 'select(.type=="user" and (.message.role=="user"))
+           | .message.content
+           | if type=="string" then .
+             elif type=="array" then
+               (if (.[0].type? == "tool_result") then empty
+                else (map(select(.type=="text")|.text)|join("\n")) end)
+             else empty end' "$f" 2>/dev/null \
+      | awk 'NF{print; exit}'
+  } 2>/dev/null || printf ''
+}
+
+# Context tokens in use = the last assistant record's input-side usage, the
+# exact formula Claude Code uses for used_percentage. Empty if unavailable.
+playbook_context_used() {
+  { local f; f="$(playbook_transcript_path "${1:-}")"
+    [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
+    local v
+    v="$(jq -r 'select(.message.usage)
+                | .message.usage
+                | ((.input_tokens // 0) + (.cache_creation_input_tokens // 0)
+                   + (.cache_read_input_tokens // 0))' "$f" 2>/dev/null \
+         | awk 'NF{last=$0} END{if(last!="")print last}')"
+    case "$v" in ''|*[!0-9]*) printf '' ;; *) printf '%s' "$v" ;; esac
+  } 2>/dev/null || printf ''
+}
+
+# The agent-declared nominal window: the most recent line matching the fixed
+# prefix `playbook-window: <integer>` anywhere in the transcript. Empty if
+# never declared.
+playbook_declared_window() {
+  { local f; f="$(playbook_transcript_path "${1:-}")"
+    [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
+    local v
+    v="$(grep -oE 'playbook-window:[[:space:]]*[0-9]+' "$f" 2>/dev/null \
+         | tail -1 | grep -oE '[0-9]+' || true)"
+    case "$v" in ''|*[!0-9]*) printf '' ;; *) printf '%s' "$v" ;; esac
+  } 2>/dev/null || printf ''
+}
+
+# Integer percent of context used, or empty when either input is unavailable.
+# Same return contract the take-a-beat caller already expects.
+playbook_context_percent() {
+  { local u w; u="$(playbook_context_used "${1:-}")"
+    w="$(playbook_declared_window "${1:-}")"
+    case "$u" in ''|*[!0-9]*) printf ''; return 0 ;; esac
+    case "$w" in ''|*[!0-9]*) printf ''; return 0 ;; esac
+    [ "$w" -gt 0 ] 2>/dev/null || { printf ''; return 0; }
+    local p=$(( (u * 100 + w / 2) / w ))
+    [ "$p" -lt 0 ] && p=0; [ "$p" -gt 100 ] && p=100
+    printf '%s' "$p"
+  } 2>/dev/null || printf ''
 }
 
 # JSON-string escape via bash parameter substitution (single C-level passes;
@@ -47,90 +100,6 @@ playbook_emit_context() {
     printf '{\n  "additionalContext": "%s"\n}\n' "$escaped"
   fi
 }
-
-# Returns the integer percent of the context window USED (0-100), or an empty
-# string when the signal is unavailable. Decided in
-# docs/playbook/decisions/2026-05-16-context-signal.md.
-#
-# Source: the GSD-style session-keyed bridge file
-#   ${TMPDIR:-/tmp}/claude-ctx-${CLAUDE_CODE_SESSION_ID}.json
-# (GSD's gsd-statusline.js writes it; shape:
-#  {session_id, remaining_percentage, used_pct, timestamp}). $TMPDIR is honoured
-# because GSD's Node os.tmpdir() resolves there on macOS, not /tmp.
-#
-# CRITICAL: returns percent USED, derived as used = 100 - remaining_percentage.
-# GSD keys on remaining; comparing remaining >= 65 would fire at 35% used or
-# never. used_pct is only a fallback for a bridge variant lacking remaining.
-# No auto-compact-buffer rescale (raw window, matching CC native /context).
-#
-# Test seam: PLAYBOOK_CTX_FIXTURE, when set, is read instead of the live bridge
-# path; it feeds the identical parse path. Silent degradation is mandatory:
-# any missing/invalid/unparseable input yields empty, never a wrong number,
-# and never aborts a `set -euo pipefail` caller.
-playbook_context_percent() {
-  {
-    local src pct
-    if [ -n "${PLAYBOOK_CTX_FIXTURE:-}" ]; then
-      src="$PLAYBOOK_CTX_FIXTURE"
-    elif [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
-      src="${TMPDIR:-/tmp}/claude-ctx-${CLAUDE_CODE_SESSION_ID}.json"
-    else
-      printf ''
-      return 0
-    fi
-    [ -f "$src" ] || { printf ''; return 0; }
-    # Authoritative path: derive used from remaining_percentage. Fallback to a
-    # used field only if remaining is absent/non-numeric. jq emits "" on any
-    # failure (missing file, bad JSON, non-numeric), which we treat as unknown.
-    pct="$(jq -r '
-      if (.remaining_percentage | type) == "number"
-        then ((100 - .remaining_percentage) | round)
-      elif (.used_pct | type) == "number"
-        then (.used_pct | round)
-      elif (.used_percentage | type) == "number"
-        then (.used_percentage | round)
-      else empty end
-    ' "$src" 2>/dev/null)" || pct=""
-    case "$pct" in
-      ''|*[!0-9-]*) printf ''; return 0 ;;
-    esac
-    [ "$pct" -lt 0 ] 2>/dev/null && pct=0
-    [ "$pct" -gt 100 ] 2>/dev/null && pct=100
-    printf '%s' "$pct"
-  } 2>/dev/null || true
-}
-
-playbook_anchor_init() {
-  local original="$1" what_matters="$2" stdin="${3:-}"
-  playbook_ensure_dir "$stdin"
-  local f; f="$(playbook_anchor "$stdin")"
-  [ -f "$f" ] && return 0   # never clobber an existing anchor
-  cat >"$f" <<EOF
-# Playbook anchor
-
-## Original request (verbatim)
-$original
-
-## What matters now (one line)
-$what_matters
-
-## Lessons and wrong turns
-(none yet)
-
-## Next work
-(set by the engine)
-EOF
-}
-
-playbook_ledger_append() {
-  local band="$1" clause="$2" stdin="${3:-}"
-  playbook_ensure_dir "$stdin"
-  local f ts; f="$(playbook_ledger "$stdin")"
-  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '%s | %s | %s\n' "$ts" "$band" "$clause" >>"$f"
-}
-
-playbook_anchor_read() { local f; f="$(playbook_anchor "${1:-}")"; [ -f "$f" ] && cat "$f" || printf ''; }
 
 # Stop-turn nudge. Channel decided by docs/playbook/decisions/2026-05-16-stop-channel.md.
 # MUST be a model-visible, turn-terminating channel (never unconditional decision:block).

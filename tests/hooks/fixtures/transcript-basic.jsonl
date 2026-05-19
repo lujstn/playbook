@@ -1,0 +1,5 @@
+{"type":"system","subtype":"hook","content":"SessionStart hook additional context: noise"}
+{"type":"user","message":{"role":"user","content":"Build me a widget that does X. Original request text."}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":10,"cache_creation_input_tokens":1000,"cache_read_input_tokens":4000,"output_tokens":50},"content":[{"type":"text","text":"playbook-window: 1000000"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"some tool output"}]}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":20,"cache_creation_input_tokens":2000,"cache_read_input_tokens":8000,"output_tokens":99},"content":[{"type":"text","text":"working"}]}}
