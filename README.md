@@ -27,12 +27,12 @@ The staffing call is one visible, vetoable sentence in plain language. There is 
 
 ## The nine tenets
 
-The overlay improves adherence to nine tenets, enforced by the engine doctrine plus the two hooks and the pinned anchor file rather than by skill text being re-read.
+The overlay improves adherence to nine tenets, enforced by the engine doctrine plus the two hooks carrying state in-session rather than by skill text being re-read.
 
 1. **Remember what's important.** The original request, verbatim, plus the current one-line of what matters, restated at every checkpoint and re-injected with primacy after every compaction.
 2. **Ask stupid questions.** All clarifying questions are batched upfront, once, before the staffing call; ask as many as needed until confident.
 3. **Team alignment.** Every multi-agent mode treats the team as equals; a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents push back with technical reasoning.
-4. **Uncertainty.** An append-only unease ledger, gated by the confidant test, escalating up the ladder on three callout shapes; a standing override stops and asks the user whenever the North Star would no longer be met.
+4. **Unease.** An in-session unease pulse restated after every agent action, never a file or a score; the escalation ladder is offered only on an increase; a standing override stops and asks the user whenever the North Star would no longer be met.
 5. **Offline mode.** `playbook:offline-mode` adds an explicit per-run wait picker, an ntfy notification channel, an external-manager fallback, and an absent-decisions log.
 6. **Ready for production.** No scaffolding vocabulary in shipped code, minimal comments, no references back to internal artefacts; a final sweep before handing work back.
 7. **Take a beat.** The `take-a-beat` hook fires at about 65% context used, carries lessons-learned forward, and re-anchors on the original request with primacy.
@@ -41,8 +41,8 @@ The overlay improves adherence to nine tenets, enforced by the engine doctrine p
 
 ## The two hooks
 
-- **`take-a-beat`** (tenet 7): a context-monitor and pre-compaction hook that fires at about 65% context used, re-reads the anchor and lessons ledger, and re-anchors on the original request with primacy over orchestration scaffolding.
-- **`uncertainty`** (tenet 4): fires at the end of every turn and asks the agent one thing, whether anything should go in the unease ledger. The expected answer is almost always no; logging is the rare exception, gated by the confidant test. It writes a wall-clock timestamp on any entry added, performs no computation, and maintains no score.
+- **`take-a-beat`** (tenet 7): a context-monitor and pre-compaction hook that fires at about 65% context used, recovers the original request from the transcript and re-anchors with primacy over orchestration scaffolding.
+- **`unease`** (tenet 4): fires after every agent action and prompts the unease restatement. It is stateless, computes nothing, and writes nothing.
 
 ## Prerequisites and graceful degradation
 
@@ -55,12 +55,7 @@ Neither prompt is a failure; you can always pick a different mode at the fork.
 
 ## Runtime state
 
-Playbook maintains two engine files inside the working project, both in a `.playbook/` directory at the project root:
-
-- `.playbook/anchor.md`: the original request verbatim, the current one-line of what matters, a running lessons-and-wrong-turns ledger, and the next work.
-- `.playbook/uncertainty-ledger.md`: the append-only unease ledger for tenet 4.
-
-This location is deliberately distinct from GSD's `.planning/` so the two harnesses never collide. You should add `.playbook/` to the consuming project's `.gitignore`; the engine offers to do this once via `AskUserQuestion` on first use. That one-time offer is the only place this lives: it is documentation plus a single engine offer, never a per-turn hook side-effect.
+Playbook writes no file into your working tree. There is no `.playbook/` directory, no anchor file and no ledger. The original request, the North Star and the unease sense are held in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. A fresh session starts clean.
 
 ## Licence
 
