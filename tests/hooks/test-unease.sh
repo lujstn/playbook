@@ -4,7 +4,7 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/unease"
 export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
-out="$(echo '{"hook_event_name":"Stop"}' | bash "$H")"
+out="$(printf '{"hook_event_name":"Stop"}' | bash "$H")"
 
 jq -e '.hookSpecificOutput.additionalContext' <<<"$out" >/dev/null \
   && echo "PASS: model-visible additionalContext channel" || { echo FAIL channel; exit 1; }
@@ -39,3 +39,16 @@ printf '{"hook_event_name":"Stop","cwd":"%s"}' "$d_tmp" | bash "$H" >/dev/null 2
 [ ! -e "$d_tmp/.playbook" ] && echo "PASS: writes no file into the project" \
   || { rm -rf "$d_tmp"; echo "FAIL: hook created .playbook"; exit 1; }
 rm -rf "$d_tmp"
+
+# SubagentStop: unease also fires on SubagentStop with the right event name.
+sout="$(printf '{"hook_event_name":"SubagentStop","agent_id":"a1"}' | bash "$H")"
+jq -e '.hookSpecificOutput.additionalContext' <<<"$sout" >/dev/null \
+  && echo "PASS: SubagentStop yields additionalContext channel" \
+  || { echo "FAIL: SubagentStop additionalContext missing"; exit 1; }
+jq -e '.hookSpecificOutput.hookEventName == "SubagentStop"' <<<"$sout" >/dev/null \
+  && echo "PASS: SubagentStop envelope event name" \
+  || { echo "FAIL: SubagentStop envelope event name wrong"; exit 1; }
+ctx_sa="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$sout")"
+grep -q "near_breaking" <<<"$ctx_sa" \
+  && echo "PASS: SubagentStop unease prompt content unchanged" \
+  || { echo "FAIL: SubagentStop unease prompt content wrong"; exit 1; }

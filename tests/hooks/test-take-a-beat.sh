@@ -22,9 +22,9 @@ out="$(printf '{"hook_event_name":"SessionStart","source":"compact","transcript_
 grep -q "Build me a widget that does X. Original request text." <<<"$out" \
   && echo "PASS: SessionStart/compact also recovers" || { echo FAIL reanchor2; exit 1; }
 
-# Below threshold: silent (basic fixture is ~1 percent of 1,000,000).
+# Below threshold: silent (basic fixture is ~1 percent of 1,000,000 vs 80% default).
 out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$B" | bash "$H")"
-[ -z "$out" ] && echo "PASS: no beat under 65 percent" || { echo FAIL spurious; exit 1; }
+[ -z "$out" ] && echo "PASS: no beat under 80 percent" || { echo FAIL spurious; exit 1; }
 
 # Undeclared window with real usage: one self-healing notice, not silence,
 # and not a (false) beat.
@@ -41,25 +41,60 @@ out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$NWN" 
 [ -z "$out" ] && echo "PASS: notice not repeated once carried" \
   || { echo "FAIL notice repeated: [$out]"; exit 1; }
 
-# At/over threshold on the main thread: beat, still labelled original request.
-out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$T" | bash "$H")"
-{ grep -qi "taking a beat" <<<"$out" && grep -q "Original request, verbatim:" <<<"$out" \
+# At/over threshold on the main thread: calm beat fires with calm wording,
+# anchor re-injected labelled as original request.
+# PLAYBOOK_CALM_PCT=70 aligns the threshold with the fixture (70% used).
+out="$(PLAYBOOK_CALM_PCT=70 printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$T" | PLAYBOOK_CALM_PCT=70 bash "$H")"
+{ grep -qi "auto-compact is seamless" <<<"$out" \
+  && grep -q "Original request, verbatim:" <<<"$out" \
   && ! grep -q "Overall goal" <<<"$out"; } \
-  && echo "PASS: main-thread beat at 70 percent, original-request label" \
+  && echo "PASS: main-thread calm beat at 70 percent, original-request label" \
   || { echo "FAIL nobeat/mislabel: [$out]"; exit 1; }
 
-# Subagent beat (agent_id present): drift-check framed, North Star primary,
-# task relabelled, no "Original request, verbatim:".
+# Beat gated once per window: a second PostToolUse with the same transcript
+# stays silent because "Playbook context calm" is now in the output (sentinel).
+# We simulate this by appending the sentinel to a temp transcript.
+tmp_t="$(mktemp).jsonl"
+cat "$T" > "$tmp_t"
+printf '%s\n' '{"type":"system","subtype":"hook","content":"Playbook context calm: context is at 70 percent used. Auto-compact is seamless."}' >> "$tmp_t"
+out2="$(PLAYBOOK_CALM_PCT=70 printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$tmp_t" | PLAYBOOK_CALM_PCT=70 bash "$H")"
+[ -z "$out2" ] && echo "PASS: calm beat not repeated when sentinel is in transcript" \
+  || { echo "FAIL sentinel: beat repeated [$out2]"; rm "$tmp_t"; exit 1; }
+rm "$tmp_t"
+
+# Subagent beat: context calm fires, North Star primary, task relabelled,
+# no "Original request, verbatim:". Use PLAYBOOK_CALM_PCT=70 to match fixture.
 SB="$root/tests/hooks/fixtures/transcript-subagent-beat.jsonl"
-out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s","agent_id":"a1"}' "$SB" | bash "$H")"
-{ grep -q "check your work still serves the goal" <<<"$out" \
+out="$(PLAYBOOK_CALM_PCT=70 printf '{"hook_event_name":"PostToolUse","transcript_path":"%s","agent_id":"a1"}' "$SB" | PLAYBOOK_CALM_PCT=70 bash "$H")"
+{ grep -qi "auto-compact is seamless" <<<"$out" \
   && grep -q "Overall goal (what success means for the whole project):" <<<"$out" \
   && grep -q "Ship a zero-dependency context anchor" <<<"$out" \
   && grep -q "Your part of it, verbatim:" <<<"$out" \
-  && grep -q "If your part has drifted from the overall goal" <<<"$out" \
   && ! grep -q "Original request, verbatim:" <<<"$out"; } \
-  && echo "PASS: subagent beat is drift-check framed with North Star primacy" \
+  && echo "PASS: subagent calm beat with North Star primacy and task label" \
   || { echo "FAIL subagent beat: [$out]"; exit 1; }
+
+# SessionStart startup: competing hook detected, no context-calm marker ->
+# OFFER fires once.
+csl_home="$(mktemp -d)"
+csl_proj="$(mktemp -d)"
+mkdir -p "$csl_home/.claude" "$csl_proj/.claude/playbook"
+printf '{"hooks":{"PostToolUse":[{"hooks":[{"command":"gsd-context-monitor"}]}]}}' \
+  > "$csl_home/.claude/settings.json"
+out="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"startup","cwd":"%s"}' "$csl_proj" \
+  | HOME="$csl_home" bash "$H")"
+grep -q "context-calm offer" <<<"$out" \
+  && echo "PASS: context-calm offer fires when competing hook detected" \
+  || { echo "FAIL: competing hook offer missing in [$out]"; rm -rf "$csl_home" "$csl_proj"; exit 1; }
+
+# SessionStart startup: context-calm marker present -> offer is SILENT.
+printf 'owned\n' > "$csl_proj/.claude/playbook/context-calm"
+out2="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"startup","cwd":"%s"}' "$csl_proj" \
+  | HOME="$csl_home" bash "$H")"
+[ -z "$out2" ] \
+  && echo "PASS: offer silent when context-calm marker exists" \
+  || { echo "FAIL: offer repeated despite marker [$out2]"; rm -rf "$csl_home" "$csl_proj"; exit 1; }
+rm -rf "$csl_home" "$csl_proj"
 
 # Unrelated event: silent.
 out="$(printf '{"hook_event_name":"Stop","transcript_path":"%s"}' "$B" | bash "$H")"

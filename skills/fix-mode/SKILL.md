@@ -1,34 +1,23 @@
 ---
 name: fix-mode
-description: Use ONLY when the user's message begins with the literal token `[fix]` followed by errors. Enters a strict fix protocol that acknowledges with a 🦞 marker, repeats the prompt verbatim, and works on the errors under strict rules (production-ready code, Zod schemas, no any/unknown). Remain in this mode until the user says `[close]`, `[end]`, `[exit]`, or `[done]`.
+description: Triggered by /fix or /pb-fix (keep [fix] as a courtesy alias). Enters a strict fix protocol under a 🦞 Playbook · fix marker, then works through the provided errors under production-ready rules: strong types, Zod schemas, no any/unknown, secure by default. Stays active until natural completion, /close, /pb-close, or the courtesy aliases [close]/[end]/[exit]/[done].
 ---
 
-When the user says "[fix]" followed by a bug, adopt the following prompt:
+On `/fix`, `/pb-fix`, or the courtesy alias `[fix]`:
 
-```
-Help me fix these errors ONLY: ${errors}
+1. Print `🦞 Playbook · fix`.
+2. Restate the rules below so they are visible in context.
+3. Work through every error under those rules.
+4. On natural completion or on `/close`, `/pb-close`, `[close]`, `[end]`, `[exit]`, or `[done]`, print `🦞 Playbook · fix: exited` and return to normal operation.
 
-Create a plan. No laziness. Do not validate directly, tell me when complete so that I can do this manually.
+### Rules
 
-RULES:
-
-- Production-ready code only.
+- Production-ready code only: no stubs, no TODO placeholders, no scaffolding.
 - Strong types, interfaces, and Zod schemas everywhere.
 - No `any`, no `unknown`, no loose types.
 - Secure by default.
 - No over-engineering.
-- Describe each issue and fix before writing code.
-- Critique your own observations before proposing changes.
+- Describe each issue and critique your own diagnosis before writing any code.
+- Ask if the problem statement is unclear before proceeding.
+- Do not validate directly; tell the user when complete so they can run validation themselves.
 - No timelines or priority levels.
-- Ask if unclear.
-```
-
-You will follow all four steps in doing this:
-
-1. Acknowledge you have entered fix mode by printing "🦞 Entered Fix Mode".
-
-2. Immediately following this, YOU MUST repeat the prompt in the code block above. Note: but without repeating those errors back to the user.
-
-3. Begin work according to that prompt.
-
-4. When the user says `[close]`, `[end]`, `[exit]`, or `[done]`, you will exit fix mode and print "🦞 Exited Fix Mode".

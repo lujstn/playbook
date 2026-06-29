@@ -13,6 +13,15 @@ grep -q "regardless of the unease level or the mode" <<<"$ctx" \
 ! grep -q '\.playbook/' <<<"$ctx" && ! grep -qi 'anchor file is the persistence' <<<"$ctx" \
   && echo "PASS: no file-persistence claim" || { echo "FAIL: still claims a file persists"; exit 1; }
 ! grep -qi 'uncertainty' <<<"$ctx" && echo "PASS: unease naming" || { echo "FAIL: uncertainty word present"; exit 1; }
+grep -q 'execute on Sonnet' <<<"$ctx" && grep -q 'plan and review' <<<"$ctx" \
+  && echo "PASS: model rule present in overlay" \
+  || { echo "FAIL: model rule missing"; exit 1; }
+grep -q 'auto-compact is seamless' <<<"$ctx" && grep -q 'Do not wrap up early' <<<"$ctx" \
+  && echo "PASS: context-calm doctrine in overlay" \
+  || { echo "FAIL: context-calm doctrine missing"; exit 1; }
+grep -qF 'Playbook · ' <<<"$ctx" \
+  && echo "PASS: Playbook middot brand convention in overlay" \
+  || { echo "FAIL: Playbook middot brand missing"; exit 1; }
 jq -e . <<<"$out" >/dev/null && echo "PASS: valid JSON" || { echo FAIL json; exit 1; }
 
 # SubagentStart: the same overlay must reach a spawned subagent, and the

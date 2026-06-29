@@ -1,0 +1,2 @@
+{"type":"system","subtype":"bridge_status","url":"https://claude.ai/code/session_TEST_INACTIVE","content":"/remote-control is inactive","timestamp":"2026-05-19T10:00:00.000Z"}
+{"type":"user","message":{"role":"user","content":"a paste mentioning https://claude.ai/code/session_DECOY in free text"},"timestamp":"2026-05-19T10:00:30.000Z"}

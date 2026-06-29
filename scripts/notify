@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Playbook: push a notification to the user's phone via Pushover or ntfy.
+#
+# Usage:
+#   scripts/notify [--level info|action|critical] [--link <url>]
+#                  "<headline>" ["<detail>"]
+#
+#   Back-compat: --category=action and --category=info are accepted as aliases
+#   (action -> action level, info -> info level). --level takes precedence.
+#
+# Title format: "📚 <Level>: <headline>" (the text shown on the lock screen).
+# Detail defaults to the headline when omitted.
+#
+# Provider is read from .claude/playbook/notify-provider (values: pushover|ntfy).
+# If that file is absent but .claude/playbook/ntfy-topic exists, ntfy is used.
+#
+# Level mapping:
+#   info     -> ntfy Priority 3 / Pushover priority 0
+#   action   -> ntfy Priority 4 / Pushover priority 1
+#   critical -> ntfy Priority 5 / Pushover priority 2 (retry=60 expire=1800 sound=siren)
+#
+# Pushover creds: .claude/playbook/pushover-token and .claude/playbook/pushover-user.
+# ntfy topic:     .claude/playbook/ntfy-topic
+# ntfy server:    .claude/playbook/ntfy-server (default https://ntfy.sh)
+#
+# When /remote-control is active in the current session, a tappable deep-link
+# is attached (ntfy: Click header; Pushover: url field). --link overrides it
+# when both are present. Silent degradation when neither is available.
+#
+# Exit codes:
+#   0   success
+#   3   publish failed (curl error or non-2xx HTTP)
+#   4   no topic/credentials configured
+#   5   curl not installed
+#   64  usage error
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../hooks/lib/playbook-common.sh
+source "${SCRIPT_DIR}/../hooks/lib/playbook-common.sh"
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: notify [--level info|action|critical] [--link <url>]
+              "<headline>" ["<detail>"]
+
+  --level info      (default) calm heads-up or progress
+  --level action    urgent push, pulls user back to steer
+  --level critical  DND-bypass alert, use only when genuinely warranted
+
+  --link <url>      attach a tappable URL to the notification
+
+Back-compat: --category=action and --category=info are accepted as aliases.
+Provider is read from .claude/playbook/notify-provider (pushover|ntfy).
+Pushover creds: .claude/playbook/pushover-token and .claude/playbook/pushover-user.
+ntfy topic:     .claude/playbook/ntfy-topic
+EOF
+  exit 64
+}
+
+LEVEL="info"
+LINK=""
+HEADLINE=""
+DETAIL=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --level=*)         LEVEL="${1#--level=}"; shift ;;
+    --level)           [ $# -gt 1 ] || { echo "ERROR: --level requires a value" >&2; usage; }; LEVEL="$2"; shift 2 ;;
+    --link=*)          LINK="${1#--link=}"; shift ;;
+    --link)            [ $# -gt 1 ] || { echo "ERROR: --link requires a value" >&2; usage; }; LINK="$2"; shift 2 ;;
+    --category=action) LEVEL="action"; shift ;;
+    --category=info)   LEVEL="info";   shift ;;
+    --category=*)      echo "ERROR: unknown --category '${1#--category=}' (expected action or info)" >&2; usage ;;
+    -h|--help)         usage ;;
+    --)                shift; break ;;
+    -*)                echo "ERROR: unknown flag '$1'" >&2; usage ;;
+    *)
+      if   [ -z "$HEADLINE" ]; then HEADLINE="$1"
+      elif [ -z "$DETAIL"   ]; then DETAIL="$1"
+      else echo "ERROR: too many positional arguments" >&2; usage
+      fi
+      shift ;;
+  esac
+done
+
+[ -n "$HEADLINE" ] || usage
+[ -n "$DETAIL"   ] || DETAIL="$HEADLINE"
+
+case "$LEVEL" in
+  info)     TITLE_LEVEL="Info";     NTFY_PRIORITY=3; PUSHOVER_PRIORITY=0  ;;
+  action)   TITLE_LEVEL="Action";   NTFY_PRIORITY=4; PUSHOVER_PRIORITY=1  ;;
+  critical) TITLE_LEVEL="Critical"; NTFY_PRIORITY=5; PUSHOVER_PRIORITY=2  ;;
+  *)        echo "ERROR: unknown level '$LEVEL' (expected info, action, or critical)" >&2; exit 64 ;;
+esac
+
+TITLE="📚 ${TITLE_LEVEL}: ${HEADLINE}"
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "ERROR: curl not installed" >&2
+  exit 5
+fi
+
+PROVIDER="$(playbook_notify_provider "$PWD")"
+if [ -z "$PROVIDER" ]; then
+  TOPIC_CHECK="$(playbook_ntfy_topic "$PWD")"
+  [ -n "$TOPIC_CHECK" ] && PROVIDER="ntfy"
+fi
+
+REMOTE_URL="$(playbook_remote_url "" "$PWD")"
+# --link overrides the remote-control URL when both are present.
+CLICK_URL="${LINK:-$REMOTE_URL}"
+
+case "$PROVIDER" in
+  ntfy)
+    TOPIC="$(playbook_ntfy_topic "$PWD")"
+    if [ -z "$TOPIC" ]; then
+      echo "ERROR: no ntfy topic configured. Save your topic to .claude/playbook/ntfy-topic." >&2
+      exit 4
+    fi
+    SERVER="$(playbook_ntfy_server "$PWD")"
+    [ -n "$SERVER" ] || SERVER="https://ntfy.sh"
+
+    curl_args=( -fsS -H "Title: ${TITLE}" -H "Priority: ${NTFY_PRIORITY}" )
+    [ -n "$CLICK_URL" ] && curl_args+=( -H "Click: ${CLICK_URL}" )
+
+    if ! curl "${curl_args[@]}" -d "$DETAIL" "${SERVER%/}/${TOPIC}" >/dev/null; then
+      echo "ERROR: ntfy publish failed" >&2
+      exit 3
+    fi
+    echo "ntfy sent (level=${LEVEL}, server=${SERVER})"
+    ;;
+
+  pushover)
+    TOKEN="$(playbook_pushover_token "$PWD")"
+    USER_KEY="$(playbook_pushover_user "$PWD")"
+    if [ -z "$TOKEN" ] || [ -z "$USER_KEY" ]; then
+      echo "ERROR: Pushover credentials missing. Save your app token to .claude/playbook/pushover-token and your user key to .claude/playbook/pushover-user." >&2
+      exit 4
+    fi
+
+    push_args=(
+      -fsS
+      --form-string "token=${TOKEN}"
+      --form-string "user=${USER_KEY}"
+      --form-string "title=${TITLE}"
+      --form-string "message=${DETAIL}"
+      --form-string "priority=${PUSHOVER_PRIORITY}"
+    )
+
+    if [ "$LEVEL" = "critical" ]; then
+      push_args+=( --form-string "retry=60" --form-string "expire=1800" --form-string "sound=siren" )
+    fi
+
+    if [ -n "$CLICK_URL" ]; then
+      push_args+=( --form-string "url=${CLICK_URL}" --form-string "url_title=Open session" )
+    fi
+
+    response="$(curl "${push_args[@]}" https://api.pushover.net/1/messages.json 2>/dev/null)"
+    if ! printf '%s' "$response" | grep -q '"status":1'; then
+      echo "ERROR: Pushover publish failed: ${response}" >&2
+      exit 3
+    fi
+    echo "pushover sent (level=${LEVEL})"
+    ;;
+
+  *)
+    echo "ERROR: no notification provider configured. Save 'pushover' or 'ntfy' to .claude/playbook/notify-provider." >&2
+    exit 4
+    ;;
+esac

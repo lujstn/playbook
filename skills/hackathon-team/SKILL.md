@@ -1,25 +1,29 @@
 ---
 name: hackathon-team
-description: Use when coupled work in one shared codebase needs peers that talk to each other directly with lightweight coordination, after the playbook engine has chosen hackathon-team.
+description: Use when coupled work in one shared codebase needs peers that talk to each other directly with lightweight coordination, after the playbook engine has routed here internally.
 ---
 
 # Hackathon Team
 
 ## Overview
 
-A thin choreography over Claude Code's native agent-teams primitive (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). It is reached only when the `playbook:playbook` engine has made the staffing call for the `hackathon-team` route: coupled work in one shared codebase where peers must talk to each other and coordination should stay lightweight. It adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below). Rendered faithfully from `DESIGN.md` section 5.2.
+A thin choreography over Claude Code's native agent-teams primitive (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). The `playbook:playbook` engine routes here when work is coupled in one shared codebase and peers need to talk to each other directly. The engine announces and proceeds; there is no vetoable staffing gate. This skill adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below).
+
+**Note:** Claude Code agent teams are experimental and disabled by default. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your environment to enable them. If the flag is absent this mode is unavailable; the engine will route to an alternative.
 
 **Core principle:** Co-located peers, partitioned once by file ownership, then left to self-organise. The lead coordinates and steps back; it does not think for the team. Less is more (tenet 8): the smallest team that fits the partition.
 
-**Announce at start:** "I'm using the hackathon-team skill to run this as co-located peers with a thin coordinating lead."
+**Announce at start:** "🤝 Playbook · hackathon: co-located peers, thin coordinating lead"
 
 ## Topology
 
-Co-located peers in one shared working directory. There are no isolated worktrees here (that is `playbook:synchronised-subagent-development`'s job). Peers message each other directly by name. The lead is a thin coordinator: it partitions the work by file ownership, assigns once, then steps back. Peers self-organise from there and are expected to call each other out with technical reasoning rather than route every exchange through the lead.
+Co-located peers in one shared working directory. There are no isolated worktrees here. Peers message each other directly by name. The lead is a thin coordinator: it partitions the work by file ownership, assigns once, then steps back. Peers self-organise from there and are expected to call each other out with technical reasoning rather than route every exchange through the lead.
+
+The named **joint-leads -> workers fan-out** (e.g. 5 leads x 5 workers) belongs to the `interns` and `workflows` modes, not here. Hackathon is a flat peer mesh in one shared tree, not a nested fan-out.
 
 ## The lead-authority limitation, stated openly
 
-Native agent-teams requires a mandatory, non-delegable lead that holds task-assignment authority. The choreography therefore cannot cast a pure comms-only, fully equal-peer lead the way tenet 3 would otherwise prefer. This is the one technically-forced exception to the equals doctrine, and `DESIGN.md` section 5.2 and tenet 3 both name it openly rather than hiding it.
+Native agent-teams requires a mandatory, non-delegable lead that holds task-assignment authority. The choreography therefore cannot cast a pure comms-only, fully equal-peer lead the way tenet 3 would otherwise prefer. This is the one technically-forced exception to the equals doctrine, and tenet 3 names it openly rather than hiding it.
 
 The choreography honours tenet 3 as closely as the primitive allows:
 
@@ -43,14 +47,14 @@ Teammates run in the background and persist until they are explicitly shut down.
 
 ## Sizing
 
-Default to a small team. Native guidance recommends roughly 3 to 5 peers. The choreography may go modestly higher when the file-ownership partition is clean, but it defaults conservative per tenet 8. The exact size cap is user-tunable per `DESIGN.md` section 12; do not hardcode a hard ceiling, prefer the conservative default and let the user widen it deliberately.
+Default to a small team. Native guidance recommends roughly 3 to 5 peers. The choreography may go modestly higher when the file-ownership partition is clean, but it defaults conservative per tenet 8. The exact size cap is user-tunable; do not hardcode a hard ceiling, prefer the conservative default and let the user widen it deliberately.
 
 ## Process
 
 ```dot
 digraph hackathon_team {
     rankdir=TB;
-    "Engine chose hackathon-team" [shape=box];
+    "Engine routed to hackathon" [shape=box];
     "Partition the work by file ownership (one owner per file)" [shape=box];
     "Clean partition, no file shared by two owners?" [shape=diamond];
     "Re-partition until disjoint" [shape=box];
@@ -62,7 +66,7 @@ digraph hackathon_team {
     "Lead integrates the result" [shape=box];
     "Shut the team down explicitly" [shape=box style=filled fillcolor=lightgreen];
 
-    "Engine chose hackathon-team" -> "Partition the work by file ownership (one owner per file)";
+    "Engine routed to hackathon" -> "Partition the work by file ownership (one owner per file)";
     "Partition the work by file ownership (one owner per file)" -> "Clean partition, no file shared by two owners?";
     "Clean partition, no file shared by two owners?" -> "Re-partition until disjoint" [label="no"];
     "Re-partition until disjoint" -> "Clean partition, no file shared by two owners?";
@@ -86,7 +90,8 @@ digraph hackathon_team {
 - Pretend the lead is comms-only or fully equal when native agent-teams forbids that. State the limitation honestly instead.
 - Re-explain the native agent-teams API mechanically beyond the lead-authority gap that closes the tenet 3 exception (tenet 8).
 - Assume `/resume` or `/rewind` brings in-process teammates back, or leave a finished team running.
-- Hardcode a hard size ceiling. The cap is user-tunable per `DESIGN.md` section 12.
+- Hardcode a hard size ceiling. The cap is user-tunable; widen it deliberately, not by default.
+- Use the joint-leads -> workers nested fan-out here. That belongs to interns/workflows, not hackathon.
 
 **Always:**
 - Partition by file ownership before spawning, with exactly one owner per in-scope file.
@@ -98,10 +103,11 @@ digraph hackathon_team {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the front door. It restates the North Star, batches questions, and makes the visible staffing call that routes here. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
+- `playbook:playbook` routes here internally. The engine announces and proceeds; it does not make a visible vetoable staffing call. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
 
 **Substrate:**
-- Native Claude Code agent-teams (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). Zero extra dependency, so this is part of the common path.
+- Native Claude Code agent-teams (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the flag is set.
 
 **Not this skill:**
-- Worktree-isolated, wave-grouped work belongs to `playbook:synchronised-subagent-development` via `playbook:modifying-plans`. A peer mesh in one shared directory is this skill's job; do not force one into the worktree-isolated route or the other way round.
+- Worktree-isolated, wave-grouped work is a different mode. A peer mesh in one shared directory is this skill's job; do not force one into the worktree-isolated route or the other way round.
+- Nested joint-leads -> workers fan-outs belong to interns/workflows, not here.

@@ -112,7 +112,7 @@ playbook_context_used() {
 # playbook_original_request is: only the agent's own assistant records
 # count, and the whole trimmed text element must be the declaration, so a
 # quotation of the token inside prose, a tool-result echo of a spec file
-# (e.g. DESIGN.md), or a user-channel paste cannot be mistaken for it.
+# (e.g. one of the docs/ pages), or a user-channel paste cannot be mistaken for it.
 # Empty if never declared. Silent degradation: empty, never a wrong value.
 playbook_declared_window() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
@@ -165,6 +165,113 @@ playbook_json_escape() {
   s="${s//\\/\\\\}"; s="${s//\"/\\\"}"
   s="${s//$'\n'/\\n}"; s="${s//$'\r'/\\r}"; s="${s//$'\t'/\\t}"
   printf '%s' "$s"
+}
+
+# Read a single-line scalar from .claude/playbook/<file> under the project
+# dir. Trims surrounding whitespace; returns the first non-empty line only.
+# Empty if the file is missing or blank. Silent degradation: empty, never a
+# wrong value. Used by scripts/notify to read the gitignored ntfy topic and
+# the optional server override.
+playbook_claude_file() {
+  local proj="${1:-}" name="${2:-}" path
+  [ -n "$proj" ] && [ -n "$name" ] || { printf ''; return 0; }
+  path="${proj}/.claude/playbook/${name}"
+  [ -f "$path" ] || { printf ''; return 0; }
+  { tr -d '\r' <"$path" \
+      | awk 'NF{print; exit}' \
+      | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'
+  } 2>/dev/null || printf ''
+}
+
+# The gitignored ntfy topic and the optional server override, read from
+# .claude/playbook/ in the project tree.
+playbook_ntfy_topic()  { playbook_claude_file "${1:-$PWD}" "ntfy-topic"; }
+playbook_ntfy_server() { playbook_claude_file "${1:-$PWD}" "ntfy-server"; }
+
+# The chosen notification provider (pushover|ntfy). Empty if not configured;
+# scripts/notify falls back to ntfy when an ntfy-topic is present.
+playbook_notify_provider() { playbook_claude_file "${1:-$PWD}" "notify-provider"; }
+
+# Pushover app token and user/group key, read from .claude/playbook/ in the
+# project tree. Silent degradation: empty, never a wrong value.
+playbook_pushover_token() { playbook_claude_file "${1:-$PWD}" "pushover-token"; }
+playbook_pushover_user()  { playbook_claude_file "${1:-$PWD}" "pushover-user"; }
+
+# Candidate settings files that may register hooks: the user's global config and
+# the project-local configs. Echoed one per line, only those that exist.
+playbook_settings_files() {
+  local proj="${1:-$PWD}" f
+  for f in "${HOME}/.claude/settings.json" \
+           "${proj}/.claude/settings.json" \
+           "${proj}/.claude/settings.local.json"; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+
+# Detect a competing context-warning hook: one that injects low-context anxiety
+# into the model's context (e.g. GSD's gsd-context-monitor, which tells agents to
+# wrap up and stop near the context limit). Echoes a short identifier for the
+# first match, else empty. Detection is by the command path a settings file
+# registers, since that path is all the settings file carries. Silent
+# degradation: empty, never a wrong value.
+playbook_competing_context_hook() {
+  local proj="${1:-$PWD}" f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if grep -qiE 'context-monitor|context-warning' "$f" 2>/dev/null; then
+      printf 'gsd-context-monitor'
+      return 0
+    fi
+  done < <(playbook_settings_files "$proj")
+  printf ''
+}
+
+# Whether the context-calm channel has been resolved: the user has either let
+# Playbook own it or explicitly declined. Persisted as a marker so the one-time
+# offer is not repeated every session. Checks the project marker first, then a
+# global fallback. Echoes the marker contents (e.g. owned or declined), else
+# empty.
+playbook_context_calm_resolved() {
+  local proj="${1:-$PWD}" v g
+  v="$(playbook_claude_file "$proj" "context-calm")"
+  [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+  g="${HOME}/.claude/playbook/context-calm"
+  [ -f "$g" ] || { printf ''; return 0; }
+  { tr -d '\r' <"$g" | awk 'NF{print; exit}' \
+      | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; } 2>/dev/null || printf ''
+}
+
+# Discover the most recently modified transcript jsonl for the current
+# working directory. Claude Code stores per-project transcripts under
+# ~/.claude/projects/<encoded-cwd>/, where the encoding replaces '/' with
+# '-' in the absolute project path. Empty if the directory does not exist
+# or carries no transcripts.
+playbook_latest_transcript() {
+  local proj="${1:-$PWD}" enc dir latest
+  enc="$(printf '%s' "$proj" | tr '/' '-')"
+  dir="${HOME}/.claude/projects/${enc}"
+  [ -d "$dir" ] || { printf ''; return 0; }
+  latest="$(ls -1t "$dir"/*.jsonl 2>/dev/null | awk 'NR==1')"
+  [ -n "$latest" ] && [ -f "$latest" ] && printf '%s' "$latest" || printf ''
+}
+
+# The remote-control session URL the live transcript carries when
+# /remote-control is active. Recovered the same role/type-anchored way as
+# playbook_original_request and playbook_declared_window: filter records
+# whose type=="system" and subtype=="bridge_status" and whose content
+# literally contains "is active", take the .url of the latest such record.
+# A user paste of the URL string is type=="user", so it cannot match. A
+# later deactivation or an absent record yields empty: silent degradation
+# by construction, never a wrong value.
+playbook_remote_url() {
+  { local f; f="${1:-}"
+    [ -n "$f" ] || f="$(playbook_latest_transcript "${2:-$PWD}")"
+    [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
+    jq -rs '
+      [ .[] | select(.type=="system" and .subtype=="bridge_status"
+                     and ((.content // "") | tostring | test("is active"; "i"))) ]
+      | (.[-1].url // empty)' "$f" 2>/dev/null
+  } 2>/dev/null || printf ''
 }
 
 # Emit the context-injection envelope. Replicates the Superpowers session-start

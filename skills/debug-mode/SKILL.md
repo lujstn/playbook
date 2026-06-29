@@ -1,35 +1,36 @@
 ---
 name: debug-mode
-description: Use when the user says the literal token `[debug]`. Enters a strict debugging workflow that compacts history, runs a read-summarise-diagnose-confirm cycle per file, requires user confirmation before every code modification, and uses compaction checkpoints. Remain in this mode until the user says `[close]`, `[end]`, `[exit]`, or `[done]`, or the bug is resolved.
+description: Triggered by /debug or /pb-debug (keep [debug] as a courtesy alias). Enters a strict read-summarise-diagnose-confirm cycle under a 👾 Playbook · debug marker: reads each file in full before any edit, waits for explicit user confirmation before writing, works one file at a time. Stays active until the bug is resolved, or on /close, /pb-close, or the courtesy aliases [close]/[end]/[exit]/[done].
 ---
 
-When the user says "[debug]", switch to the following strict workflow. Remain in this mode until the user says `[close]`, `[end]`, `[exit]`, or `[done]`, or the bug is resolved.
+On `/debug`, `/pb-debug`, or the courtesy alias `[debug]`:
 
-### On entry
-1. Print "👾 Entered Debug Mode"
-2. Compact/compress chat history (best-effort attempt to avoid context bias) and lock in these instructions
-3. Ask the user to describe the bug and identify the file(s) involved
+1. Print `👾 Playbook · debug`.
+2. Ask the user to describe the bug and identify the file(s) involved.
+3. Follow the cycle below for every file until the bug is resolved.
 
-### For EVERY file you need to modify
-1. Read the full file (or relevant section for large files)
-2. Summarise what the relevant code currently does in plain English
-3. State your diagnosis: what specific line(s) cause the bug and why
-4. STOP and wait for user confirmation before writing any code
+Context is managed by Playbook's hooks: auto-compact is seamless and the session continues; the re-anchor after compaction restores the current bug, diagnosis, and progress automatically. Debug mode does not manage context itself and does not issue `/compact`.
+
+### Cycle: for every file you need to touch
+
+1. Read the full file (or the relevant section for large files).
+2. Summarise what the relevant code currently does in plain English.
+3. State your diagnosis: which specific lines cause the bug and why.
+4. Stop and wait for explicit user confirmation before writing any code.
 
 ### After confirmation
-5. Write the minimal fix addressing the root cause from step 3
-6. Re-read the modified file and confirm coherence
-7. For visual changes: describe the expected before and after rendering and name the specific properties involved
 
-### Compaction checkpoints
-- If the conversation exceeds ~15 back-and-forth exchanges while in debug mode, proactively run /compact before continuing
-- After compaction, restate the current bug, diagnosis, and progress so nothing is lost
+5. Write the minimal fix addressing the root cause from step 3.
+6. Re-read the modified file and confirm coherence.
+7. For visual changes: describe the expected before and after rendering, and name the specific properties changed.
 
 ### Rules
-- NEVER skip the read, summarise, diagnose, confirm cycle
-- NEVER modify a function or component you haven't read in full
-- If you catch yourself writing code before completing steps 1-3, stop, say "restarting process", and go back to step 1
-- One file at a time. Do not batch changes across multiple files without a confirm step for each.
+
+- Never skip the read, summarise, diagnose, confirm cycle.
+- Never modify a function or component you have not read in full.
+- If you catch yourself writing code before completing steps 1 to 3, stop, say "restarting process", and go back to step 1.
+- One file at a time; do not batch changes across multiple files without a confirm step for each.
 
 ### Exit
-- When the bug is resolved or the user says `[close]`, `[end]`, `[exit]`, or `[done]`, print "👾 Exited Debug Mode" and return to normal operation.
+
+When the bug is resolved or the user types `/close`, `/pb-close`, `[close]`, `[end]`, `[exit]`, or `[done]`, print `👾 Playbook · debug: exited` and return to normal operation.

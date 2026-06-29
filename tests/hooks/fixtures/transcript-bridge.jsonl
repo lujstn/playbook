@@ -1,0 +1,3 @@
+{"type":"system","subtype":"bridge_status","url":"https://claude.ai/code/session_TEST_ACTIVE","content":"/remote-control is active · Continue here, on your phone, or at https://claude.ai/code/session_TEST_ACTIVE","timestamp":"2026-05-19T10:00:00.000Z"}
+{"type":"user","message":{"role":"user","content":"this is a user paste that mentions https://claude.ai/code/session_DECOY_PASTE_URL inside free text"},"timestamp":"2026-05-19T10:00:30.000Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"timestamp":"2026-05-19T10:00:31.000Z"}
