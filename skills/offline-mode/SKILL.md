@@ -147,7 +147,7 @@ The script is invoked at the notify-and-wait step (ladder step 1) when the work 
 
 **ntfy config.** Topic at `.claude/playbook/ntfy-topic`. Optional server override at `.claude/playbook/ntfy-server` (default `https://ntfy.sh`).
 
-**Pushover config.** App token at `.claude/playbook/pushover-token`. User key at `.claude/playbook/pushover-user`. Emergency (priority 2 / `--level critical`) requires retry and expire fields; the script sets `retry=60` and `expire=1800` automatically.
+**Pushover config.** App token at `.claude/playbook/pushover-token`. User key at `.claude/playbook/pushover-user`. Emergency (priority 2 / `--level critical`) requires retry and expire fields; the script sets `retry=60` and `expire=1800` automatically. A critical send returns a `receipt` token in the Pushover API response; `scripts/notify` captures it to `.claude/playbook/last-receipt` (overwritten on each critical send). Wiring this receipt into an acknowledgement-polling loop is a future step: the file is capture-only for now.
 
 **Remote-control deep-link.** When `/remote-control` is active in the live session, the notification carries a tappable link that opens the recovered session URL straight from the lock screen (ntfy: Click header; Pushover: url field). The URL is read from the current transcript (the latest record of `type=="system"` and `subtype=="bridge_status"` whose content carries `is active`). When the bridge is inactive or absent the link is omitted: silent degradation, never a wrong link. `--link <url>` attaches an explicit URL instead.
 

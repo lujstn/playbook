@@ -36,10 +36,10 @@ Work is routed on **separability and durability, not size**. Size only decides w
 | 🐺 | `lone-wolf` | main thread | one coherent unit, no benefit from extra hands |
 | 🐜 | `interns` | parallel subagents | several independent sub-tasks; helpers do not talk; includes the joint-leads to workers nested fan-out (e.g. 5 leads x 5 workers = 25, inside the depth-5 cap) |
 | 🤝 | `hackathon` | agent teams | coupled work in one shared codebase; peers message each other |
-| ⚙️ | `workflows` | ultracode dynamic workflows | the default for substantive separable work; the script holds the loop, results stay out of context |
+| ⚙️ | `workflows` | dynamic workflows | separable work that needs real scale (dozens to hundreds of agents) or results kept out of context; opt-in via `/workflow` or the ultracode keyword |
 | 🏗️ | `gsd` | GSD | a whole MVP in an unknown area; durable cross-session state |
 
-If substantive separable work is starting and `/effort ultracode` is not set, Playbook surfaces one non-blocking line offering to set it. It never gates on your answer.
+The baseline is plain high-effort Claude Code, with no default mode. For separable work, `interns` runs directly (a few parallel subagents); `workflows` is the opt-in scale upgrade you trigger with `/workflow` (or by adding the keyword "ultracode" to a prompt), since the assistant cannot start a workflow on its own. When work is workflow-shaped, Playbook either runs interns and notes that `/workflow` would scale it further, or, for genuinely large work, points you at `/workflow`. It never gates you.
 
 ## The nine tenets
 
@@ -74,7 +74,8 @@ Plugin name stays `playbook`. Every command ships under two names: a branded `/p
 | `/pb-brainstorming` | `/brainstorming` | explore options, ask sharp questions, paint the picture, converge (also auto-triggers on fuzzy work) |
 | `/pb-offline-mode` | `/offline-mode` | enable offline behaviour and notifications for this run |
 | `/pb-worktrees` | `/worktrees` | isolate a separate Claude Code session in `.worktrees/` with its own branch and instance number |
-| `/pb-fix` | `/fix` | 🦞 strict fix protocol, production-ready, strong types and Zod |
+| `/pb-workflow` | `/workflow` | ⚙️ run this task as a dynamic workflow at scale, carrying the North Star and model rule into the workflow |
+| `/pb-fix` | `/fix` | 🦞 strict fix protocol, production-ready, strongly typed for the stack, validated at boundaries |
 | `/pb-debug` | `/debug` | 👾 strict read, summarise, diagnose, confirm debugging cycle |
 | `/pb` | | status heartbeat: is Playbook active, which mode, which model split, offline on or off |
 

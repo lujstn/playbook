@@ -1,6 +1,6 @@
 ---
 name: fix-mode
-description: Triggered by /fix or /pb-fix (keep [fix] as a courtesy alias). Enters a strict fix protocol under a 🦞 Playbook · fix marker, then works through the provided errors under production-ready rules: strong types, Zod schemas, no any/unknown, secure by default. Stays active until natural completion, /close, /pb-close, or the courtesy aliases [close]/[end]/[exit]/[done].
+description: Triggered by /fix or /pb-fix (keep [fix] as a courtesy alias). Enters a strict fix protocol under a 🦞 Playbook · fix marker, then works through the provided errors under production-ready rules: strongly typed for the language in use, validated at every boundary, secure by default. Stays active until natural completion, /close, /pb-close, or the courtesy aliases [close]/[end]/[exit]/[done].
 ---
 
 On `/fix`, `/pb-fix`, or the courtesy alias `[fix]`:
@@ -13,8 +13,7 @@ On `/fix`, `/pb-fix`, or the courtesy alias `[fix]`:
 ### Rules
 
 - Production-ready code only: no stubs, no TODO placeholders, no scaffolding.
-- Strong types, interfaces, and Zod schemas everywhere.
-- No `any`, no `unknown`, no loose types.
+- Strongly typed for the language in use; validated at every boundary; no loose or weakly typed escapes.
 - Secure by default.
 - No over-engineering.
 - Describe each issue and critique your own diagnosis before writing any code.

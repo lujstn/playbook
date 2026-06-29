@@ -294,3 +294,73 @@ set +e
 run_notify "test" >/dev/null 2>&1; ec=$?; set -e
 [ "$ec" -eq 4 ] && echo "PASS: no provider configured yields exit 4" \
   || { echo "FAIL: no-provider exit was $ec"; exit 1; }
+
+# --- curl failure: both providers must return exit 3 ----------------------
+
+# Stub that always fails; stderr is visible so the script can surface it.
+fail_bin="$sandbox/fail_bin"
+mkdir -p "$fail_bin"
+cat >"$fail_bin/curl" <<'STUB'
+#!/usr/bin/env bash
+printf 'curl: (7) Failed to connect to host\n' >&2
+exit 7
+STUB
+chmod +x "$fail_bin/curl"
+
+run_notify_fail() {
+  HOME="$fake_home" PATH="$fail_bin:$PATH" \
+    bash -c "cd '$proj' && '$NOTIFY' \"\$@\"" -- "$@"
+}
+
+# Pushover: curl failure -> exit 3.
+printf 'pushover\n' > "$proj/.claude/playbook/notify-provider"
+printf 'token_abc\n' > "$proj/.claude/playbook/pushover-token"
+printf 'user_xyz\n' > "$proj/.claude/playbook/pushover-user"
+set +e
+run_notify_fail "test" >/dev/null 2>&1; ec=$?; set -e
+[ "$ec" -eq 3 ] && echo "PASS: Pushover curl failure yields exit 3" \
+  || { echo "FAIL: Pushover curl failure exit was $ec (expected 3)"; exit 1; }
+
+# ntfy: curl failure -> exit 3.
+printf 'ntfy\n' > "$proj/.claude/playbook/notify-provider"
+printf 'topic-abc\n' > "$proj/.claude/playbook/ntfy-topic"
+set +e
+run_notify_fail "test" >/dev/null 2>&1; ec=$?; set -e
+[ "$ec" -eq 3 ] && echo "PASS: ntfy curl failure yields exit 3" \
+  || { echo "FAIL: ntfy curl failure exit was $ec (expected 3)"; exit 1; }
+
+# --- Pushover critical receipt capture ------------------------------------
+
+printf 'pushover\n' > "$proj/.claude/playbook/notify-provider"
+printf 'token_abc\n' > "$proj/.claude/playbook/pushover-token"
+printf 'user_xyz\n' > "$proj/.claude/playbook/pushover-user"
+
+# Stub that returns a receipt in the response JSON.
+cat >"$stub_bin/curl" <<'STUB'
+#!/usr/bin/env bash
+log="${CURL_LOG:-/dev/null}"
+{
+  echo "ARGS:"
+  for a in "$@"; do printf '  %s\n' "$a"; done
+} >"$log"
+printf '{"status":1,"receipt":"receipt_test_abc123"}'
+exit 0
+STUB
+chmod +x "$stub_bin/curl"
+
+rm -f "$proj/.claude/playbook/last-receipt"
+run_notify --level critical "Urgent alert" >/dev/null
+[ -f "$proj/.claude/playbook/last-receipt" ] \
+  && echo "PASS: critical send writes last-receipt file" \
+  || { echo "FAIL: last-receipt not created after critical send"; exit 1; }
+receipt_val="$(cat "$proj/.claude/playbook/last-receipt")"
+[ "$receipt_val" = "receipt_test_abc123" ] \
+  && echo "PASS: last-receipt contains the parsed receipt token" \
+  || { echo "FAIL: last-receipt contains [$receipt_val] (expected receipt_test_abc123)"; exit 1; }
+
+# Non-critical send must not write last-receipt even when stub always emits receipt.
+rm -f "$proj/.claude/playbook/last-receipt"
+run_notify --level info "Just an update" >/dev/null
+[ ! -f "$proj/.claude/playbook/last-receipt" ] \
+  && echo "PASS: non-critical send does not write last-receipt" \
+  || { echo "FAIL: last-receipt unexpectedly created on non-critical send"; exit 1; }

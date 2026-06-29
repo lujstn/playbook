@@ -23,12 +23,13 @@ When a task could be read two ways, classify by what happens when the agent is w
 
 ### Propagation
 
-Model resolution order: env var (`CLAUDE_CODE_SUBAGENT_MODEL`) > per-spawn model param > subagent frontmatter model > main model.
+The real levers, in resolution order: per-spawn `model` param on an `Agent` dispatch > `model:` field in subagent or skill frontmatter > `model` on each `agent()` call inside a workflow stage > main model.
 
-The env var does not cascade reliably into nested depths. Enforce the rule at every level by:
-- relying on the `SubagentStart` overlay (handled by Playbook's hooks) to carry the rule into every nested agent;
-- setting `model:` explicitly on every `Agent` dispatch and every `agent()` workflow stage you author, rather than relying on inheritance;
-- for GSD, using `model_overrides` in the project config: `model_overrides.gsd-executor: sonnet`, `model_overrides.gsd-planner: opus`, `model_overrides.gsd-verifier: opus`.
+These are reliable on plain Agent subagents and workflow stages. For agent-team peers (hackathon mode), per-peer model selection is limited: `CLAUDE_CODE_SUBAGENT_MODEL` governs all team members globally, so the Sonnet/Opus split is weakest there and should not be relied upon.
+
+`CLAUDE_CODE_SUBAGENT_MODEL`, if set in the environment, overrides all of the above for every subagent and agent-team peer simultaneously. Because it is one model for everything, it cannot express a Sonnet-for-execution / Opus-for-review split; it flattens the distinction. This rule assumes it is unset (or set to `inherit`); if a user has it set, Playbook's per-dispatch model choices are silently overridden.
+
+Enforce the rule at every level by setting `model:` explicitly on every `Agent` dispatch, in subagent/skill frontmatter, and on each `agent()` workflow stage you author. For GSD, use `model_overrides` in the project config: `model_overrides.gsd-executor: sonnet`, `model_overrides.gsd-planner: opus`, `model_overrides.gsd-verifier: opus`.
 
 Explicit params are the source of truth; inheritance is the fallback of last resort.
 

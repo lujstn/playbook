@@ -7,7 +7,7 @@ description: Use when coupled work in one shared codebase needs peers that talk 
 
 ## Overview
 
-A thin choreography over Claude Code's native agent-teams primitive (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). The `playbook:playbook` engine routes here when work is coupled in one shared codebase and peers need to talk to each other directly. The engine announces and proceeds; there is no vetoable staffing gate. This skill adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below).
+A thin choreography over Claude Code's native agent-teams primitive. Teams are spawned via the `Agent` tool and auto-form; peers are addressed by name via `SendMessage`; coordination flows through a shared task list and direct peer messages. The `playbook:playbook` engine routes here when work is coupled in one shared codebase and peers need to talk to each other directly. The engine announces and proceeds; there is no vetoable staffing gate. This skill adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below).
 
 **Note:** Claude Code agent teams are experimental and disabled by default. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your environment to enable them. If the flag is absent this mode is unavailable; the engine will route to an alternative.
 
@@ -106,7 +106,7 @@ digraph hackathon_team {
 - `playbook:playbook` routes here internally. The engine announces and proceeds; it does not make a visible vetoable staffing call. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
 
 **Substrate:**
-- Native Claude Code agent-teams (`TeamCreate`, `SendMessage`, `Agent(team_name=...)`). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the flag is set.
+- Native Claude Code agent-teams: spawn peers via the `Agent` tool (the team auto-forms), address peers by name via `SendMessage`, coordinate via the shared task list. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the flag is set.
 
 **Not this skill:**
 - Worktree-isolated, wave-grouped work is a different mode. A peer mesh in one shared directory is this skill's job; do not force one into the worktree-isolated route or the other way round.

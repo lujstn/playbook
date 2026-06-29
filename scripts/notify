@@ -156,12 +156,31 @@ case "$PROVIDER" in
       push_args+=( --form-string "url=${CLICK_URL}" --form-string "url_title=Open session" )
     fi
 
-    response="$(curl "${push_args[@]}" https://api.pushover.net/1/messages.json 2>/dev/null)"
+    if ! response="$(curl "${push_args[@]}" https://api.pushover.net/1/messages.json 2>&1)"; then
+      echo "ERROR: Pushover publish failed: ${response}" >&2
+      exit 3
+    fi
     if ! printf '%s' "$response" | grep -q '"status":1'; then
       echo "ERROR: Pushover publish failed: ${response}" >&2
       exit 3
     fi
-    echo "pushover sent (level=${LEVEL})"
+    RECEIPT=""
+    if [ "$LEVEL" = "critical" ]; then
+      if command -v jq >/dev/null 2>&1; then
+        RECEIPT="$(printf '%s' "$response" | jq -r '.receipt // empty' 2>/dev/null || true)"
+      else
+        RECEIPT="$(printf '%s' "$response" | sed -n 's/.*"receipt":"\([^"]*\)".*/\1/p' 2>/dev/null || true)"
+      fi
+      if [ -n "$RECEIPT" ]; then
+        mkdir -p "${PWD}/.claude/playbook"
+        printf '%s\n' "$RECEIPT" > "${PWD}/.claude/playbook/last-receipt"
+      fi
+    fi
+    if [ -n "$RECEIPT" ]; then
+      echo "pushover sent (level=${LEVEL}, receipt=${RECEIPT})"
+    else
+      echo "pushover sent (level=${LEVEL})"
+    fi
     ;;
 
   *)

@@ -11,16 +11,6 @@
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start", "async": false }
       ] }
     ],
-    "PreCompact": [
-      { "matcher": "manual|auto", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
-      ] }
-    ],
-    "PostCompact": [
-      { "matcher": "manual|auto", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
-      ] }
-    ],
     "PostToolUse": [
       { "matcher": "*", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }

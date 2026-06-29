@@ -7,20 +7,14 @@ unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
 B="$root/tests/hooks/fixtures/transcript-basic.jsonl"
 T="$root/tests/hooks/fixtures/transcript-beat.jsonl"
 
-# PreCompact: steer that names the carried items, no file read.
+# PreCompact is a dead seam: additionalContext is never injected, so take-a-beat must be silent.
 out="$(printf '{"hook_event_name":"PreCompact","transcript_path":"%s"}' "$B" | bash "$H")"
-jq -e '.hookSpecificOutput.additionalContext | test("Compact Instructions")' <<<"$out" >/dev/null \
-  && echo "PASS: precompact steers" || { echo FAIL precompact; exit 1; }
-grep -q "Lessons and wrong turns" <<<"$out" && echo "PASS: lessons named" || { echo FAIL lessons; exit 1; }
-grep -q "playbook-window" <<<"$out" && echo "PASS: declared window carried" || { echo FAIL window; exit 1; }
+[ -z "$out" ] && echo "PASS: PreCompact is silent (dead seam, no output)" || { echo "FAIL: PreCompact produced output: [$out]"; exit 1; }
 
-# Post-compaction: original request recovered from the transcript with primacy.
-out="$(printf '{"hook_event_name":"PostCompact","transcript_path":"%s"}' "$B" | bash "$H")"
-grep -q "Build me a widget that does X. Original request text." <<<"$out" \
-  && echo "PASS: original request re-injected from transcript" || { echo FAIL reanchor; exit 1; }
+# Post-compaction re-anchor: SessionStart with source=compact is the real seam.
 out="$(printf '{"hook_event_name":"SessionStart","source":"compact","transcript_path":"%s"}' "$B" | bash "$H")"
 grep -q "Build me a widget that does X. Original request text." <<<"$out" \
-  && echo "PASS: SessionStart/compact also recovers" || { echo FAIL reanchor2; exit 1; }
+  && echo "PASS: SessionStart/compact recovers original request with primacy" || { echo FAIL reanchor; exit 1; }
 
 # Below threshold: silent (basic fixture is ~1 percent of 1,000,000 vs 80% default).
 out="$(printf '{"hook_event_name":"PostToolUse","transcript_path":"%s"}' "$B" | bash "$H")"

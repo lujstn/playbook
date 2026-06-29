@@ -32,13 +32,6 @@ Re-establish the one-line North Star and your current unease from the anchor abo
 }
 
 case "$event" in
-  PreCompact)
-    playbook_emit_context "PreCompact" "## Compact Instructions
-When summarising, preserve verbatim and ahead of orchestration scaffolding: the original request, the current one-line North Star, the Lessons and wrong turns (including silent wrong turns, not only errors with a stack trace), the current unease level and last movement, and the most recent playbook-window line. Re-anchor the summary on the original request and the next work.
-
-$(anchor)"
-    ;;
-  PostCompact)            reanchor_resume "PostCompact" ;;
   SessionStart)
     src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
     if [ "$src" = "compact" ]; then

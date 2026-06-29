@@ -27,11 +27,9 @@ State your context window once as a single line of the form `playbook-window: <i
 - **Durability** decides whether state must survive `/clear`: if yes, gsd; if no, the session-scoped modes.
 - **Size** decides only whether to decompose first. If the work is too large to route as one unit, propose the cut and recurse per piece (decompose-as-judgement). There is no sixth mode for this; it is a decision that lives in the engine.
 
-### 3. The ultracode nudge
+Playbook assumes a plain high-effort baseline and no default mode. Of the separable-work modes, interns is assistant-driven and runs directly; workflows is the opt-in scale upgrade the user triggers via the `/workflow` command or the ultracode keyword, since Playbook cannot start a workflow itself.
 
-If substantive separable work is starting and `/effort ultracode` is not set, surface one short non-blocking line: "not in ultracode mode; want me to set it before planning?" Do not repeat it. Never gate on the answer; proceed either way.
-
-### 4. Announce the route
+### 3. Announce the route
 
 Print exactly one branded marker line before routing:
 
@@ -49,7 +47,7 @@ The `Playbook ·` brand is mandatory so the marker is unmistakably Playbook on t
 | ⚙️ | workflows |
 | 🏗️ | gsd |
 
-### 5. Route
+### 4. Route
 
 Pass the North Star into every dispatch as a single labelled line: `playbook-northstar: <one-line North Star>`. The overlay reaches helpers through `SubagentStart`; this data line is the one piece of carried state the hook cannot recover on its behalf.
 
@@ -67,19 +65,23 @@ Agent teams whose peers message each other. Use when the work is coupled in one 
 
 #### workflows
 
-Ultracode dynamic workflows. The default for substantive separable work. The script holds the loop; results stay out of main context. When routing here, carry the wave wisdom as guidance for the workflow author:
+Dynamic workflows: a JavaScript orchestration the runtime executes, where the script holds the loop and intermediate results stay out of your context. This is a peer mode, not the default, and it is the right call when separable work needs real scale (dozens to hundreds of agents) or when keeping bulk results out of context matters.
 
-- Extract shared contracts and types first, as a serial stage before any parallel work begins.
-- Keep parallel stages file-disjoint; prove disjointness before running them in parallel, and never reduce parallelism on a hunch once it is proven.
-- Verify the merged state per stage before advancing.
+You cannot start a workflow yourself: the Workflow tool only runs once the user opts in. So when work is workflow-shaped, decide by scale. For modest separable work, run interns now and note that `/workflow` would scale it further. For genuinely large work, surface one line offering it: run `/workflow` (or add the ultracode keyword) and Playbook fans it out as a workflow. Announce the ⚙️ workflows marker only once a workflow is actually running, never before.
 
-This is the distillation of the synchronised-development wave model, expressed as workflow authorship guidance rather than a separate skill.
+When you do run a workflow, a workflow subagent receives only the prompt you author for it: not the North Star, not CLAUDE.md, not this overlay, not the hooks. So carry context explicitly in the script:
+
+- Put the one-line North Star verbatim at the top of every `agent()` prompt, and apply the model rule per stage by setting `model` on each `agent()` call (Sonnet to execute, Opus to plan, judge, and review), naming the rule in the prompt too.
+- Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and prove disjointness before running them; verify the merged state before advancing. Scale comes from the script's own parallelism, not from subagents spawning subagents.
+- A workflow takes no mid-run user input and its subagents cannot pull the user back, so the standing override and the escalation ladder degrade to fail-and-surface inside a workflow: stop and return the blocker rather than guessing, and split any human sign-off into a separate workflow.
+
+The `/workflow` command carries this guidance; this section is why the engine routes there. It is the distillation of the synchronised-development wave model, expressed as workflow authorship guidance rather than a separate skill.
 
 #### gsd
 
 A whole MVP in an unknown area. Durable cross-session state required. Routes into `playbook:gsd-mode`, which front-loads user involvement and forces parallel execution. Detect GSD availability before routing (see `playbook:gsd-mode`); if absent, prompt to install with `npx get-shit-done-cc@latest` and let the user re-run or pick a different mode.
 
-### 6. Production-ready sweep
+### 5. Production-ready sweep
 
 Before handing work back, run the tenet 6 sweep: no scaffolding vocabulary (plan, wave, mission) in shipped code, no comment sludge, no plan references.
 

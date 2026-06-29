@@ -1,6 +1,6 @@
 {
   "name": "playbook",
-  "description": "Native, invisible-but-visible Claude Code workflow layer: silent routing across five modes with visible markers, an always-on Sonnet-execute and Opus-review model rule, calm compaction that stops agents fearing the context limit, and offline notifications via Pushover or ntfy.",
+  "description": "Native, invisible-but-visible Claude Code steering layer: neutral routing across five modes with visible markers, an always-on Sonnet-execute and Opus-review model rule, calm compaction that stops agents fearing the context limit, and offline notifications via Pushover or ntfy.",
   "version": "2.0.0",
   "author": {
     "name": "Lucas Johnston Kurilov",
