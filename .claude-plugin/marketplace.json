@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "playbook",
-      "description": "Native, invisible-but-visible Claude Code steering layer: neutral mode routing with visible markers, an always-on model rule, calm compaction, and offline notifications.",
+      "description": "Native, invisible-but-visible Claude Code steering layer: task-fit mode routing with visible markers, restraint that keeps ultracode from over-reaching for workflows, an always-on model rule, calm compaction, and offline notifications.",
       "version": "2.0.0",
       "source": "./",
       "author": {

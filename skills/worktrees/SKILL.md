@@ -72,13 +72,13 @@ Use a short descriptive slug for the work (e.g. `auth`, `billing`, `spike`), suf
 
 ### 4. Write the instance config
 
-Create `.worktrees/<slug>-N/.worktree-instance` with the instance number and any resource overrides so the session in that worktree knows its identity without scanning the directory:
+Create `.worktrees/<slug>-N/.worktree-instance` with the instance number and any resource overrides so the session in that worktree knows its identity without scanning the directory. The values are the resolved offsets for instance 2 of the Docker-Postgres stack (host port from the table above, dev-server port per the 3000 + N - 1 pattern):
 
 ```
-PLAYBOOK_INSTANCE=N
-DB_PORT=543N
-DB_NAME=myapp_N
-DEV_PORT=300M
+PLAYBOOK_INSTANCE=2
+DB_PORT=5433
+DB_NAME=myapp_2
+DEV_PORT=3001
 ```
 
 Fill in only the variables relevant to the detected stack. This file is read by the Claude Code session that opens the worktree; it is not a shell script and is not sourced automatically.
@@ -88,14 +88,14 @@ Fill in only the variables relevant to the detected stack. This file is read by 
 Print a short block:
 
 ```
-🌿 Playbook · worktrees: created .worktrees/<slug>-N on branch <slug>-N (instance N)
+🌿 Playbook · worktrees: created .worktrees/<slug>-2 on branch <slug>-2 (instance 2)
 
 Resources isolated for this session:
-  DB port:       543N
-  DB name:       myapp_N
-  Dev port:      300M
+  DB port:       5433
+  DB name:       myapp_2
+  Dev port:      3001
 
-Open a new Claude Code session in .worktrees/<slug>-N to begin.
+Open a new Claude Code session in .worktrees/<slug>-2 to begin.
 ```
 
 If no isolatable resources were detected, say so plainly: "no isolatable resources found; the worktree is branch-isolated but shares the stack."

@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming or /pb-brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off into the engine's routed mode. Does not write a design-doc artifact unless asked, and never starts building inside brainstorming.
+description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming or /pb-brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off into the engine's routed mode. Does not write a design-doc artefact unless asked, and never starts building inside brainstorming.
 ---
 
 # Brainstorming
@@ -37,12 +37,12 @@ Once enough signal exists, describe what the chosen direction actually looks lik
 
 ### 4. Converge
 
-Drive toward a clear enough shape that the routing engine can take over. The shape does not need to be a detailed spec; it needs to be specific enough that "separable or not" and "durable or not" can be answered. State the convergence explicitly: "the shape is X; routing to the engine now."
+Drive towards a clear enough shape that the routing engine can take over. The shape does not need to be a detailed spec; it needs to be specific enough that "separable or not" and "durable or not" can be answered. State the convergence explicitly: "the shape is X; routing to the engine now."
 
 ## Red Flags
 
 **Never:**
-- Force a design-doc artifact. Brainstorming produces shared understanding in-conversation; it does not write a document unless the user asks for one.
+- Force a design-doc artefact. Brainstorming produces shared understanding in-conversation; it does not write a document unless the user asks for one.
 - Drip-feed questions across multiple turns. Batch them once, early.
 - Start building inside brainstorming. The first line of code is written after hand-off, not before.
 - Stay open-ended indefinitely. If the user signals readiness or the shape is clear, converge and hand off.

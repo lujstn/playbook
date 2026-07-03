@@ -36,10 +36,10 @@ Work is routed on **separability and durability, not size**. Size only decides w
 | 🐺 | `lone-wolf` | main thread | one coherent unit, no benefit from extra hands |
 | 🐜 | `interns` | parallel subagents | several independent sub-tasks; helpers do not talk; includes the joint-leads to workers nested fan-out (e.g. 5 leads x 5 workers = 25, inside the depth-5 cap) |
 | 🤝 | `hackathon` | agent teams | coupled work in one shared codebase; peers message each other |
-| ⚙️ | `workflows` | dynamic workflows | separable work that needs real scale (dozens to hundreds of agents) or results kept out of context; opt-in via `/workflow` or the ultracode keyword |
+| ⚙️ | `workflows` | dynamic workflows | many genuinely independent units, a scale one context cannot hold, or work that needs independent verification; self-launched under ultracode, otherwise opt-in via `/workflow` |
 | 🏗️ | `gsd` | GSD | a whole MVP in an unknown area; durable cross-session state |
 
-The baseline is plain high-effort Claude Code, with no default mode. For separable work, `interns` runs directly (a few parallel subagents); `workflows` is the opt-in scale upgrade you trigger with `/workflow` (or by adding the keyword "ultracode" to a prompt), since the assistant cannot start a workflow on its own. When work is workflow-shaped, Playbook either runs interns and notes that `/workflow` would scale it further, or, for genuinely large work, points you at `/workflow`. It never gates you.
+The baseline is ultracode: most substantial work runs under `/effort ultracode`, where the assistant can launch a dynamic workflow itself. That is exactly why the engine's discipline is restraint, not reach: it matches the tool to the task, never to the mode. A coherent read-and-fix or a small known file set runs as `lone-wolf` or `interns`; a workflow is reserved for work with many genuinely independent units, a scale one context cannot hold, or a real need for independent verification. "Ultracode is on" is never itself the reason to fan out. When ultracode is not on, `workflows` is opt-in instead, triggered with `/workflow` or by adding the keyword "ultracode" to a prompt. Either way Playbook announces the route and never gates you.
 
 ## The nine tenets
 
@@ -99,7 +99,7 @@ The common path is zero-dependency. `lone-wolf`, `interns`, `hackathon`, `workfl
 
 ## Runtime state
 
-The core writes no file into your working tree: no `.playbook/` directory, no anchor file, no ledger. The original request, the North Star and the unease sense live in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. The opt-in pieces are the only exceptions, and only when you enable them: offline mode stores its notification config under the gitignored `.claude/playbook/`, the context-calm choice is remembered there too, and `.worktrees/` holds your parallel-session worktrees.
+The core writes no file into your working tree: no `.playbook/` directory, no anchor file, no persisted state file. The original request, the North Star and the unease sense live in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. The opt-in pieces are the only exceptions, and only when you enable them: offline mode stores its notification config under the gitignored `.claude/playbook/`, the context-calm choice is remembered there too, and `.worktrees/` holds your parallel-session worktrees.
 
 ## Licence
 

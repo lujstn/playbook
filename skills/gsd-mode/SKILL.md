@@ -27,7 +27,7 @@ Detect whether a GSD project already exists by checking for `.planning/` at the 
 
 ## Front-load user involvement
 
-GSD's default phase flow asks questions during the gray-areas pass and researcher pass. The wrapper collapses this into a single early conversation: ask only what the current phase needs, do it once, then pre-seed the stage files so GSD skips its interactive passes.
+GSD's default phase flow asks questions during the grey-areas pass and researcher pass. The wrapper collapses this into a single early conversation: ask only what the current phase needs, do it once, then pre-seed the stage files so GSD skips its interactive passes.
 
 ### Step 1: assess how much is actually needed
 
@@ -66,7 +66,7 @@ Optionally write `XX-RESEARCH.md` with the findings from step 2 if they are subs
 /gsd:plan-phase XX --skip-research
 ```
 
-GSD detects the CONTEXT file and bypasses the gray-areas and researcher passes. The planner has what it needs; no interactive prompts fire.
+GSD detects the CONTEXT file and bypasses the grey-areas and researcher passes. The planner has what it needs; no interactive prompts fire.
 
 Express alternatives when a PRD or doc glob is available:
 

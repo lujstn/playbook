@@ -3,7 +3,7 @@ name: offline-mode
 description: Use only when explicitly run to enable offline behaviour for one session, declaring the wait window fresh each time and producing a morning-readable HTML decision log.
 ---
 
-# 📚 Playbook · offline
+# Offline Mode
 
 ## Overview
 
@@ -11,7 +11,7 @@ Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalat
 
 **Core principle:** Absence is not permission. When the user is away, wait the window the user declared this run, escalate up the ladder, and only then proceed on the best call, logging every absent-decision so the user can read exactly what happened in the morning.
 
-**Announce at start:** "📚 Playbook · offline - enabling offline behaviour for this session and declaring the wait window now."
+**Announce at start:** "📚 Playbook · offline: enabling offline behaviour for this session and declaring the wait window now."
 
 This skill does not re-explain `AskUserQuestion`, native subagents, or the escalation ladder mechanics; it specifies only the offline-specific behaviour that closes the tenet 5 gap.
 
@@ -97,10 +97,10 @@ The notify-and-wait step at the escalation ladder defaults to `action`. Escalate
 
 ## Decision log
 
-While offline mode is active, accumulate a running ledger of events that occur specifically because the user was absent:
+While offline mode is active, accumulate a running log of events that occur specifically because the user was absent:
 
 - Forced-without-you decisions made after the wait window elapsed.
-- CTO-subagent consultations.
+- External-manager consultations.
 - Waits.
 - Notification sends (all levels).
 
@@ -110,7 +110,7 @@ Online runs produce no log. The log accumulates only while offline mode is activ
 
 ## HTML export
 
-At the end of the session, render the accumulated ledger to a clean, simple-to-read HTML document using `decision-log.html.tmpl` in this skill directory. Save it to a folder the user chooses at runtime: either the project root, or a dedicated logs folder outside the root. The destination folder is chosen at runtime, not fixed in advance and not persisted between runs. The intent is a document the user can read calmly in the morning, so keep it legible at a glance.
+At the end of the session, render the accumulated log to a clean, simple-to-read HTML document using `decision-log.html.tmpl` in this skill directory. Save it to a folder the user chooses at runtime: either the project root, or a dedicated logs folder outside the root. The destination folder is chosen at runtime, not fixed in advance and not persisted between runs. The intent is a document the user can read calmly in the morning, so keep it legible at a glance.
 
 ---
 
@@ -219,7 +219,7 @@ digraph offline_mode {
 
 **Always:**
 - Declare the wait behaviour fresh every run via the per-run picker, option A custom window (default pre-filled 10 minutes) or option B disable waiting.
-- Log every forced-without-you decision, CTO-subagent consultation, wait, and notification send while offline mode is active.
+- Log every forced-without-you decision, external-manager consultation, wait, and notification send while offline mode is active.
 - Notify via `scripts/notify --level action` and wait the declared window before any external-manager step, unless waiting was disabled this run.
 - Consult the external manager first, where your in-session unease warrants, before a forced call.
 - Export the HTML decision log to the folder the user chooses at runtime at session end, morning-readable.
@@ -231,7 +231,7 @@ digraph offline_mode {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the front door. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
+- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
 
 **Division of labour:**
 - `/goal` owns the "am I actually done?" loop. This skill owns absence, escalation, and the morning log. Suggest pairing with `/goal` when the task has a clear completion criterion.
@@ -243,4 +243,4 @@ digraph offline_mode {
 - `scripts/notify [--level info|action|critical] [--link <url>] "<headline>" ["<detail>"]` sends to the user's phone via the configured provider. Topic or credentials live in `.claude/playbook/`; the Click or url field deep-links back to `/remote-control` when it is active, otherwise omitted.
 
 **Substrate:**
-- Native Claude Code plus `curl`. `AskUserQuestion` drives the per-run picker; native subagents handle the CTO consultation; `scripts/notify` ships with the plugin. No further dependency: still part of the common path.
+- Native Claude Code plus `curl`. `AskUserQuestion` drives the per-run picker; native subagents handle the external-manager consultation; `scripts/notify` ships with the plugin. No further dependency: still part of the common path.

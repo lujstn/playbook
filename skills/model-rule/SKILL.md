@@ -17,7 +17,7 @@ Classify by the task's risk profile, not the agent's role name or the orchestrat
 
 2. **Bulk implementation under a locked specification, with a reviewer above.** The design is settled and the contract is written elsewhere; the agent translates spec to code. A reviewer running on the parent model sits above and will catch slippage. Use Sonnet, with reasoning effort matched to the density of the work. If there is no reviewer above, the task does not qualify for this profile; treat it as profile 3.
 
-3. **Judgment, validation, design, audit, contract authorship, or any task whose errors propagate silently into other agents' work.** This covers anyone signing off work, anyone authoring an interface or contract that downstream agents depend on, and anyone nominated as a check of last resort. Use Opus; never downgrade.
+3. **Judgement, validation, design, audit, contract authorship, or any task whose errors propagate silently into other agents' work.** This covers anyone signing off work, anyone authoring an interface or contract that downstream agents depend on, and anyone nominated as a check of last resort. Use Opus; never downgrade.
 
 When a task could be read two ways, classify by what happens when the agent is wrong: a loud, locally fixable error can run on a lighter tier; a quiet error that propagates into other agents keeps the flagship.
 

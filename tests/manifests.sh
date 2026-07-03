@@ -21,5 +21,9 @@ assert "! grep -q 'uncertainty' '$root/hooks/hooks.json'" "no uncertainty refere
 assert "[ -d '$root/commands' ]" "commands/ directory exists"
 assert "[ -f '$root/commands/pb-fix.md' ]" "commands/pb-fix.md present (dual-name command)"
 assert "[ -f '$root/commands/fix.md' ]" "commands/fix.md present (dual-name command)"
+assert "[ -f '$root/commands/workflow.md' ]" "commands/workflow.md present (dual-name command)"
+assert "[ -f '$root/commands/pb-workflow.md' ]" "commands/pb-workflow.md present (dual-name command)"
+assert "grep -q 'disable-model-invocation: true' '$root/commands/workflow.md'" "workflow.md is user-only (disable-model-invocation: the Workflow-tool opt-in)"
+assert "grep -q 'disable-model-invocation: true' '$root/commands/pb-workflow.md'" "pb-workflow.md is user-only (disable-model-invocation: the Workflow-tool opt-in)"
 
 exit $fail

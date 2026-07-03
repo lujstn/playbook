@@ -52,3 +52,15 @@ ctx_sa="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$sout")"
 grep -q "near_breaking" <<<"$ctx_sa" \
   && echo "PASS: SubagentStop unease prompt content unchanged" \
   || { echo "FAIL: SubagentStop unease prompt content wrong"; exit 1; }
+
+# stop_hook_active guard: when the previous stop was triggered by this pulse the
+# hook must stay silent, or it re-prompts the model and loops until the platform
+# force-overrides the turn (the 9x "Ran 3 stop hooks" wall seen in both baseline
+# sessions). A normal stop with no active flag still fires the pulse.
+gout="$(printf '{"hook_event_name":"Stop","stop_hook_active":true}' | bash "$H")"
+[ -z "$gout" ] && echo "PASS: stop_hook_active suppresses the pulse (no loop)" \
+  || { echo "FAIL: pulse fired despite stop_hook_active (would loop)"; exit 1; }
+nout="$(printf '{"hook_event_name":"Stop","stop_hook_active":false}' | bash "$H")"
+jq -e '.hookSpecificOutput.additionalContext' <<<"$nout" >/dev/null \
+  && echo "PASS: pulse still fires when stop_hook_active is false" \
+  || { echo "FAIL: pulse suppressed when it should fire"; exit 1; }

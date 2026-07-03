@@ -19,7 +19,7 @@ The overlay is the persistence mechanism, carried by the hooks across compaction
 
 One line, derived verbatim from the user's request, kept load-bearing at every decision. For trivial work this is one line and there are zero questions; lone-wolf and proceed.
 
-State your context window once as a single line of the form `playbook-window: <integer>` so the hooks can read it.
+State your context window once, quietly, on your first reply, as a single faint line of the form `playbook-window: <integer>` so the hooks can read it; do not repeat it on later turns.
 
 ### 2. Assess separability and durability
 
@@ -27,7 +27,7 @@ State your context window once as a single line of the form `playbook-window: <i
 - **Durability** decides whether state must survive `/clear`: if yes, gsd; if no, the session-scoped modes.
 - **Size** decides only whether to decompose first. If the work is too large to route as one unit, propose the cut and recurse per piece (decompose-as-judgement). There is no sixth mode for this; it is a decision that lives in the engine.
 
-Playbook assumes a plain high-effort baseline and no default mode. Of the separable-work modes, interns is assistant-driven and runs directly; workflows is the opt-in scale upgrade the user triggers via the `/workflow` command or the ultracode keyword, since Playbook cannot start a workflow itself.
+Ultracode is the assumed baseline: most substantial work runs under `/effort ultracode`, where you can launch a dynamic workflow yourself. Match the tool to the task, never to the mode, and right-size the number of hands to the number of genuinely independent units the task actually has. The hand count follows the work; it is never a target to scale up to, and this governs the count inside interns just as much as the choice to run a workflow. Ask what this task actually requires before reaching for scale. A workflow earns its place only when one of these genuinely holds: the independent units run to dozens or hundreds, or the bulk exceeds what one context can hold, or independent verification is itself the deliverable (an answer re-derived through several independent agents to defeat correlated error on a high-stakes or ambiguous result). Reading and fixing a known, bounded set of files is none of these: even a couple of dozen files is lone-wolf or interns, because the set fits one plan, and an audit's own checking is self-review or a single reviewer subagent, not a fan-out. This tie-break is decisive: a read-and-fix or audit over a known file set is interns at most, and that overrides the units-count and verification justifiers. "Ultracode is on, so this is the right scale" is the wrong reasoning; the mode being on is never itself the reason to fan out, and relabelling a 23-agent fan-out as interns is just as wrong as calling it a workflow. When ultracode is not on, workflows are opt-in instead: run interns and point the user at the `/workflow` command or the ultracode keyword to scale further.
 
 ### 3. Announce the route
 
@@ -57,7 +57,7 @@ Main thread. One coherent unit, no benefit from extra hands.
 
 #### interns
 
-Parallel subagents, star topology. Helpers do not talk to each other. Includes the named joint-leads to workers nested fan-out: e.g. 5 leads x 5 workers = 25 agents at depth 2, inside the hard depth-5 cap. Use when the work is separable into independent sub-tasks.
+Parallel subagents, star topology. Helpers do not talk to each other. Includes the named joint-leads to workers nested fan-out: e.g. 5 leads x 5 workers = 25 agents at depth 2, inside the hard depth-5 cap. Use when the work is separable into independent sub-tasks. The 25-agent figure is the ceiling for genuinely fan-out-shaped work, not a default: spawn one hand per genuinely independent unit and usually fewer, so a bounded read-and-fix gets a handful of interns at most, never a 25-agent nest.
 
 #### hackathon
 
@@ -65,17 +65,18 @@ Agent teams whose peers message each other. Use when the work is coupled in one 
 
 #### workflows
 
-Dynamic workflows: a JavaScript orchestration the runtime executes, where the script holds the loop and intermediate results stay out of your context. This is a peer mode, not the default, and it is the right call when separable work needs real scale (dozens to hundreds of agents) or when keeping bulk results out of context matters.
+Dynamic workflows: a JavaScript orchestration the runtime executes, where the script holds the loop and intermediate results stay out of your context. This is a peer mode, not the default, and it earns its place only when the work has dozens to hundreds of genuinely independent units, a scale one context cannot hold, or a need for independent verification that is itself the deliverable. The agent count follows the number of independent units; it is never a figure to scale up to.
 
-You cannot start a workflow yourself: the Workflow tool only runs once the user opts in. So when work is workflow-shaped, decide by scale. For modest separable work, run interns now and note that `/workflow` would scale it further. For genuinely large work, surface one line offering it: run `/workflow` (or add the ultracode keyword) and Playbook fans it out as a workflow. Announce the ⚙️ workflows marker only once a workflow is actually running, never before.
+Under ultracode you can start a workflow yourself; otherwise the Workflow tool only runs once the user opts in via `/workflow` or the ultracode keyword. Either way, decide by what the task needs, not by whether the power is available. Rule out the cheaper modes first: one coherent unit is lone-wolf; separable but modest is interns; reach for a workflow only when the units are many and genuinely independent, the scale exceeds one context, or independent verification is itself the deliverable. Sizing the tool to the task is the discipline: ultracode being on is never the reason to fan out, and a small read-and-fix never warrants a multi-agent adversarial swarm. Without ultracode, surface one line offering `/workflow` rather than running it. Announce the ⚙️ workflows marker only once a workflow is actually running, never before.
 
 When you do run a workflow, a workflow subagent receives only the prompt you author for it: not the North Star, not CLAUDE.md, not this overlay, not the hooks. So carry context explicitly in the script:
 
 - Put the one-line North Star verbatim at the top of every `agent()` prompt, and apply the model rule per stage by setting `model` on each `agent()` call (Sonnet to execute, Opus to plan, judge, and review), naming the rule in the prompt too.
 - Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and prove disjointness before running them; verify the merged state before advancing. Scale comes from the script's own parallelism, not from subagents spawning subagents.
 - A workflow takes no mid-run user input and its subagents cannot pull the user back, so the standing override and the escalation ladder degrade to fail-and-surface inside a workflow: stop and return the blocker rather than guessing, and split any human sign-off into a separate workflow.
+- Validate the workflow's own result before trusting it. A structured return that comes back empty or zero-findings is more often an aggregation bug in your own script than a genuinely clean task; reconcile the returned shape against the per-stage progress, and never report success on a degenerate result you have not sanity-checked.
 
-The `/workflow` command carries this guidance; this section is why the engine routes there. It is the distillation of the synchronised-development wave model, expressed as workflow authorship guidance rather than a separate skill.
+The `/workflow` command carries this guidance; this section is why the engine routes there. It distils the wave-based parallel-execution model into workflow authorship guidance rather than a separate skill.
 
 #### gsd
 
