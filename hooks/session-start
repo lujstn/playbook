@@ -54,7 +54,7 @@ src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
 if [ "$event" = "SessionStart" ] && { [ "$src" = "startup" ] || [ "$src" = "clear" ]; }; then
   body="${body}
 
-Playbook liveness: on your first reply this session, include one short faint line on its own, exactly: · playbook active. Print it once so the user can see Playbook loaded even on a trivial session; do not repeat it on later turns and do not print it inside subagents."
+Playbook liveness: at the very end of your first reply this session, as the last line, on its own, include exactly this short faint line: 📚 *Playbook skills available in this session*. Place it after everything else in that first reply, not at the start. Print it once, only on the first reply, so the user can see Playbook loaded even on a trivial session; do not repeat it on later turns and do not print it inside subagents."
 fi
 
 # On a dispatched helper, ask for one closing unease line only when elevated, so a

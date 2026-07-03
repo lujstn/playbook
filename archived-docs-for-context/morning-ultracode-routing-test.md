@@ -39,8 +39,9 @@ cd ../playbook-m1 && claude --plugin-dir /Users/lucas/Developer/lujstn/playbook
 Repeat for `../playbook-m2`, `../playbook-m3`.
 
 **Two setup confirmations before you start:**
-1. The faint `· playbook active` line appears on the first reply, and no `playbook-window:`
-   line ever appears (the window is inferred silently now, never declared by the model).
+1. The faint `📚 *Playbook skills available in this session*` line appears at the end of
+   the first reply, and no `playbook-window:` line ever appears (the window is inferred
+   silently now, never declared by the model).
 2. The Workflow tool is actually available in this build under `--plugin-dir` + ultracode
    (otherwise Prompt 2 cannot up-shift for environment reasons, not judgement). Quick
    check: ask the session "is the Workflow tool available to you right now?" If it is

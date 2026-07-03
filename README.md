@@ -6,12 +6,18 @@ The two things it cares about most: keep the original goal load-bearing across c
 
 ## Install
 
+Playbook is a Claude Code plugin, so setup is two lines inside Claude Code:
+
 ```
 /plugin marketplace add lujstn/playbook
 /plugin install playbook
 ```
 
-Then just work. Describe what you want in a normal sentence. Playbook activates at the start of any non-trivial work, announces how it is running the work, and stays out of your way.
+That is the whole thing. If the plugin does not load straight away, restart Claude Code once and it will pick it up. You will know it is live because the first reply of a session ends with a faint `📚 Playbook skills available in this session` line.
+
+Then just work. Describe what you want in a normal sentence. Playbook activates at the start of any non-trivial work, announces how it is running the work, and otherwise stays out of your way.
+
+The common path is zero-dependency, so there is nothing else to install. The one thing worth having on your machine is `jq`, which most systems already carry: it powers the North Star recovery and the compaction calm, and if it is ever missing Playbook says so in the session rather than degrading quietly.
 
 ## You can see it working
 
@@ -25,6 +31,12 @@ When the model rule downshifts a spawn to save cost, it says so too:
 
 ```
 🪙 executing on Sonnet: bulk implementation under a locked spec
+```
+
+And when something genuinely starts going wrong, the unease register surfaces on its own line, so a rising worry is visible instead of buried. It only speaks when the worry actually climbs, so its silence is meaningful too:
+
+```
+🌡️ Playbook · unease: watchful: three edits in a row failed to apply
 ```
 
 ## The five modes
