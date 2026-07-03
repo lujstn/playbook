@@ -24,40 +24,52 @@ used="$(playbook_context_used "$stdin_b")"
 [ "$used" = "10020" ] && echo "PASS: usage sum = last assistant input+cache" \
   || { echo "FAIL: used was [$used], expected 10020"; exit 1; }
 
-win="$(playbook_declared_window "$stdin_b")"
-[ "$win" = "1000000" ] && echo "PASS: declared window parsed" \
-  || { echo "FAIL: window was [$win]"; exit 1; }
+# Window inference: env override wins; the ratcheted state window is sticky; the
+# assumed 200000 is the default; an invalid env value falls through; provenance
+# is proven for env/ratchet and assumed for the default.
+ws="$(mktemp -d)"
+[ "$(PLAYBOOK_WINDOW=1000000 playbook_window "$ws")" = "1000000" ] \
+  && echo "PASS: playbook_window env override wins" || { echo "FAIL: env window"; exit 1; }
+[ "$(PLAYBOOK_WINDOW=1000000 playbook_window_provenance "$ws")" = "proven" ] \
+  && echo "PASS: env window provenance is proven" || { echo "FAIL: env provenance"; exit 1; }
+[ "$(playbook_window "$ws")" = "200000" ] \
+  && echo "PASS: playbook_window defaults to the assumed 200000" || { echo "FAIL: default window"; exit 1; }
+[ "$(playbook_window_provenance "$ws")" = "assumed" ] \
+  && echo "PASS: default window provenance is assumed" || { echo "FAIL: default provenance"; exit 1; }
+[ "$(PLAYBOOK_WINDOW=notanumber playbook_window "$ws")" = "200000" ] \
+  && echo "PASS: invalid env window falls through to the default" || { echo "FAIL: invalid env"; exit 1; }
+printf 'v=1\nwindow_proven=1000000\n' > "$ws/state"
+[ "$(playbook_window "$ws")" = "1000000" ] \
+  && echo "PASS: playbook_window is sticky from a proven state" || { echo "FAIL: sticky window"; exit 1; }
+[ "$(playbook_window_provenance "$ws")" = "proven" ] \
+  && echo "PASS: ratcheted state window provenance is proven" || { echo "FAIL: sticky provenance"; exit 1; }
+rm -rf "$ws"
 
-# Regression lock: an assistant declaration of 200000 must win over a
-# user-message paste, a tool-result echo of DESIGN.md, and assistant prose
-# that quotes playbook-window: 1000000 mid-sentence. The old unanchored
-# grep|tail returned 1000000 here; the role-anchored parser must return
-# 200000.
-D="$root/tests/hooks/fixtures/transcript-window-decoy.jsonl"
-dwin="$(playbook_declared_window "$(printf '{"transcript_path":"%s"}' "$D")")"
-[ "$dwin" = "200000" ] \
-  && echo "PASS: decoy ignored, real assistant declaration wins" \
-  || { echo "FAIL: decoy window was [$dwin], expected 200000"; exit 1; }
-
-# Undeclared window: usage exists but no declaration. Window empty, percent
-# empty (silent degradation, never a wrong value). The take-a-beat
-# self-healing notice path keys off exactly this state.
-NW="$root/tests/hooks/fixtures/transcript-no-window.jsonl"
-stdin_nw="$(printf '{"transcript_path":"%s"}' "$NW")"
-nwin="$(playbook_declared_window "$stdin_nw")"
-nused="$(playbook_context_used "$stdin_nw")"
-npct="$(playbook_context_percent "$stdin_nw")"
-{ [ -z "$nwin" ] && [ -n "$nused" ] && [ -z "$npct" ]; } \
-  && echo "PASS: undeclared window is empty/empty-percent with usage present" \
-  || { echo "FAIL: nwin=[$nwin] nused=[$nused] npct=[$npct]"; exit 1; }
-
-pct="$(playbook_context_percent "$stdin_t")"
-[ "$pct" = "70" ] && echo "PASS: percent = round(100*used/window)" \
+# The single beat formula: round(100 * used / window).
+pct="$(playbook_percent 700020 1000000)"
+[ "$pct" = "70" ] && echo "PASS: playbook_percent = round(100*used/window)" \
   || { echo "FAIL: percent was [$pct], expected 70"; exit 1; }
 
-missing="$(playbook_context_percent '{"transcript_path":"/no/such/file"}')"
-[ -z "$missing" ] && echo "PASS: silent empty on missing transcript" \
+missing="$(playbook_context_used '{"transcript_path":"/no/such/file"}')"
+[ -z "$missing" ] && echo "PASS: silent empty usage on missing transcript" \
   || { echo "FAIL: expected empty, got [$missing]"; exit 1; }
+
+# Bounded reads: a filler record over 300KB must not stop the tail read from
+# finding the final usage record, nor the head read from finding the first user
+# record.
+big="$(mktemp).jsonl"
+printf '{"type":"user","message":{"role":"user","content":"the bounded-read first ask"}}\n' > "$big"
+filler="$(head -c 350000 /dev/zero | tr '\0' 'z')"
+printf '{"type":"system","subtype":"noise","content":"%s"}\n' "$filler" >> "$big"
+printf '{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":100,"cache_creation_input_tokens":2000,"cache_read_input_tokens":50000,"output_tokens":5},"content":[{"type":"text","text":"done"}]}}\n' >> "$big"
+bstdin="$(printf '{"transcript_path":"%s"}' "$big")"
+bu="$(playbook_context_used "$bstdin")"
+[ "$bu" = "52100" ] && echo "PASS: bounded read finds the final usage record past a 300KB filler" \
+  || { echo "FAIL bounded used: [$bu]"; rm -f "$big"; exit 1; }
+bo="$(playbook_original_request "$bstdin")"
+[ "$bo" = "the bounded-read first ask" ] && echo "PASS: bounded read finds the first user record past a 300KB filler" \
+  || { echo "FAIL bounded orig: [$bo]"; rm -f "$big"; exit 1; }
+rm -f "$big"
 
 # Project North Star recovery and the subagent-aware anchor block.
 SB="$root/tests/hooks/fixtures/transcript-subagent-beat.jsonl"
@@ -90,7 +102,7 @@ nons_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"
 removed=0
 for fn in playbook_dir playbook_anchor playbook_ledger playbook_ensure_dir \
           playbook_anchor_init playbook_ledger_append playbook_anchor_read \
-          playbook_emit_stop_nudge; do
+          playbook_emit_stop_nudge playbook_declared_window playbook_context_percent; do
   if declare -F "$fn" >/dev/null 2>&1; then echo "FAIL: $fn still defined"; removed=1; fi
 done
-[ "$removed" -eq 0 ] && echo "PASS: rejected file and Stop-channel helpers removed" || exit 1
+[ "$removed" -eq 0 ] && echo "PASS: rejected file, Stop-channel, and declared-window helpers removed" || exit 1

@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Assumed-window calm fixture original request."}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":0,"cache_creation_input_tokens":70000,"cache_read_input_tokens":100000,"output_tokens":8},"content":[{"type":"text","text":"Working under an undeclared window."}]}}

@@ -11,19 +11,19 @@
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start", "async": false }
       ] }
     ],
-    "PostToolUse": [
+    "PostToolBatch": [
       { "matcher": "*", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
       ] }
     ],
-    "Stop": [
+    "PostToolUseFailure": [
       { "matcher": "*", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" unease", "async": false }
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
       ] }
     ],
-    "SubagentStop": [
-      { "matcher": "*", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" unease", "async": false }
+    "UserPromptSubmit": [
+      { "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
       ] }
     ]
   }

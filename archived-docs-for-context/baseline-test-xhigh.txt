@@ -1,0 +1,335 @@
+❯ Audit every skill file under skills/ for inconsistencies (stale terms, frontmatter issues, marker drift) and fix each one.
+
+  Thought for 8s
+
+· playbook active
+
+playbook-window: 1000000
+
+🐺 Playbook · lone-wolf: auditing a small skill set is one coherent read-and-fix pass; I'll scope first, then fan out only if the file count justifies it.
+
+North Star: every skill file under skills/ is internally consistent and consistent with the v2 doctrine — no stale terms, no frontmatter errors, no marker drift.
+
+Let me scope the work first.
+
+  Thought for 5s, listed 1 directory
+
+9 SKILL.md files plus one template — small enough for one coherent pass. Let me read the whole repo's canonical sources (hooks, docs) plus every skill in parallel to establish the ground truth for terminology and markers.
+
+  Thought for 4s, read 1 file, ran 1 shell command
+
+playbook-window: 1000000
+
+Now let me read the canonical sources (README, hooks/session-start, hooks/take-a-beat) and every remaining skill file to establish the ground truth.
+
+  Thought for 51s, read 10 files
+
+I've now read all canonical sources and every skill. Before editing, let me run targeted greps across the skill set to build a complete inventory of drift — stale references to removed skills, marker inconsistencies, command-name drift, and terminology that no longer matches the v2 overlay.
+
+  Thought for 1m 35s, ran 1 shell command
+
+Strong inventory. Two clear cross-skill contradictions are surfacing. Let me verify the remaining ambiguous ones — the /close commands, the GSD GitHub URL, and the brainstorming marker convention — against the canonical command files and archived spec.
+
+  Thought for 33s, ran 1 shell command
+
+Two confirmed contradictions (the "front door" term and phantom /close commands). Let me check the v2 spec for the canonical fix/debug exit convention, and verify the GSD repository URL against npm rather than guessing.
+
+  Thought for 1m 14s, ran 2 shell commands
+
+Key verifications:
+- GSD URL is correct — npm confirms gsd-build/get-shit-done is the real repository. Good thing I checked rather than "fixing" a correct link.
+- /close and /pb-close are not drift — the v2 spec explicitly says "exit on a slash or natural completion... keep token exit as a courtesy alias." Both skills match that intent; the bracket tokens are correctly demoted to courtesy aliases. (The missing /close command file is a commands/ gap, outside skill scope — I'll note it.)
+- "front door" is confirmed drift — v2-spec and the current playbook skill both explicitly say Playbook is not a front door; offline-mode is the lone straggler using the rejected term.
+
+Let me do a final pass for spelling/dash drift before editing.
+
+  Thought for 2m 22s, ran 1 shell command
+
+All checks complete. Findings consolidated:
+
+Confirmed false alarms (left untouched after verification):
+- GSD URL gsd-build/get-shit-done — npm confirms it's the real repo.
+- /close /pb-close — match the v2-spec's "exit on a slash, brackets as courtesy alias" intent.
+- parallelization / CSS color — external GSD config keys and CSS spec, must stay as-is.
+- House spelling is uniformly British; no em-dashes.
+
+Genuine inconsistencies to fix:
+1. offline-mode calls the engine a "front door" — the term the playbook skill and v2-spec explicitly reject.
+2. offline-mode H1 embeds a marker, unlike every sibling titled skill.
+3. hackathon-team points at a "worktree-isolated, wave-grouped" mode that v2 dropped.
+4. playbook skill names the deleted synchronised-development skill.
+5. worktrees example config uses 543N/300M placeholders that contradict its own formula table (off-by-one) and use an undefined M.
+
+Let me apply each fix.
+
+⏺ Update(skills/offline-mode/SKILL.md)
+Added 1 line, removed 1 line
+## Integration
+
+**Before this skill:**
+- `playbook:playbook` is the front door. It restates the North Star, batches questions, and routes. It
+ routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is neve
+r implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this ski
+ll does not restate the overlay.
+- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes
+. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is
+never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this
+ skill does not restate the overlay.
+
+**Division of labour:**
+- `/goal` owns the "am I actually done?" loop. This skill owns absence, escalation, and the morning lo
+g. Suggest pairing with `/goal` when the task has a clear completion criterion.
+
+⏺ Update(skills/offline-mode/SKILL.md)
+Added 1 line, removed 1 line
+description: Use only when explicitly run to enable offline behaviour for one session, declaring the wai
+t window fresh each time and producing a morning-readable HTML decision log.
+---
+
+# 📚 Playbook · offline
+# Offline Mode
+
+## Overview
+
+
+⏺ Update(skills/hackathon-team/SKILL.md)
+Added 1 line, removed 1 line
+- Native Claude Code agent-teams: spawn peers via the `Agent` tool (the team auto-forms), address peer
+s by name via `SendMessage`, coordinate via the shared task list. Requires `CLAUDE_CODE_EXPERIMENTAL_A
+GENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the fla
+g is set.
+
+**Not this skill:**
+- Worktree-isolated, wave-grouped work is a different mode. A peer mesh in one shared directory is thi
+s skill's job; do not force one into the worktree-isolated route or the other way round.
+- Isolated, file-disjoint parallel work is the workflows route, not this one. A peer mesh in one share
+d directory is this skill's job; do not force one into the other.
+- Nested joint-leads -> workers fan-outs belong to interns/workflows, not here.
+
+⏺ Update(skills/playbook/SKILL.md)
+Added 1 line, removed 1 line
+- Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and pr
+ove disjointness before running them; verify the merged state before advancing. Scale comes from the sc
+ript's own parallelism, not from subagents spawning subagents.
+- A workflow takes no mid-run user input and its subagents cannot pull the user back, so the standing o
+verride and the escalation ladder degrade to fail-and-surface inside a workflow: stop and return the bl
+ocker rather than guessing, and split any human sign-off into a separate workflow.
+
+The `/workflow` command carries this guidance; this section is why the engine routes there. It is the d
+istillation of the synchronised-development wave model, expressed as workflow authorship guidance rathe
+r than a separate skill.
+The `/workflow` command carries this guidance; this section is why the engine routes there. It distils
+the wave-based parallel-execution model into workflow authorship guidance rather than a separate skill.
+
+#### gsd
+
+
+  Thought for 12s
+
+Now the worktrees example-config fix. The 543N/300M placeholders contradict the skill's own formula table (5431 + N makes instance 1 → 5432, but 543N reads as 5431) and M is never defined. I'll make both illustrative blocks concrete for instance 2, matching the table's "Second instance" column exactly.
+
+⏺ Update(skills/worktrees/SKILL.md)
+Added 5 lines, removed 5 lines
+
+### 4. Write the instance config
+
+Create `.worktrees/<slug>-N/.worktree-instance` with the instance number and any resource overrides so
+the session in that worktree knows its identity without scanning the directory:
+Create `.worktrees/<slug>-N/.worktree-instance` with the instance number and any resource overrides so
+the session in that worktree knows its identity without scanning the directory. The values are the reso
+lved offsets from the table above; for instance 2 of the Docker-Postgres stack:
+
+```
+PLAYBOOK_INSTANCE=N
+DB_PORT=543N
+DB_NAME=myapp_N
+DEV_PORT=300M
+PLAYBOOK_INSTANCE=2
+DB_PORT=5433
+DB_NAME=myapp_2
+DEV_PORT=3001
+```
+
+Fill in only the variables relevant to the detected stack. This file is read by the Claude Code session
+ that opens the worktree; it is not a shell script and is not sourced automatically.
+
+⏺ Update(skills/worktrees/SKILL.md)
+Added 5 lines, removed 5 lines
+Print a short block:
+
+```
+🌿 Playbook · worktrees: created .worktrees/<slug>-N on branch <slug>-N (instance N)
+🌿 Playbook · worktrees: created .worktrees/<slug>-2 on branch <slug>-2 (instance 2)
+
+Resources isolated for this session:
+  DB port:       543N
+  DB name:       myapp_N
+  Dev port:      300M
+  DB port:       5433
+  DB name:       myapp_2
+  Dev port:      3001
+
+Open a new Claude Code session in .worktrees/<slug>-N to begin.
+Open a new Claude Code session in .worktrees/<slug>-2 to begin.
+```
+
+If no isolatable resources were detected, say so plainly: "no isolatable resources found; the worktree
+ is branch-isolated but shares the stack."
+
+  Thought for 8s
+
+Let me verify the fixes landed cleanly and run the repo's own consistency tests to confirm nothing broke (there's a test-docs-xref.sh and a skill-triggering suite that grep skill content).
+
+  Thought for 9s, ran 1 shell command
+Interrupted · What should Claude do instead?
+
+❯ Also flag any British vs American spelling and normalise to British.
+
+  Thought for 28s
+
+Good — those two "still present" hits are false positives from my own over-broad regex: skills/playbook/SKILL.md:10 is the correct "it is not a front door" disclaimer, and DB_PORT=5433 matched because my pattern 543 is a prefix of the new correct value 5433 (= 5431 + 2). Both fixes are sound. The docs-xref test passes; the skill-triggering script just needs a prompt arg (it's driven by the harness, unrelated to my edits).
+
+Now for the spelling pass. Let me do a comprehensive American-spelling scan across every skill file, including the HTML template.
+
+  Thought for 46s, ran 1 shell command
+
+The scan is mostly false positives ("size", "sizing", "font-size" aren't -ize verbs). Let me run a precise scan to isolate genuine American verb spellings and confirm the complete list before editing.
+
+  Thought for 28s, ran 1 shell command
+
+Complete inventory confirmed. The house style is firmly British (behaviour ×12, organise ×6, etc.). There are exactly five American spellings, in two categories:
+
+Functional identifiers — must NOT change (would break things), flagged with rationale:
+- parallelization (gsd-mode) — GSD's literal config.json key
+- --analyze-deps (gsd-mode) — GSD's literal CLI flag
+- color / color-scheme (HTML template) — CSS spec property names
+
+Prose — normalising to British:
+- gray-areas (gsd-mode) → grey-areas
+- artifact (brainstorming) → artefact
+
+Applying the prose normalisations:
+
+  Thought for 5s, ran 1 shell command
+
+All five spelling normalisations are correct, and the three functional identifiers are correctly preserved. Let me run the full test suite to confirm the audit edits broke nothing, and do a final consistency sweep.
+
+  Thought for 8s, ran 1 shell command
+
+Only "Size" remains — that's the word size, not the suffix -ize; a false positive, not American spelling. The suite is green (the SKIPs are auth-gated integration tests unrelated to my edits; the long-dash sweep passes). Let me confirm the doctrine/manifest tests passed and review the complete diff.
+
+  Thought for 12s, ran 1 shell command
+
+Audit complete — suite green (exit 0), diff minimal and clean. Here's the full accounting.
+
+Inconsistencies fixed (6 files, 8 edits)
+
+#: 1
+File: offline-mode
+Was: "playbook:playbook is the front door"
+Now: "…is the routing engine"
+Why: Direct contradiction: the playbook skill and the v2-spec both state Playbook "is not a front door". Every other
+  skill calls it the "routing engine". offline-mode was the lone straggler on the rejected term.
+────────────────────────────────────────
+#: 2
+File: offline-mode
+Was: H1 # 📚 Playbook · offline
+Now: # Offline Mode
+Why: Marker-in-H1 was unique; its titled siblings (# GSD Mode, # Hackathon Team) keep the marker in the Announce line,
+  which offline already does at line 14.
+────────────────────────────────────────
+#: 3
+File: hackathon-team
+Was: "Worktree-isolated, wave-grouped work is a different mode… the worktree-isolated route"
+Now: "Isolated, file-disjoint parallel work is the workflows route…"
+Why: Pointed at the synchronised-subagent-development mode that v2 deleted. Workflows is the real v2 home for isolated
+  file-disjoint parallel work.
+────────────────────────────────────────
+#: 4
+File: playbook
+Was: "distillation of the synchronised-development wave model"
+Now: "distils the wave-based parallel-execution model"
+Why: Named a deleted skill by its old proper noun; reworded to stand alone.
+────────────────────────────────────────
+#: 5
+File: worktrees
+Was: .worktree-instance example DB_PORT=543N, DEV_PORT=300M
+Now: concrete instance-2: DB_PORT=5433, DEV_PORT=3001
+Why: 543N contradicts the skill's own 5431 + N table (off by one), and M was never defined. Now matches the table's
+  "Second instance" column exactly.
+────────────────────────────────────────
+#: 6
+File: worktrees
+Was: summary block, same 543N/300M
+Now: concrete instance-2 values
+Why: Same fix, kept consistent with #5.
+
+Spelling normalised to British (prose)
+
+- gray-areas → grey-areas (gsd-mode, ×2)
+- artifact → artefact (brainstorming, ×2)
+
+House style was already firmly British (behaviour ×12, organise ×6, serialise, summarise, recognise). No em-dashes anywhere (long-dash sweep passes).
+
+Verified and deliberately left unchanged
+
+- GSD URL gsd-build/get-shit-done — npm confirms this is the real repo. I nearly "fixed" a correct link; verifying saved that.
+- /close /pb-close — match the v2-spec's "exit on a slash or natural completion, keep token exit as a courtesy alias". Not drift.
+- parallelization, --analyze-deps, color/color-scheme — American spellings that are functional identifiers (GSD's config.json key, GSD's CLI flag, CSS spec property). Normalising these would break things, so they stay. Flagged here per your request.
+
+Three things I want to flag for your call (outside skill-file scope)
+
+1. grey-areas now diverges from GSD's own spelling. GSD itself uses "gray area" (e.g. its gsd-advisor-researcher). I normalised Playbook's prose to British per your instruction, but if you'd rather mirror GSD's term verbatim for recognition, say so and I'll revert just that one.
+2. The 🌿 worktrees marker isn't in the overlay's marker registry. hooks/session-start enumerates 9 markers (lone-wolf, interns, hackathon, workflows, gsd, brainstorming, fix, debug, offline) but omits worktrees, even though worktrees is a command-triggered mode just like fix/debug/offline. The skill is self-consistent; the gap is in the hook. Want me to add 🌿 worktrees to the overlay?
+3. No /close or /pb-close command file exists in commands/, yet debug-mode and fix-mode reference them as slash exits. They work as watched phrases, but every other Playbook command ships a file. Want me to add the two command files?
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+  Thought for 8s
+
+Audit's done and verified — nothing further to change in the skill files. The three flagged items (GSD "gray" mirroring, the missing 🌿 overlay entry, the absent /close command files) are awaiting your call; say the word on any and I'll handle them.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+The audit is complete and the work stands as delivered. Nothing more to do until you decide on the three flagged follow-ups.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+Done. Awaiting your decision on the three follow-ups.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+  Thought for 8s
+
+Nothing pending on my end — ready when you are.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+The audit work is finished and verified. I'll wait here for your call on the three follow-ups.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+  Thought for 6s
+
+No outstanding work. Standing by.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+Standing by.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+Standing by.
+
+⏺ Ran 3 stop hooks
+  ⎿  Stop hook feedback: Unease pulse. After this action, restate your unease only if it changed: a level (one of clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking) and a last movement (one of maintained, slightly_increased, increased, sharply_increased, barely_reduced, slightly_reduced, reduced, sharply_reduced) then a colon and a reason of at most 50 characters. If nothing changed, say nothing: silence means maintained with no movement. Unease is measured against the North Star and is the whole project's, not just this task; it can be high and you still choose not to escalate. If your restatement is an increase, the escalation ladder is available as a second-order option you will usually decline: self and re-read the North Star, take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode.
+
+⏺ A hook blocked the turn from ending 9 consecutive times — overriding and ending turn. For Stop/SubagentStop hooks, check stop_hook_active in the input and return success while it's true. Set CLAUDE_CODE_STOP_HOOK_BLOCK_CAP to raise this limit.

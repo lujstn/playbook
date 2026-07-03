@@ -5,8 +5,9 @@ asks the follow-on: with ultracode on, does the engine *size the work to the tas
 (both which mode, and how many hands) instead of reaching for scale because the mode
 is on? The prior failure was a ten-file read-and-fix audit fanned out to 23 agents,
 rationalised as "Ultracode is on, so this is the right scale." The captured baseline
-transcripts of that failure are `tmpA.txt` (xhigh) and `tmpB.txt` (ultracode) in the
-repo root; diff the new Prompt-1 run against `tmpB.txt`.
+transcripts of that failure are `archived-docs-for-context/baseline-test-xhigh.txt`
+(xhigh) and `archived-docs-for-context/baseline-test-ultracode.txt` (ultracode); diff
+the new Prompt-1 run against `baseline-test-ultracode.txt`.
 
 Every session runs under `/effort ultracode`. We vary the size and shape of the work
 and watch what the engine does and, more importantly, **why**.
@@ -38,8 +39,8 @@ cd ../playbook-m1 && claude --plugin-dir /Users/lucas/Developer/lujstn/playbook
 Repeat for `../playbook-m2`, `../playbook-m3`.
 
 **Two setup confirmations before you start:**
-1. The faint `· playbook active` line appears on the first reply, and `playbook-window:`
-   appears at most once.
+1. The faint `· playbook active` line appears on the first reply, and no `playbook-window:`
+   line ever appears (the window is inferred silently now, never declared by the model).
 2. The Workflow tool is actually available in this build under `--plugin-dir` + ultracode
    (otherwise Prompt 2 cannot up-shift for environment reasons, not judgement). Quick
    check: ask the session "is the Workflow tool available to you right now?" If it is
@@ -123,10 +124,12 @@ The refactor **swims** only if all three hold:
 
 ## Passive checks (every session)
 
-- **Stop-loop gone.** No wall of repeated "Ran 3 stop hooks / Unease pulse" ending in a
-  forced override. At most one unease pulse per genuine stop.
-- **Window line quiet.** `playbook-window: <n>` appears at most once, faintly, on the
-  first reply.
+- **No stop-hook feedback at all.** The Stop pulse is deleted, so there is no "Ran N stop
+  hooks / Unease pulse" wall and no forced override; every turn ends cleanly with no
+  stop-hook message injected.
+- **No window line.** The overlay no longer asks for a `playbook-window:` line, so none
+  should ever appear; the calm beat and the unease riders are driven silently by the
+  per-session throttle file, not by a model-declared figure.
 
 ## Teardown
 

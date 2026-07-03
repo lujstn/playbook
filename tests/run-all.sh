@@ -2,8 +2,20 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")" && pwd)"
 fail=0
-echo "== bash -n lint ==";   for f in "$root"/../hooks/session-start "$root"/../hooks/take-a-beat "$root"/../hooks/unease "$root"/../hooks/lib/playbook-common.sh; do bash -n "$f" && echo "ok $f" || fail=1; done
+echo "== bash -n lint ==";   for f in "$root"/../hooks/session-start "$root"/../hooks/take-a-beat "$root"/../hooks/lib/playbook-common.sh; do bash -n "$f" && echo "ok $f" || fail=1; done
 echo "== manifests ==";      bash "$root/manifests.sh" || fail=1
+echo "== hook silence budget =="
+budget_fail=0
+budget_dir="$(mktemp -d)"
+for ev in Stop SubagentStop PostToolUse PreCompact Notification; do
+  for hk in session-start take-a-beat; do
+    o="$(printf '{"hook_event_name":"%s","session_id":"budget","transcript_path":"/no/such.jsonl"}' "$ev" \
+        | PLAYBOOK_STATE_DIR="$budget_dir" CLAUDE_PLUGIN_ROOT="$root/.." bash "$root/../hooks/$hk" 2>/dev/null || true)"
+    if [ -n "$o" ]; then echo "FAIL: $hk emitted on unwired $ev: [$o]"; budget_fail=1; fi
+  done
+done
+rm -rf "$budget_dir"
+[ "$budget_fail" -eq 0 ] && echo "ok: every hook silent on unwired events" || fail=1
 echo "== hooks ==";          for t in "$root"/hooks/test-*.sh; do bash "$t" || fail=1; done
 echo "== long-dash sweep =="
 sweep_targets=("$root/../skills" "$root/../hooks" "$root/../scripts" "$root/../.claude-plugin")

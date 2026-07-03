@@ -9,7 +9,7 @@ Run the task below as a dynamic workflow using the Workflow tool. The user invok
 
 Task: $ARGUMENTS
 
-A workflow subagent receives only its own prompt. It does not receive the project North Star, CLAUDE.md, Playbook's overlay, or the session hooks, and it cannot spawn agents, run nested workflows, or message the user. So carry everything it needs in the prompt you author:
+A workflow subagent receives Playbook's SubagentStart overlay, so the doctrine reaches it, but only the prompt you author carries anything session-specific: it does not receive the project North Star, CLAUDE.md, or this conversation, and it cannot spawn agents, run nested workflows, or message the user. So carry everything session-specific in the prompt you author:
 
 - Put the one-line project North Star verbatim at the top of every agent() prompt the script authors, and state that the stage serves it.
 - Apply the model rule per stage by setting model on each agent() call: Sonnet for execution and bulk stages, Opus for planning, judging, and review stages. Name the rule in the prompt too, since the subagent will not otherwise know it.

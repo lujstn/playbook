@@ -19,8 +19,6 @@ The overlay is the persistence mechanism, carried by the hooks across compaction
 
 One line, derived verbatim from the user's request, kept load-bearing at every decision. For trivial work this is one line and there are zero questions; lone-wolf and proceed.
 
-State your context window once, quietly, on your first reply, as a single faint line of the form `playbook-window: <integer>` so the hooks can read it; do not repeat it on later turns.
-
 ### 2. Assess separability and durability
 
 - **Separability** decides the coordination topology: can the work be partitioned by file ownership and run without peer communication (interns), does it need peers talking to each other (hackathon), or does it benefit from a scripted loop that keeps results out of main context (workflows)?
@@ -69,7 +67,7 @@ Dynamic workflows: a JavaScript orchestration the runtime executes, where the sc
 
 Under ultracode you can start a workflow yourself; otherwise the Workflow tool only runs once the user opts in via `/workflow` or the ultracode keyword. Either way, decide by what the task needs, not by whether the power is available. Rule out the cheaper modes first: one coherent unit is lone-wolf; separable but modest is interns; reach for a workflow only when the units are many and genuinely independent, the scale exceeds one context, or independent verification is itself the deliverable. Sizing the tool to the task is the discipline: ultracode being on is never the reason to fan out, and a small read-and-fix never warrants a multi-agent adversarial swarm. Without ultracode, surface one line offering `/workflow` rather than running it. Announce the ⚙️ workflows marker only once a workflow is actually running, never before.
 
-When you do run a workflow, a workflow subagent receives only the prompt you author for it: not the North Star, not CLAUDE.md, not this overlay, not the hooks. So carry context explicitly in the script:
+When you do run a workflow, a workflow subagent does receive Playbook's SubagentStart overlay, so the doctrine reaches it; but it does not receive CLAUDE.md, this session's North Star, or anything else from this conversation, and it cannot spawn agents or message the user. So carry the session-specific context explicitly in the script:
 
 - Put the one-line North Star verbatim at the top of every `agent()` prompt, and apply the model rule per stage by setting `model` on each `agent()` call (Sonnet to execute, Opus to plan, judge, and review), naming the rule in the prompt too.
 - Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and prove disjointness before running them; verify the merged state before advancing. Scale comes from the script's own parallelism, not from subagents spawning subagents.

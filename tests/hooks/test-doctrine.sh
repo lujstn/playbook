@@ -13,8 +13,15 @@ chk "! grep -qiE 'the anchor file|pinned anchor file|re-?reads? the anchor|into 
 chk "! grep -qE '(^|[^-])design\\.md' '$S'" "no bare lowercase design.md vestige"
 chk "! grep -q 'DESIGN\\.md' '$S'" "no stale DESIGN.md reference (docs split)"
 chk "grep -q 'regardless of the mode or the unease level' '$S'" "standing override no-ledger phrasing"
-chk "grep -q 'playbook-window' '$S'" "agent-declared window instruction present"
+chk "! grep -q 'playbook-window' '$S'" "no agent-declared window instruction (the window is inferred now)"
 chk "grep -q 'playbook-northstar' '$S'" "engine instructs the project North Star dispatch line"
+
+# The false "workflow subagent gets no overlay" claim is corrected: the
+# SubagentStart overlay does reach workflow subagents.
+chk "! grep -qi 'receives only the prompt you author\\|receives only its own prompt' '$S'" "engine skill drops the false no-overlay workflow claim"
+chk "grep -q 'SubagentStart overlay' '$S'" "engine skill states the SubagentStart overlay reaches workflow subagents"
+chk "grep -q 'SubagentStart overlay' '$root/commands/workflow.md'" "workflow command states the SubagentStart overlay reaches workflow subagents"
+chk "grep -q 'SubagentStart overlay' '$root/commands/pb-workflow.md'" "pb-workflow command states the SubagentStart overlay reaches workflow subagents"
 
 # Ultracode-baseline restraint: the engine must reason about what the task needs
 # rather than reaching for a workflow because the mode is on. This guards against
@@ -79,11 +86,12 @@ SS="$root/hooks/session-start"
 chk "grep -q 'Assume ultracode is the baseline' '$SS'" "overlay states the ultracode baseline"
 chk "grep -qi 'match the tool to the task, never to the mode' '$SS'" "overlay carries ultracode restraint guidance"
 chk "grep -q '🌿 worktrees' '$SS'" "overlay registers the worktrees marker"
+chk "grep -q '🌡️ unease' '$SS'" "overlay registers the unease thermometer marker"
+chk "! grep -q 'playbook-window' '$SS'" "overlay no longer instructs a window declaration"
 
-# The Stop pulse must honour stop_hook_active so it cannot loop until the
-# platform force-overrides the turn.
-U="$root/hooks/unease"
-chk "grep -q 'stop_hook_active' '$U'" "unease hook guards against the stop-hook loop"
+# The Stop-pulse hook is gone entirely; the seam itself, not its frequency, was
+# the defect, so nothing should remain on Stop.
+chk "[ ! -f '$root/hooks/unease' ]" "the Stop-pulse hook (hooks/unease) is deleted"
 
 # Both workflow commands must teach validating the workflow's own result.
 chk "grep -qi 'degenerate result' '$root/commands/workflow.md'" "workflow command warns against a degenerate result"
@@ -98,5 +106,5 @@ chk "grep -qi 'baseline is ultracode' '$R'" "README states the ultracode baselin
 chk "! grep -q '\.playbook/' '$root/.gitignore'" ".gitignore has no .playbook vestige"
 GA="$root/.gitattributes"
 chk "! grep -qi 'uncertaint' '$GA'" ".gitattributes has no old uncertainty hook name"
-chk "grep -q 'hooks/unease' '$GA'" ".gitattributes pins the renamed unease hook"
+chk "! grep -q 'hooks/unease' '$GA'" ".gitattributes no longer pins the deleted unease hook"
 exit $fail

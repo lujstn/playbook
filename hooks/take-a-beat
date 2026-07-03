@@ -5,20 +5,45 @@ source "${SCRIPT_DIR}/lib/playbook-common.sh"
 
 stdin="$(cat 2>/dev/null || true)"
 event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
-aid="$(playbook_agent_id "$stdin")"
 
-# The point near which Playbook reassures, just below the native auto-compact
-# threshold (~77-80%). Overridable for users who move the auto-compact point.
-CALM_PCT="${PLAYBOOK_CALM_PCT:-80}"
-case "$CALM_PCT" in ''|*[!0-9]*) CALM_PCT=80 ;; esac
+# Tunables, all integer-validated with fallbacks.
+CALM_PCT="${PLAYBOOK_CALM_PCT:-80}";            case "$CALM_PCT" in ''|*[!0-9]*) CALM_PCT=80 ;; esac
+PULSE_TOKENS="${PLAYBOOK_PULSE_TOKENS:-75000}"; case "$PULSE_TOKENS" in ''|*[!0-9]*) PULSE_TOKENS=75000 ;; esac
+SPIKE_FAILS="${PLAYBOOK_SPIKE_FAILS:-3}";       case "$SPIKE_FAILS" in ''|*[!0-9]*) SPIKE_FAILS=3 ;; esac
 
-# The anchor block costs a transcript parse, so it is computed lazily and
-# memoised: the common sub-threshold PostToolUse and the offer never need it,
-# only the compaction events and the beat over threshold do.
+# The anchor block costs a bounded transcript parse, so it is computed lazily and
+# memoised: only the emissions that actually fire ever pay for it.
 _anchor=""; _anchor_ready=""
 anchor() {
   [ -n "$_anchor_ready" ] || { _anchor="$(playbook_anchor_block "$stdin")"; _anchor_ready=1; }
   printf '%s' "$_anchor"
+}
+
+# Heal-or-baseline: return 0 when state is healthy and the caller should proceed;
+# perform a bias-to-silence reset and return 1 (caller stays silent this event)
+# when state is missing or corrupt, or when usage dropped below the baseline (a
+# compaction the hook never heard about). The reset re-baselines to current usage
+# so a lost or rewound baseline can never fire a giant spurious delta.
+heal_or_baseline() {
+  local dir="$1" used="${2:-}" base u="${2:-}"
+  case "$u" in ''|*[!0-9]*) u=0 ;; esac
+  if ! playbook_state_healthy "$dir"; then
+    playbook_state_reset "$dir" "$u"; return 1
+  fi
+  base="$(playbook_state_int "$dir" last_anchor_used 0)"
+  if [ -n "$used" ] && [ "$used" -lt "$base" ] 2>/dev/null; then
+    playbook_state_reset "$dir" "$u"; return 1
+  fi
+  return 0
+}
+
+# The usage ratchet: the first time usage exceeds 200000 this session, prove the
+# window is the one-million product tier. Sticky: at most one write per session.
+ratchet_window() {
+  local dir="$1" used="$2" wp
+  [ "$used" -gt 200000 ] 2>/dev/null || return 0
+  wp="$(playbook_state_get "$dir" window_proven)"
+  if [ -z "$wp" ]; then playbook_state_put "$dir" "window_proven=1000000"; fi
 }
 
 reanchor_resume() {
@@ -28,15 +53,55 @@ reanchor_resume() {
 
 ${a}
 
-Re-establish the one-line North Star and your current unease from the anchor above and the live work, then resume the in-flight work where you left off. Do not stop to ask whether to continue, and do not treat the compaction as a reason to wrap up. Re-state your context window as a single line of the form playbook-window: <integer> if it is not already visible."
+Re-establish the one-line North Star and your current unease from the anchor above and the live work, then resume the in-flight work where you left off. Do not stop to ask whether to continue, and do not treat the compaction as a reason to wrap up."
+}
+
+emit_calm() {
+  local ev="$1" used="$2" win="$3" prov="$4" pct="$5" a body
+  a="$(anchor)"
+  if [ "$prov" = "proven" ]; then
+    body="Playbook context calm: context is at about ${pct} percent of your ${win}-token window. Auto-compact is seamless and the session keeps going; the platform will not stop you. Do not wrap up early, do less, halt, or break an offline run because context is tight. You keep what matters: the original request and the North Star are re-anchored for you after compaction. Keep working at the same completeness bar."
+  else
+    body="Playbook context calm: about ${used} tokens are in use this session. On a standard 200000-token window that is close to the auto-compact point; on a one-million window there is ample room, and either way nothing needs to change. Auto-compact is seamless and the session keeps going; the platform will not stop you. Do not wrap up early, do less, halt, or break an offline run because context is tight. You keep what matters: the original request and the North Star are re-anchored for you after compaction. Keep working at the same completeness bar."
+  fi
+  if [ -n "$a" ]; then body="${body}
+
+${a}"; fi
+  playbook_emit_context "$ev" "$body"
+}
+
+emit_pulse() {
+  local ev="$1" a body
+  a="$(anchor)"
+  body="Playbook pulse: a long stretch of work has passed since the last anchor. Silently re-check the anchor below. If the work still serves the North Star and your unease has not increased, say nothing about this pulse and carry on. If your unease has increased or the work has drifted, say so in one branded line: 🌡️ Playbook · unease: <level>: <reason of at most 50 characters>. The escalation ladder is available on an increase and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager."
+  if [ -n "$a" ]; then body="${body}
+
+${a}"; fi
+  playbook_emit_context "$ev" "$body"
+}
+
+emit_spike() {
+  playbook_emit_context "$1" "Playbook unease spike: several tool calls have failed in a row without a clean batch between them. Take a beat before the next attempt: re-read the North Star and check whether the approach itself is what is failing. If you agree unease has risen, print one branded line before continuing: 🌡️ Playbook · unease: <level>: <reason of at most 50 characters>; if it has not, print nothing about this. The escalation ladder is open and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
+}
+
+emit_micro_anchor() {
+  playbook_emit_context "$1" "Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
 }
 
 case "$event" in
   SessionStart)
     src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
+    dir="$(playbook_state_dir "$stdin")"
     if [ "$src" = "compact" ]; then
+      # The transcript's last assistant record still carries the pre-compact
+      # figure, so reset to 0; the first post-compact batch re-baselines to the
+      # real small figure.
+      playbook_state_reset "$dir" 0
       reanchor_resume "SessionStart"
     else
+      used="$(playbook_context_used "$stdin" || true)"
+      playbook_state_reset "$dir" "$used"
+      playbook_state_gc
       # Fresh start: if a competing context-warning hook is registered and the
       # context-calm channel has not been resolved, offer once to let Playbook
       # own it, so agents are not scared into stopping near the context limit.
@@ -48,32 +113,80 @@ case "$event" in
       fi
     fi
     ;;
-  PostToolUse)
-    used="$(playbook_context_used "$stdin" || true)"
-    win="$(playbook_declared_window "$stdin" || true)"
-    pct="$(playbook_percent "$used" "$win" || true)"
-    if [ -n "$pct" ] && [ "$pct" -ge "$CALM_PCT" ] 2>/dev/null; then
-      # Fire the calm beat once per high-context window, gated on a transcript
-      # sentinel so it reassures without nagging every tool call. After a
-      # compaction the sentinel is dropped from the summary, so a fresh
-      # reassurance can fire again in the next high-context window.
-      tp="$(playbook_transcript_path "$stdin")"
-      if [ -z "$tp" ] || [ ! -f "$tp" ] \
-         || ! grep -qF 'Playbook context calm' "$tp" 2>/dev/null; then
-        playbook_emit_context "PostToolUse" "Playbook context calm: context is at ${pct} percent used. Auto-compact is seamless and the session keeps going; the platform will not stop you. Do not wrap up early, do less, halt, or break an offline run because context is tight. You keep what matters: the original request and the North Star are re-anchored for you after compaction. Keep working at the same completeness bar.
 
-$(anchor)"
-      fi
-    elif [ -z "$win" ] && [ -n "$used" ]; then
-      # Work is under way but no window is declared, so the calm check cannot
-      # compute a percentage. Emit one calm self-healing notice per session.
-      tp="$(playbook_transcript_path "$stdin")"
-      if [ -z "$tp" ] || [ ! -f "$tp" ] \
-         || ! grep -qF 'Playbook context meter is off' "$tp" 2>/dev/null; then
-        playbook_emit_context "PostToolUse" "Playbook context meter is off: no context window has been declared this session, so the calm context check cannot compute a percentage. Nothing is wrong and this is not urgent; state your window once as a single line of the form playbook-window: <integer> (for the one-million window state playbook-window: 1000000; for the standard window state playbook-window: 200000) so Playbook can reassure you accurately near the limit."
+  PostToolBatch)
+    dir="$(playbook_state_dir "$stdin")"
+    used="$(playbook_context_used "$stdin" || true)"
+    if ! heal_or_baseline "$dir" "$used"; then exit 0; fi
+
+    # Clean-batch failure reset: an unchanged non-zero failure count means a whole
+    # batch passed without a new failure, so the streak is broken; otherwise
+    # record the current count as the snapshot for the next batch.
+    fc="$(playbook_fail_count "$dir")"
+    snap="$(playbook_state_int "$dir" fail_snapshot 0)"
+    if [ "$fc" -ne 0 ] && [ "$fc" -eq "$snap" ]; then
+      : > "${dir}/failures" 2>/dev/null || true
+      playbook_state_put "$dir" "fail_snapshot=0"
+    else
+      playbook_state_put "$dir" "fail_snapshot=${fc}"
+    fi
+
+    # No usable usage figure: the failure bookkeeping above still ran; stop here.
+    case "$used" in ''|*[!0-9]*) exit 0 ;; esac
+
+    ratchet_window "$dir" "$used"
+
+    win="$(playbook_window "$dir")"
+    prov="$(playbook_window_provenance "$dir")"
+    pct="$(playbook_percent "$used" "$win")"
+    calm_fired="$(playbook_state_int "$dir" calm_fired 0)"
+    base="$(playbook_state_int "$dir" last_anchor_used 0)"
+    delta=$(( used - base ))
+
+    if [ -n "$pct" ] && [ "$pct" -ge "$CALM_PCT" ] 2>/dev/null && [ "$calm_fired" -eq 0 ]; then
+      emit_calm "PostToolBatch" "$used" "$win" "$prov" "$pct"
+      playbook_state_put "$dir" "calm_fired=1" "last_anchor_used=${used}"
+    elif [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
+      emit_pulse "PostToolBatch"
+      playbook_state_put "$dir" "last_anchor_used=${used}"
+    fi
+    ;;
+
+  PostToolUseFailure)
+    dir="$(playbook_state_dir "$stdin")"
+    playbook_fail_append "$dir"
+    fc="$(playbook_fail_count "$dir")"
+    if [ "$fc" -ge "$SPIKE_FAILS" ] 2>/dev/null; then
+      # Claim the failures file with an atomic rename so exactly one concurrent
+      # failure wins the spike; losers exit silently.
+      claim="${dir}/failures.claimed.$$"
+      if mv "${dir}/failures" "$claim" 2>/dev/null; then
+        rm -f "$claim" 2>/dev/null || true
+        used="$(playbook_context_used "$stdin" || true)"
+        case "$used" in
+          ''|*[!0-9]*) playbook_state_put "$dir" "fail_snapshot=0" ;;
+          *)           playbook_state_put "$dir" "fail_snapshot=0" "last_anchor_used=${used}" ;;
+        esac
+        emit_spike "PostToolUseFailure"
       fi
     fi
     ;;
+
+  UserPromptSubmit)
+    dir="$(playbook_state_dir "$stdin")"
+    used="$(playbook_context_used "$stdin" || true)"
+    if ! heal_or_baseline "$dir" "$used"; then exit 0; fi
+    # No assistant record yet this session: nothing to anchor against, stay silent.
+    case "$used" in ''|*[!0-9]*) exit 0 ;; esac
+    ratchet_window "$dir" "$used"
+    base="$(playbook_state_int "$dir" last_anchor_used 0)"
+    delta=$(( used - base ))
+    if [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
+      emit_micro_anchor "UserPromptSubmit"
+      playbook_state_put "$dir" "last_anchor_used=${used}"
+    fi
+    ;;
+
   *) : ;;
 esac
 exit 0

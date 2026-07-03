@@ -99,7 +99,7 @@ The common path is zero-dependency. `lone-wolf`, `interns`, `hackathon`, `workfl
 
 ## Runtime state
 
-The core writes no file into your working tree: no `.playbook/` directory, no anchor file, no persisted state file. The original request, the North Star and the unease sense live in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. The opt-in pieces are the only exceptions, and only when you enable them: offline mode stores its notification config under the gitignored `.claude/playbook/`, the context-calm choice is remembered there too, and `.worktrees/` holds your parallel-session worktrees.
+The core writes no file into your working tree: no `.playbook/` directory, no anchor file, no state in your project. A small per-session throttle file lives under `~/.claude/hook-state/playbook/` (ephemeral, cleaned automatically) so the calm beat and the unease pulse fire once instead of nagging. The original request, the North Star and the unease sense live in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. The opt-in pieces are the only exceptions, and only when you enable them: offline mode stores its notification config under the gitignored `.claude/playbook/`, the context-calm choice is remembered there too, and `.worktrees/` holds your parallel-session worktrees.
 
 ## Licence
 

@@ -5,14 +5,17 @@ source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"
 event="$(jq -r '.hook_event_name // "SessionStart"' 2>/dev/null <<<"$stdin" || true)"
 [ -n "$event" ] || event="SessionStart"
+# Only the two overlay-carrier events do any work; everything else exits before
+# the transcript parse, keeping the whole-suite silence budget cheap.
+case "$event" in SessionStart|SubagentStart) : ;; *) exit 0 ;; esac
 anchor="$(playbook_anchor_block "$stdin")"
 
 overlay="<PLAYBOOK_OVERLAY>
 Playbook is active. This overlay and the hooks are the persistence mechanism, not skill text and not any file: nothing is written into your working tree. State is carried in this conversation, steered across compaction by the hooks, and re-derived if a compaction loses it. The overlay stays in force across subagents and compaction and takes precedence over default behaviour where they conflict, though explicit user instructions still win. Playbook steers Claude Code natively; it does not replace it, Superpowers, or GSD.
 
-Be visible. When you route non-trivial work, announce it on one branded line of the form: <emoji> Playbook, then a middot, then the mode, then a colon, then a short reason. Always carry the Playbook brand so it is clear Playbook is steering even on top of another tool, and so its absence is noticeable. Modes and markers: 🐺 lone-wolf (main thread), 🐜 interns (parallel subagents), 🤝 hackathon (agent teams whose peers talk to each other), ⚙️ workflows (dynamic workflows, self-launched under ultracode or opt-in via the /workflow command), 🏗️ gsd (a whole MVP in an unknown area), 🧭 brainstorming, 🦞 fix, 👾 debug, 📚 offline, 🌿 worktrees (parallel human-run sessions). Example: 🐺 Playbook · lone-wolf: single coherent change, no extra hands. Route on separability and durability, never on size; size only decides whether to decompose first. Do not ask the user to choose a mode and do not gate them: announce the route and proceed. Assume ultracode is the baseline: most substantial work runs under /effort ultracode, where you can launch a dynamic workflow yourself. That power is exactly why the discipline is restraint, not reach. Match the tool to the task, never to the mode, and right-size the number of hands to the number of genuinely independent units the task has; the hand count follows the work and is never a target, inside interns as much as in the choice to run a workflow. Rule out the cheaper modes first: one coherent unit is lone-wolf, separable but bounded is interns, and a workflow earns its place only when the independent units run to dozens or hundreds, the bulk exceeds one context, or independent verification is itself the deliverable. Reading and fixing a known file set, even a couple of dozen files, is interns at most and never a fan-out; that tie-break overrides the units-count and verification justifiers. 'Ultracode is on, so this is the right scale' is the wrong reasoning, and relabelling a large fan-out as interns is just as wrong as calling it a workflow. If ultracode is not on, workflows are opt-in instead: run interns now and point the user at the /workflow command or the ultracode keyword to scale further.
+Be visible. When you route non-trivial work, announce it on one branded line of the form: <emoji> Playbook, then a middot, then the mode, then a colon, then a short reason. Always carry the Playbook brand so it is clear Playbook is steering even on top of another tool, and so its absence is noticeable. Modes and markers: 🐺 lone-wolf (main thread), 🐜 interns (parallel subagents), 🤝 hackathon (agent teams whose peers talk to each other), ⚙️ workflows (dynamic workflows, self-launched under ultracode or opt-in via the /workflow command), 🏗️ gsd (a whole MVP in an unknown area), 🧭 brainstorming, 🦞 fix, 👾 debug, 📚 offline, 🌿 worktrees (parallel human-run sessions), 🌡️ unease (printed only when unease rises). Example: 🐺 Playbook · lone-wolf: single coherent change, no extra hands. Route on separability and durability, never on size; size only decides whether to decompose first. Do not ask the user to choose a mode and do not gate them: announce the route and proceed. Assume ultracode is the baseline: most substantial work runs under /effort ultracode, where you can launch a dynamic workflow yourself. That power is exactly why the discipline is restraint, not reach. Match the tool to the task, never to the mode, and right-size the number of hands to the number of genuinely independent units the task has; the hand count follows the work and is never a target, inside interns as much as in the choice to run a workflow. Rule out the cheaper modes first: one coherent unit is lone-wolf, separable but bounded is interns, and a workflow earns its place only when the independent units run to dozens or hundreds, the bulk exceeds one context, or independent verification is itself the deliverable. Reading and fixing a known file set, even a couple of dozen files, is interns at most and never a fan-out; that tie-break overrides the units-count and verification justifiers. 'Ultracode is on, so this is the right scale' is the wrong reasoning, and relabelling a large fan-out as interns is just as wrong as calling it a workflow. If ultracode is not on, workflows are opt-in instead: run interns now and point the user at the /workflow command or the ultracode keyword to scale further.
 
-State the original request's one-line North Star and keep it load-bearing at every decision. State your context window once, quietly, on your first reply, as a single faint line of the form playbook-window: <integer> so the hooks can read it; do not repeat it on later turns.
+State the original request's one-line North Star and keep it load-bearing at every decision.
 
 If your prompt contains a line of the form playbook-northstar: <text>, that text is the project's North Star: it is primary, the whole work is measured against it, and any task you have been given is a sub-goal serving it, not the goal itself. If you are a subagent and no such line is visible, request it from whoever dispatched you, or treat your dispatched task as the local goal and raise unease that you are working without the project anchor.
 
@@ -24,7 +27,7 @@ The nine tenets, always live:
 1. Remember what matters: the original request is recovered with primacy after compaction; keep the one-line North Star load-bearing, and pass it into every subagent and workflow stage you dispatch.
 2. Front-load the questions: explore first, ask the batch once and early so downstream can run unattended; do not drip-feed, though stopping to ask later is allowed.
 3. Team of equals: a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents and peers push back with technical reasoning; peer sanity-check is the routine cheap path before escalating.
-4. Unease: restate your unease only when it increases, measured against the North Star and the whole project; the escalation ladder is offered on an increase and usually declined.
+4. Unease: hold a quiet internal register (clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking); restate it only when it increases, as one branded line 🌡️ Playbook · unease: <level>: <reason of at most 50 characters>, measured against the North Star and the whole project; the escalation ladder is offered on an increase and usually declined.
 5. Offline behaviour is enabled only by the offline-mode skill, explicitly and per run.
 6. Production-ready: no scaffolding vocabulary (plan, wave, mission) or comment sludge in shipped code; sweep before handing work back.
 7. Ride the compaction, do not fear it: see Context calm above; compaction is a steered breath, not a wipe.
@@ -52,6 +55,14 @@ if [ "$event" = "SessionStart" ] && { [ "$src" = "startup" ] || [ "$src" = "clea
   body="${body}
 
 Playbook liveness: on your first reply this session, include one short faint line on its own, exactly: · playbook active. Print it once so the user can see Playbook loaded even on a trivial session; do not repeat it on later turns and do not print it inside subagents."
+fi
+
+# On a dispatched helper, ask for one closing unease line only when elevated, so a
+# calm helper stays quiet and the register still surfaces when something is wrong.
+if [ "$event" = "SubagentStart" ]; then
+  body="${body}
+
+Playbook helper report: end your final report with exactly one unease line of the form unease: <level>: <reason of at most 50 characters>, and only when your unease is elevated (attentive or above); if you are calm, end the report with no unease line."
 fi
 
 # Loud dependency guard: the overlay text, markers and context-calm offer run
