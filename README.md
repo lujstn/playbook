@@ -1,8 +1,8 @@
 # Playbook
 
-`@lujstn/playbook` is a native steering layer for Claude Code. It is invisible-but-visible: it activates on every session, steers Claude Code from the inside, and shows you what it is doing with a branded marker on every routing decision, but it never makes you pick a mode, never gates you behind a wizard, and never asks new questions just to function. It hops on top of native Claude Code, Superpowers and GSD and closes the specific places where their defaults fall short in practice, with the minimum mechanism.
+`@lujstn/playbook` is a small, opinionated steering layer for Claude Code that forces Claude to keep the original goal in sight, **keeps track of its own unease** as it works, **asks for help** (with a **notification**) when that unease builds, decides when to reach for **workflows, teams or subagents** on its own, and adds proper new commands for **brainstorming** and a dedicated **offline mode** for when it's running without you. In other words, all the stuff I think Claude Code should have.
 
-The two things it cares about most: keep the original goal load-bearing across compaction, and route separable work for speed without ever rushing it.
+It stays out of the way, only pops up when needed, and will always tell you what matters in one line.
 
 ## Install
 
@@ -13,105 +13,144 @@ Playbook is a Claude Code plugin, so setup is two lines inside Claude Code:
 /plugin install playbook
 ```
 
-That is the whole thing. If the plugin does not load straight away, restart Claude Code once and it will pick it up. You will know it is live because the first reply of a session ends with a faint `📚 Playbook skills available in this session` line.
+You'll know it's live when you see `📚 Playbook skills available in this session` in your chat.
 
-Then just work. Describe what you want in a normal sentence. Playbook activates at the start of any non-trivial work, announces how it is running the work, and otherwise stays out of your way.
+You don't need to install anything else, but it's worth having `jq` for goal recovery and smooth compactions. It's on most machines already, and Playbook will tell you if it isn't.
 
-The common path is zero-dependency, so there is nothing else to install. The one thing worth having on your machine is `jq`, which most systems already carry: it powers the North Star recovery and the compaction calm, and if it is ever missing Playbook says so in the session rather than degrading quietly.
+Playbook prioritises native Claude development flows, with the one exception of large MVPs, where I'd point you at the [GSD](https://github.com/open-gsd/gsd-core) framework, which you install separately from their repo.
 
-## You can see it working
+## How it works
 
-Every time Playbook routes work it prints one branded line, both as a nudge and as a heartbeat so you always know it is alive (and notice instantly if it ever vanishes):
+Playbook is a set of Claude Code hooks and skills. There's no runtime, no daemon, and nothing written into your working tree. When a session starts, and again after every compaction, it does four things:
+
+1. **Re-states the goal.** It recovers your original request from the transcript and keeps a one-line North Star in front of Claude at every decision.
+2. **Picks how to run the work,** judged on how separable and durable it is rather than how big it looks.
+3. **Keeps Claude calm near the context limit,** so it doesn't do less or stop early as the window fills.
+4. **Watches its own unease** and speaks up, visibly, only when something genuinely starts going wrong.
+
+None of it happens behind your back. Every choice is announced on one branded line, part nudge, part heartbeat, so you always know Playbook is alive and would spot it instantly if it vanished:
 
 ```
 🐺 Playbook · lone-wolf: single coherent change, no extra hands
 ```
 
-When the model rule downshifts a spawn to save cost, it says so too:
+Everything below is one of those jobs done properly, and they all matter; the detail on each is [further down](#in-more-detail).
+
+## Commands
+
+Every command ships under two names: a branded `/pb-*` form that's safe on top of Superpowers or GSD, and a plain alias for newcomers. If another tool already owns the plain name, reach for the `/pb-` form.
+
+| Branded             | Plain            | What it does                                                 |
+| ------------------- | ---------------- | ------------------------------------------------------------ |
+| `/pb-brainstorming` | `/brainstorming` | explore options, ask sharp questions, paint the picture, converge (also fires on its own for fuzzy work) |
+| `/pb-offline-mode`  | `/offline-mode`  | turn on offline behaviour and notifications for this run     |
+| `/pb-worktrees`     | `/worktrees`     | isolate a separate Claude Code session in `.worktrees/` with its own branch and instance number |
+| `/pb-workflow`      | `/workflow`      | ⚙️ run this task as a dynamic workflow, carrying the North Star and the model rule into the script |
+| `/pb-fix`           | `/fix`           | 🦞 strict, production-ready fix protocol, typed for the stack and validated at the boundaries |
+| `/pb-debug`         | `/debug`         | 👾 a strict read, summarise, diagnose, confirm debugging cycle |
+| `/pb`               |                  | a status heartbeat: whether Playbook is active, which mode, which model split, offline on or off |
+
+## The nine tenets
+
+The doctrine underneath everything. The hooks carry these into the main thread and every subagent, so they survive compaction and reach helpers without any skill text being re-read.
+
+1. **Remember what matters.** The North Star is re-anchored after every compaction and passed into every dispatch.
+2. **Front-load the questions.** Ask the batch once, early, so the rest can run unattended.
+3. **Team of equals.** A lead coordinates; it doesn't get the last word.
+4. **Unease.** Restated only when it rises, and measured against the whole project, not just the task at hand.
+5. **Offline mode is opt-in.** Enabled per run, never assumed.
+6. **Ready for production.** No scaffolding vocabulary or comment sludge in shipped code.
+7. **Ride the compaction, do not fear it.** A compaction is a steered breath, not a wipe.
+8. **Less is more.** The cheapest sufficient mode and model; longer thinking, shorter output.
+9. **Speed comes from more hands, not from rushing.** Cutting a job short to save time is off the table.
+
+## In more detail
+
+### 🚦 Choosing the right way to run the work
+
+Work is routed on **separability and durability, not size**. Size only decides whether to break the work up first. Each mode is just a way Claude Code already works, named so you can see the choice being made.
+
+| Marker | Mode        | Claude Code primitive | When it runs                                                 |
+| ------ | ----------- | --------------------- | ------------------------------------------------------------ |
+| 🐺      | `lone-wolf` | main thread           | one coherent unit, no benefit from extra hands               |
+| 🐜      | `interns`   | parallel subagents    | several independent sub-tasks; the helpers do not talk to each other |
+| 🤝      | `hackathon` | agent teams           | coupled work in one shared codebase, where the peers need to message each other |
+| ⚙️      | `workflows` | dynamic workflows     | many genuinely independent units, or a scale one context cannot hold, or work that needs independent verification |
+| 🏗️      | `gsd`       | GSD                   | a whole MVP in an unknown area, with state that must survive across sessions |
+
+The thing this fights hardest is over-reach:
+
+- The assumed baseline is ultracode, where Claude can launch a whole dynamic workflow on its own, so the discipline that matters is restraint.
+- The tool is sized to the task, never to the mode: a read-and-fix over a known set of files is `lone-wolf` or a handful of `interns`, never a twenty-agent swarm.
+- "Ultracode is on" is never by itself a reason to fan out; a workflow has to earn its place with real volume, real scale, or a genuine need for independent verification.
+- When ultracode is off, `workflows` becomes opt-in, and Playbook points you at `/workflow` rather than reaching for it itself.
+
+### 🧘 Calm compaction
+
+Native auto-compact is seamless: it summarises the conversation and the session simply keeps going. The platform never actually stops you. What makes agents wrap up early and break runs you left going is a context-warning hook (most commonly GSD's `gsd-context-monitor`) quietly injecting "you're running low, prepare to pause" into the model. Claude believes it and downs tools.
+
+Playbook fixes this in one move:
+
+- It spots competing context warnings and offers, once, to take the context channel over. Only with your consent, and it backs up your settings first.
+- From then on it's the single calm voice in the room: auto-compact is safe, nothing important is lost, keep going.
+- After a compaction it re-anchors on your original request and the North Star, and picks the in-flight work straight back up.
+
+### 🪙 The right model for the job
 
 ```
 🪙 executing on Sonnet: bulk implementation under a locked spec
 ```
 
-And when something genuinely starts going wrong, the unease register surfaces on its own line, so a rising worry is visible instead of buried. It only speaks when the worry actually climbs, so its silence is meaningful too:
+- **Sonnet executes. Opus plans, reviews, and thinks hard.** Stuck? Go up a tier.
+- The test is what happens when Claude is wrong: a loud, locally fixable mistake can run on a lighter model; a quiet mistake that propagates into other agents keeps the flagship.
+- It's doctrine rather than a mode you enter, applied inside every workflow stage and nested subagent, and announced (as above) whenever a spawn drops to a cheaper tier.
+
+### 🌡️ Knowing when it's out of its depth
 
 ```
 🌡️ Playbook · unease: watchful: three edits in a row failed to apply
 ```
 
-## The five modes
+- Playbook holds a quiet sense of how uneasy Claude is, measured against the whole project rather than just the task in front of it.
+- It only speaks when the worry genuinely climbs, so its silence tells you just as much as its voice.
+- A standing rule sits above everything: if a decision could compromise the goal itself, stop and ask you first.
+- With offline mode on, rising unease can go a step further and actually notify you, rather than stalling until you next look.
 
-Work is routed on **separability and durability, not size**. Size only decides whether to decompose first. Each mode is just how Claude Code already works, named so you can see the choice.
+### 📴 Offline mode
 
-| Marker | Mode | Claude Code primitive | When it runs |
-|---|---|---|---|
-| 🐺 | `lone-wolf` | main thread | one coherent unit, no benefit from extra hands |
-| 🐜 | `interns` | parallel subagents | several independent sub-tasks; helpers do not talk; includes the joint-leads to workers nested fan-out (e.g. 5 leads x 5 workers = 25, inside the depth-5 cap) |
-| 🤝 | `hackathon` | agent teams | coupled work in one shared codebase; peers message each other |
-| ⚙️ | `workflows` | dynamic workflows | many genuinely independent units, a scale one context cannot hold, or work that needs independent verification; self-launched under ultracode, otherwise opt-in via `/workflow` |
-| 🏗️ | `gsd` | GSD | a whole MVP in an unknown area; durable cross-session state |
+For when Claude is working and you aren't watching, whether that's overnight or just while you're in a meeting. It runs a "wait-then-escalate" ladder:
 
-The baseline is ultracode: most substantial work runs under `/effort ultracode`, where the assistant can launch a dynamic workflow itself. That is exactly why the engine's discipline is restraint, not reach: it matches the tool to the task, never to the mode. A coherent read-and-fix or a small known file set runs as `lone-wolf` or `interns`; a workflow is reserved for work with many genuinely independent units, a scale one context cannot hold, or a real need for independent verification. "Ultracode is on" is never itself the reason to fan out. When ultracode is not on, `workflows` is opt-in instead, triggered with `/workflow` or by adding the keyword "ultracode" to a prompt. Either way Playbook announces the route and never gates you.
+1. **Pulls you back** with a notification when the work genuinely blocks.
+2. **Falls back to an external manager** if you don't answer inside the window you set.
+3. **Makes the call and logs it** if it must, writing every decision taken without you into a morning-readable HTML log.
 
-## The nine tenets
+Notifications go through **ntfy or Pushover**, whichever you pick at setup. Pushover is the one for a guaranteed wake-up: it punches through iOS Do Not Disturb once you enable Critical Alerts in its app. ntfy is the free, self-hostable, Android-friendly option.
 
-A doctrine carried by the hooks into the main thread and every subagent and workflow stage, so it survives compaction and rides into helpers without skill text being re-read.
+It's built to sit alongside Claude's native `/goal`, which owns the "am I actually finished" loop while offline mode holds the North Star, the pull-back, the ladder and the log.
 
-1. **Remember what matters.** The original request and the one-line North Star, kept load-bearing and re-anchored after every compaction; the North Star travels into every dispatch.
-2. **Front-load the questions.** Explore first, ask the batch once and early, so downstream can run unattended.
-3. **Team of equals.** A lead holds coordination authority only, not intellectual authority; subagents and peers push back with technical reasoning.
-4. **Unease.** Restated only when it increases, measured against the whole project, with a standing override to stop and ask if the North Star is at risk.
-5. **Offline mode.** Enabled only by `playbook:offline-mode`, explicitly and per run.
-6. **Ready for production.** No scaffolding vocabulary or comment sludge in shipped code; a final sweep before handing work back.
-7. **Ride the compaction, do not fear it.** See below; this is the keystone.
-8. **Less is more.** The cheapest sufficient mode and model; longer thinking and shorter output.
-9. **Speed via more hands, not rushing.** Fan separable work across subagents and workflows at the same completeness bar; partial work to save time is forbidden.
+### 🧭 Brainstorming
 
-## The model rule, always on
+Not every job starts as a clear instruction. For the fuzzy front end, brainstorming:
 
-Playbook applies one model rule everywhere, including inside every workflow stage and nested subagent: **Sonnet executes, Opus plans and reviews and thinks hard, and you bump up a tier when stuck.** Classification is by what happens when the agent is wrong: a loud, locally fixable error can run on a lighter tier; a quiet error that propagates keeps the flagship. The rule is doctrine, not a mode you enter, and it is announced on each spawn that downshifts.
+- explores the options rather than grabbing the first one,
+- asks you the sharp questions early instead of guessing,
+- paints the picture of where it's heading, and converges on a plan before any code is written.
 
-## Compaction calm (the keystone)
+It fires on its own when a request is open-ended, or call it yourself with `/brainstorming`.
 
-Native auto-compact is seamless: it summarises and the session keeps going, the platform never stops you. The thing that makes agents fearful near the limit, doing less work, wrapping up early, breaking overnight runs, is a context-warning hook (commonly GSD's `gsd-context-monitor`) that injects "you are running low, prepare to pause" into the model.
+### 🌿 Worktrees for parallel sessions
 
-Playbook fixes this in one move. It detects a competing context-warning hook and offers, once, to let Playbook own the context channel instead: with your consent and a backup, it quiets the competing warning and becomes the single calm voice. From then on it does not scare the agent near the limit, it reassures it ("auto-compact is seamless, you keep what matters, keep going"), and after a compaction it re-anchors on the original request and the North Star and resumes the in-flight work. Nothing is ever edited without your explicit consent.
+For when **you** want to run several Claude Code sessions at once. This is for humans; it's not subagent parallelism!
 
-## Commands
+- Creates a worktree under `.worktrees/` on its own branch, with an instance number.
+- Offsets every resource that has to be isolated by that number: a per-instance Docker database, a dev-server port, a cache namespace.
+- Any number of sessions run side by side without treading on each other; where there's nothing to isolate, it falls back to plain branch isolation.
 
-Plugin name stays `playbook`. Every command ships under two names: a branded `/pb-*` that is canonical and collision-proof on top of Superpowers or GSD, and a bare natural alias for newcomers.
+### 👻 It writes nothing into your project
 
-| Branded | Natural | What it does |
-|---|---|---|
-| `/pb-brainstorming` | `/brainstorming` | explore options, ask sharp questions, paint the picture, converge (also auto-triggers on fuzzy work) |
-| `/pb-offline-mode` | `/offline-mode` | enable offline behaviour and notifications for this run |
-| `/pb-worktrees` | `/worktrees` | isolate a separate Claude Code session in `.worktrees/` with its own branch and instance number |
-| `/pb-workflow` | `/workflow` | ⚙️ run this task as a dynamic workflow at scale, carrying the North Star and model rule into the workflow |
-| `/pb-fix` | `/fix` | 🦞 strict fix protocol, production-ready, strongly typed for the stack, validated at boundaries |
-| `/pb-debug` | `/debug` | 👾 strict read, summarise, diagnose, confirm debugging cycle |
-| `/pb` | | status heartbeat: is Playbook active, which mode, which model split, offline on or off |
-
-If another tool already owns a bare name, the `/pb-` form is the safe one.
-
-## Offline mode and notifications
-
-`playbook:offline-mode` is opt-in, enabled fresh per session, never carried over. While active it runs a wait-then-escalate ladder, pulls you back when work blocks, falls back to an external manager if you do not respond within the window you declared, and exports the absent-decisions as a morning-readable HTML log.
-
-Notifications support **Pushover or ntfy**, chosen at setup. Pushover is recommended when you need a guaranteed wake-up: it can break through iOS Do Not Disturb and Focus (you enable Critical Alerts once in the Pushover app). ntfy stays as the free, self-hostable, Android-friendly option. A single abstraction maps three levels onto either provider: `info`, `action`, and `critical`, and the running agent can choose the level per event and fire a critical alert when it genuinely matters.
-
-Going to sleep on a long run pairs well with native `/goal`: let `/goal` own the "am I actually done?" loop while offline mode owns the North Star, the notification pull-back, the escalation ladder, and the decision log.
-
-## Worktrees for parallel sessions
-
-`playbook:worktrees` is for the human running several Claude Code sessions at once, not for subagent parallelism. It creates a worktree under `.worktrees/` on a dedicated branch and assigns it an instance number, then offsets every resource the stack needs to isolate by that number, a per-instance Docker database, a dev-server port, a cache namespace, so any number of sessions run side by side without collision. It degrades gracefully to branch-only isolation when no isolatable resource is found.
-
-## Prerequisites and graceful degradation
-
-The common path is zero-dependency. `lone-wolf`, `interns`, `hackathon`, `workflows`, the model rule, the compaction calm, and all nine tenets need only native Claude Code. Only `gsd` needs a prerequisite, and Playbook prompts to install it at exactly that fork rather than failing: `npx get-shit-done-cc@latest`. You can always pick a different mode.
-
-## Runtime state
-
-The core writes no file into your working tree: no `.playbook/` directory, no anchor file, no state in your project. A small per-session throttle file lives under `~/.claude/hook-state/playbook/` (ephemeral, cleaned automatically) so the calm beat and the unease pulse fire once instead of nagging. The original request, the North Star and the unease sense live in the conversation, steered across compaction by the hooks, and re-derived if a compaction loses them. The opt-in pieces are the only exceptions, and only when you enable them: offline mode stores its notification config under the gitignored `.claude/playbook/`, the context-calm choice is remembered there too, and `.worktrees/` holds your parallel-session worktrees.
+- No `.playbook/` directory, no anchor file, no state in your repo. The goal, the routing and the unease all live in the conversation itself, steered by the hooks.
+- One tiny throttle file lives at `~/.claude/hook-state/playbook/`, outside your project and cleaned up on its own.
+- The only things that ever land in your project are the ones you opt into: offline mode's notification config under the gitignored `.claude/playbook/`, and your `.worktrees/`.
 
 ## Licence
 
