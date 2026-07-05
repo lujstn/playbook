@@ -21,7 +21,6 @@ chk "grep -q 'playbook-northstar' '$S'" "engine instructs the project North Star
 chk "! grep -qi 'receives only the prompt you author\\|receives only its own prompt' '$S'" "engine skill drops the false no-overlay workflow claim"
 chk "grep -q 'SubagentStart overlay' '$S'" "engine skill states the SubagentStart overlay reaches workflow subagents"
 chk "grep -q 'SubagentStart overlay' '$root/commands/workflow.md'" "workflow command states the SubagentStart overlay reaches workflow subagents"
-chk "grep -q 'SubagentStart overlay' '$root/commands/pb-workflow.md'" "pb-workflow command states the SubagentStart overlay reaches workflow subagents"
 
 # Ultracode-baseline restraint: the engine must reason about what the task needs
 # rather than reaching for a workflow because the mode is on. This guards against
@@ -38,8 +37,7 @@ chk "! grep -q 'DESIGN\\.md' '$O'" "offline-mode no stale DESIGN.md reference"
 chk "grep -q 'regardless of the unease level or the mode' '$O'" "offline-mode standing override no-ledger phrasing"
 chk "grep -qi 'gated by your in-session unease\\|gated by the in-session unease' '$O'" "external manager gated by in-session unease"
 chk "grep -q '^# Offline Mode' '$O'" "offline-mode H1 has no embedded marker"
-chk "grep -q 'Playbook · offline:' '$O'" "offline-mode announce uses the canonical colon separator"
-chk "! grep -q 'Playbook · offline -' '$O'" "offline-mode announce has no hyphen-separator drift"
+chk "grep -qF '📴 **Playbook**' '$O'" "offline-mode announce uses the branded bold marker"
 
 H="$root/skills/hackathon-team/SKILL.md"
 chk "! grep -qE '(^|[^-])design\\.md' '$H'" "hackathon-team no bare lowercase design.md vestige"
@@ -57,9 +55,11 @@ targets=( "$root"/skills/playbook/SKILL.md \
           "$root"/skills/worktrees/SKILL.md \
           "$root"/skills/fix-mode/SKILL.md \
           "$root"/skills/debug-mode/SKILL.md \
+          "$root"/skills/setup/SKILL.md \
           "$root"/skills/offline-mode/decision-log.html.tmpl \
           "$root"/commands/workflow.md \
-          "$root"/commands/pb-workflow.md )
+          "$root"/commands/pb.md \
+          "$root"/commands/playbook.md )
 for f in "${targets[@]}"; do
   rel="${f#"$root"/}"
   # A missing target would make every negative grep below pass vacuously (grep on
@@ -87,7 +87,18 @@ chk "grep -q 'Assume ultracode is the baseline' '$SS'" "overlay states the ultra
 chk "grep -qi 'match the tool to the task, never to the mode' '$SS'" "overlay carries ultracode restraint guidance"
 chk "grep -q '🌿 worktrees' '$SS'" "overlay registers the worktrees marker"
 chk "grep -q '🌡️ unease' '$SS'" "overlay registers the unease thermometer marker"
+chk "grep -q '🧰 setup' '$SS'" "overlay registers the setup marker"
 chk "! grep -q 'playbook-window' '$SS'" "overlay no longer instructs a window declaration"
+
+# Setup skill invariants.
+SU="$root/skills/setup/SKILL.md"
+chk "grep -qF '🧰 **Playbook**' '$SU'" "setup skill announces with the branded bold marker"
+chk "grep -qi 'never uninstall' '$SU'" "setup skill never uninstalls"
+chk "grep -qiE 'back(ed)? up|backup' '$SU'" "setup skill requires a settings backup"
+chk "grep -qi 'never execute another plugin' '$SU'" "setup skill reads other plugins, never runs them"
+chk "grep -q 'playbook:setup' '$root/commands/pb.md'" "pb command gates through the setup skill"
+chk "grep -q 'playbook:setup' '$root/commands/playbook.md'" "playbook command gates through the setup skill"
+chk "diff -q '$root/commands/pb.md' '$root/commands/playbook.md'" "pb and playbook commands are identical twins"
 
 # The Stop-pulse hook is gone entirely; the seam itself, not its frequency, was
 # the defect, so nothing should remain on Stop.
@@ -95,7 +106,8 @@ chk "[ ! -f '$root/hooks/unease' ]" "the Stop-pulse hook (hooks/unease) is delet
 
 # Both workflow commands must teach validating the workflow's own result.
 chk "grep -qi 'degenerate result' '$root/commands/workflow.md'" "workflow command warns against a degenerate result"
-chk "grep -qi 'degenerate result' '$root/commands/pb-workflow.md'" "pb-workflow command warns against a degenerate result"
+chk "[ -z \"\$(ls '$root'/commands/pb-*.md 2>/dev/null)\" ]" "no pb-* command files remain"
+chk "! grep -rq 'Playbook · ' '$root/hooks' '$root/skills' '$root/commands' '$root/README.md'" "no middot marker leftovers in the shipped surface"
 
 R="$root/README.md"
 chk "! grep -qE '\.playbook/[A-Za-z._-]' '$R'" "README has no .playbook/ path references"

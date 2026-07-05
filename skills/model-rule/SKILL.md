@@ -35,6 +35,6 @@ Explicit params are the source of truth; inheritance is the fallback of last res
 
 ### Visibility
 
-Announce every downshift on the spawn itself, before the agent runs. Example: `🪙 executing on Sonnet: bulk implementation under locked spec`.
+Announce every downshift on the spawn itself, before the agent runs. Example: 🪙 **Playbook** `sonnet` *bulk implementation under locked spec*.
 
 Only downshifts get a marker; do not announce when a spawn stays at the same tier as the parent.

@@ -7,6 +7,9 @@ H="$root/hooks/take-a-beat"
 SS="$root/hooks/session-start"
 export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
+# Isolate the global marker dir so the first-run doorbell never touches real HOME.
+GLOBAL_TMP="$(mktemp -d)"; export PLAYBOOK_GLOBAL_DIR="$GLOBAL_TMP"
+trap 'rm -rf "$GLOBAL_TMP"' EXIT
 source "$root/hooks/lib/playbook-common.sh"
 
 B="$root/tests/hooks/fixtures/transcript-basic.jsonl"          # used 10020

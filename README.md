@@ -30,25 +30,23 @@ Playbook is a set of Claude Code hooks and skills. There's no runtime, no daemon
 
 None of it happens behind your back. Every choice is announced on one branded line, part nudge, part heartbeat, so you always know Playbook is alive and would spot it instantly if it vanished:
 
-```
-🐺 Playbook · lone-wolf: single coherent change, no extra hands
-```
+> 🐺 **Playbook** `lone-wolf` *single coherent change, no extra hands*
 
 Everything below is one of those jobs done properly, and they all matter; the detail on each is [further down](#in-more-detail).
 
 ## Commands
 
-Every command ships under two names: a branded `/pb-*` form that's safe on top of Superpowers or GSD, and a plain alias for newcomers. If another tool already owns the plain name, reach for the `/pb-` form.
+Every command also answers to its namespaced `/playbook:*` form, which behaves identically; if another tool already owns the plain name, use that one.
 
-| Branded             | Plain            | What it does                                                 |
-| ------------------- | ---------------- | ------------------------------------------------------------ |
-| `/pb-brainstorming` | `/brainstorming` | explore options, ask sharp questions, paint the picture, converge (also fires on its own for fuzzy work) |
-| `/pb-offline-mode`  | `/offline-mode`  | turn on offline behaviour and notifications for this run     |
-| `/pb-worktrees`     | `/worktrees`     | isolate a separate Claude Code session in `.worktrees/` with its own branch and instance number |
-| `/pb-workflow`      | `/workflow`      | ⚙️ run this task as a dynamic workflow, carrying the North Star and the model rule into the script |
-| `/pb-fix`           | `/fix`           | 🦞 strict, production-ready fix protocol, typed for the stack and validated at the boundaries |
-| `/pb-debug`         | `/debug`         | 👾 a strict read, summarise, diagnose, confirm debugging cycle |
-| `/pb`               |                  | a status heartbeat: whether Playbook is active, which mode, which model split, offline on or off |
+| Command          | Alias                       | What it does                                                 |
+| ---------------- | --------------------------- | ------------------------------------------------------------ |
+| `/brainstorming` | `/playbook:brainstorming`   | explore options, ask sharp questions, paint the picture, converge (also fires on its own for fuzzy work) |
+| `/offline-mode`  | `/playbook:offline-mode`    | turn on offline behaviour and notifications for this run     |
+| `/worktrees`     | `/playbook:worktrees`       | isolate a separate Claude Code session in `.worktrees/` with its own branch and instance number |
+| `/workflow`      | `/playbook:workflow`        | ⚙️ run this task as a dynamic workflow, carrying the North Star and the model rule into the script |
+| `/fix`           | `/playbook:fix`             | 🦞 strict, production-ready fix protocol, typed for the stack and validated at the boundaries |
+| `/debug`         | `/playbook:debug`           | 👾 a strict read, summarise, diagnose, confirm debugging cycle |
+| `/playbook`      | `/pb`                       | a status heartbeat: whether Playbook is active, which mode, which model split, offline on or off; its first run also checks your machine for plugin conflicts |
 
 ## The nine tenets
 
@@ -97,9 +95,7 @@ Playbook fixes this in one move:
 
 ### 🪙 The right model for the job
 
-```
-🪙 executing on Sonnet: bulk implementation under a locked spec
-```
+> 🪙 **Playbook** `sonnet` *bulk implementation under a locked spec*
 
 - **Sonnet executes. Opus plans, reviews, and thinks hard.** Stuck? Go up a tier.
 - The test is what happens when Claude is wrong: a loud, locally fixable mistake can run on a lighter model; a quiet mistake that propagates into other agents keeps the flagship.
@@ -107,9 +103,7 @@ Playbook fixes this in one move:
 
 ### 🌡️ Knowing when it's out of its depth
 
-```
-🌡️ Playbook · unease: watchful: three edits in a row failed to apply
-```
+> 🌡️ **Playbook** `unease: watchful` *three edits in a row failed to apply*
 
 - Playbook holds a quiet sense of how uneasy Claude is, measured against the whole project rather than just the task in front of it.
 - It only speaks when the worry genuinely climbs, so its silence tells you just as much as its voice.
@@ -146,10 +140,16 @@ For when **you** want to run several Claude Code sessions at once. This is for h
 - Offsets every resource that has to be isolated by that number: a per-instance Docker database, a dev-server port, a cache namespace.
 - Any number of sessions run side by side without treading on each other; where there's nothing to isolate, it falls back to plain branch isolation.
 
+### 🧰 First-run setup
+
+The first time you type `/playbook` on a machine, it has a quick look around before doing anything else. A few plugins out there genuinely fight Playbook (the classic ones re-prompt Claude every time it tries to stop, or scare it near the context limit), so it spots those, shows you the evidence, and offers to sort them out. It'll also make sure you've got `jq`, and offer to set up notifications if you fancy offline mode.
+
+Nothing happens without your say-so: it asks about each change, backs up your settings first, and only ever disables, never uninstalls. It's biased towards leaving your stuff alone, and at the end it offers a wider health check of your Claude Code setup, which you're free to decline. Run `/playbook:setup` whenever you want to do it again.
+
 ### 👻 It writes nothing into your project
 
 - No `.playbook/` directory, no anchor file, no state in your repo. The goal, the routing and the unease all live in the conversation itself, steered by the hooks.
-- One tiny throttle file lives at `~/.claude/hook-state/playbook/`, outside your project and cleaned up on its own.
+- One tiny throttle file lives at `~/.claude/hook-state/playbook/`, outside your project and cleaned up on its own, and the one-time setup marker sits under `~/.claude/playbook/`.
 - The only things that ever land in your project are the ones you opt into: offline mode's notification config under the gitignored `.claude/playbook/`, and your `.worktrees/`.
 
 ## Licence

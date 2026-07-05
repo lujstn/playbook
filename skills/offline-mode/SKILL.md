@@ -11,7 +11,7 @@ Offline mode enables tenet 5 behaviour for a single session: a wait-then-escalat
 
 **Core principle:** Absence is not permission. When the user is away, wait the window the user declared this run, escalate up the ladder, and only then proceed on the best call, logging every absent-decision so the user can read exactly what happened in the morning.
 
-**Announce at start:** "📴 Playbook · offline: enabling offline behaviour for this session and declaring the wait window now."
+**Announce at start:** "📴 **Playbook** `offline` *enabling offline behaviour for this session and declaring the wait window now*"
 
 This skill does not re-explain `AskUserQuestion`, native subagents, or the escalation ladder mechanics; it specifies only the offline-specific behaviour that closes the tenet 5 gap.
 

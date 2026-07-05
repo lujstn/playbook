@@ -32,7 +32,7 @@ Ultracode is the assumed baseline: most substantial work runs under `/effort ult
 Print exactly one branded marker line before routing:
 
 ```
-<emoji> Playbook · <mode>: <≤60-char reason>
+<emoji> **Playbook** `<mode>` *<≤60-char reason>*
 ```
 
 The `Playbook ·` brand is mandatory so the marker is unmistakably Playbook on top of any other tool, and its disappearance is obvious.
@@ -112,7 +112,7 @@ Playbook writes into `.planning/` only via the declared pre-seed and post-proces
 - Print the branded marker line before routing.
 - Pass `playbook-northstar: <one-line>` into every helper dispatch.
 - Apply the standing North-Star override at every step.
-- Announce model downshifts on each spawn: `🪙 executing on Sonnet: <reason>`.
+- Announce model downshifts on each spawn: 🪙 **Playbook** `sonnet` *<reason>*.
 - Run the production-ready sweep before handing work back.
 
 ## Integration

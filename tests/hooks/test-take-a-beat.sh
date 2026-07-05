@@ -107,6 +107,25 @@ out2="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"sta
   || { echo "FAIL: offer repeated despite marker [$out2]"; rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"; exit 1; }
 rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"
 
+# First-run doorbell: fires once per machine, then never; a setup marker suppresses it.
+iso
+nh="$(mktemp -d)"; gd="$(mktemp -d)"
+out="$(HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"nudge1"}' \
+  | HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" bash "$H")"
+{ grep -q "type /playbook" <<<"$out" && [ -f "$gd/setup-nudged" ]; } \
+  && echo "PASS: first-run doorbell fires and writes its once-ever marker" \
+  || { echo "FAIL doorbell: [$out]"; rm -rf "$nh" "$gd" "$PLAYBOOK_STATE_DIR"; exit 1; }
+out2="$(HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"nudge1"}' \
+  | HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" bash "$H")"
+[ -z "$out2" ] && echo "PASS: doorbell never repeats once nudged" \
+  || { echo "FAIL doorbell repeated: [$out2]"; rm -rf "$nh" "$gd" "$PLAYBOOK_STATE_DIR"; exit 1; }
+gd2="$(mktemp -d)"; printf 'checked=2026-07-05\nplugins=a@b\n' > "$gd2/setup"
+out3="$(HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd2" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"nudge2"}' \
+  | HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd2" bash "$H")"
+[ -z "$out3" ] && echo "PASS: doorbell silent when setup has already run" \
+  || { echo "FAIL doorbell despite setup marker: [$out3]"; rm -rf "$nh" "$gd" "$gd2" "$PLAYBOOK_STATE_DIR"; exit 1; }
+rm -rf "$nh" "$gd" "$gd2" "$PLAYBOOK_STATE_DIR"
+
 # Unrelated event: silent.
 iso
 out="$(printf '{"hook_event_name":"Stop","session_id":"st","transcript_path":"%s"}' "$B" | bash "$H")"

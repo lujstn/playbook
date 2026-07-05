@@ -27,8 +27,8 @@ chk "grep -q 'plan and review' '$SS'" "model rule: plan and review on Opus"
 chk "grep -q 'auto-compact is seamless' '$SS'" "context-calm: auto-compact is seamless"
 chk "grep -q 'Do not wrap up early' '$SS'" "context-calm: do not wrap up early"
 
-# Marker/brand convention: the Playbook middot brand.
-chk "grep -qF 'Playbook · ' '$SS'" "brand convention: Playbook middot in overlay"
+# Marker/brand convention: the bold Playbook brand with a code-chip mode.
+chk "grep -qF '**Playbook**' '$SS'" "brand convention: bold Playbook in overlay"
 
 # North Star dispatch line.
 chk "grep -q 'playbook-northstar' '$SS'" "North Star dispatch line in overlay"

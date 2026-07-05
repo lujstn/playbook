@@ -13,7 +13,7 @@ A thin choreography over Claude Code's native agent-teams primitive. Teams are s
 
 **Core principle:** Co-located peers, partitioned once by file ownership, then left to self-organise. The lead coordinates and steps back; it does not think for the team. Less is more (tenet 8): the smallest team that fits the partition.
 
-**Announce at start:** "🤝 Playbook · hackathon: co-located peers, thin coordinating lead"
+**Announce at start:** "🤝 **Playbook** `hackathon` *co-located peers, thin coordinating lead*"
 
 ## Topology
 

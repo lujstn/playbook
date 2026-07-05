@@ -3,7 +3,7 @@ description: Playbook workflows mode: run this task as a dynamic workflow at sca
 disable-model-invocation: true
 ---
 
-The `/pb-workflow` form is canonical and collision-proof; use it if another tool defines `/workflow`. Behaviour is identical.
+If another tool defines `/workflow`, the `/playbook:workflow` alias behaves identically.
 
 Run the task below as a dynamic workflow using the Workflow tool. The user invoking this command is the opt-in, so authoring and running the workflow is sanctioned.
 
@@ -17,4 +17,4 @@ A workflow subagent receives Playbook's SubagentStart overlay, so the doctrine r
 - A workflow takes no mid-run user input and its subagents cannot pull the user back, so the standing North-Star override and the escalation ladder degrade to fail-and-surface: stop the workflow and return the blocker rather than guessing. Split any point that needs human sign-off into a separate workflow so the user can steer between them.
 - Validate the workflow's own result before trusting it. A structured return that comes back empty or zero-findings is more often an aggregation bug in the script than a genuinely clean task; reconcile the returned shape against the per-stage progress, and never report success on a degenerate result you have not sanity-checked.
 
-Announce once the workflow is actually running: a single line of the form ⚙️ Playbook · workflows: <one-line reason>.
+Announce once the workflow is actually running: a single line of the form ⚙️ **Playbook** `workflows` *<one-line reason>*.

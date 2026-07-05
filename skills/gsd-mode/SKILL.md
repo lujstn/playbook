@@ -7,7 +7,7 @@ description: The 🏗️ gsd route. Front-loads user involvement and research, p
 
 ## Overview
 
-GSD mode is Playbook's wrapper around [get-shit-done-cc](https://github.com/gsd-build/get-shit-done). It does two things: it right-sizes how much user involvement GSD asks for, and it forces parallel execution where GSD would otherwise serialise. Marker: `🏗️ Playbook · gsd`.
+GSD mode is Playbook's wrapper around [get-shit-done-cc](https://github.com/gsd-build/get-shit-done). It does two things: it right-sizes how much user involvement GSD asks for, and it forces parallel execution where GSD would otherwise serialise. Marker: 🏗️ **Playbook** `gsd`.
 
 The wrapper is built on three observations: GSD's interactive phase planning asks more questions than it needs if you supply a CONTEXT file upfront; GSD's executor serialises waves unless you set the right config knobs; and GSD's map-codebase is expensive to run unscoped. All three are fixable by the wrapper without forking or patching GSD itself.
 
@@ -172,7 +172,7 @@ Everything else in `.planning/` is GSD-owned durable state and stays read-only. 
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the routing engine. It makes the gsd routing decision and announces `🏗️ Playbook · gsd` before this skill runs. The nine-tenet overlay and the North Star stay live throughout.
+- `playbook:playbook` is the routing engine. It makes the gsd routing decision and announces 🏗️ **Playbook** `gsd` before this skill runs. The nine-tenet overlay and the North Star stay live throughout.
 
 **External dependency:**
 - GSD (`get-shit-done-cc`). Install with `npx get-shit-done-cc@latest`. This is the one mode in the common path that has a prerequisite; the wrapper prompts at the fork, never hard-fails.

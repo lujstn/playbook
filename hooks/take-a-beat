@@ -73,7 +73,7 @@ ${a}"; fi
 emit_pulse() {
   local ev="$1" a body
   a="$(anchor)"
-  body="Playbook pulse: a long stretch of work has passed since the last anchor. Silently re-check the anchor below. If the work still serves the North Star and your unease has not increased, say nothing about this pulse and carry on. If your unease has increased or the work has drifted, say so in one branded line: 🌡️ Playbook · unease: <level>: <reason of at most 50 characters>. The escalation ladder is available on an increase and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager."
+  body="Playbook pulse: a long stretch of work has passed since the last anchor. Silently re-check the anchor below. If the work still serves the North Star and your unease has not increased, say nothing about this pulse and carry on. If your unease has increased or the work has drifted, say so in one branded line: 🌡️ **Playbook** \`unease: <level>\` *<reason of at most 50 characters>*. The escalation ladder is available on an increase and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager."
   if [ -n "$a" ]; then body="${body}
 
 ${a}"; fi
@@ -81,7 +81,7 @@ ${a}"; fi
 }
 
 emit_spike() {
-  playbook_emit_context "$1" "Playbook unease spike: several tool calls have failed in a row without a clean batch between them. Take a beat before the next attempt: re-read the North Star and check whether the approach itself is what is failing. If you agree unease has risen, print one branded line before continuing: 🌡️ Playbook · unease: <level>: <reason of at most 50 characters>; if it has not, print nothing about this. The escalation ladder is open and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
+  playbook_emit_context "$1" "Playbook unease spike: several tool calls have failed in a row without a clean batch between them. Take a beat before the next attempt: re-read the North Star and check whether the approach itself is what is failing. If you agree unease has risen, print one branded line before continuing: 🌡️ **Playbook** \`unease: <level>\` *<reason of at most 50 characters>*; if it has not, print nothing about this. The escalation ladder is open and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
 }
 
 emit_micro_anchor() {
@@ -105,12 +105,23 @@ case "$event" in
       # Fresh start: if a competing context-warning hook is registered and the
       # context-calm channel has not been resolved, offer once to let Playbook
       # own it, so agents are not scared into stopping near the context limit.
+      body=""
       proj="$(playbook_project_dir "$stdin")"
       comp="$(playbook_competing_context_hook "$proj")"
       resolved="$(playbook_context_calm_resolved "$proj")"
       if [ -n "$comp" ] && [ -z "$resolved" ]; then
-        playbook_emit_context "SessionStart" "Playbook context-calm offer: a competing context-warning hook (${comp}) is registered on this machine. Near the context limit it injects wrap-up-and-stop messages into the agent, which makes work halt early and breaks offline runs. Offer the user, once, to let Playbook own the context channel instead and keep working calmly through auto-compact. If they accept: in a GSD project set hooks.context_warnings to false in .planning/config.json; otherwise back up the settings file and remove the ${comp} PostToolUse registration from it. Then write the word owned to .claude/playbook/context-calm. If they decline, write the word declined to .claude/playbook/context-calm. Either marker stops this offer repeating. Never edit settings without the user's explicit consent, and always back up first."
+        body="Playbook context-calm offer: a competing context-warning hook (${comp}) is registered on this machine. Near the context limit it injects wrap-up-and-stop messages into the agent, which makes work halt early and breaks offline runs. Offer the user, once, to let Playbook own the context channel instead and keep working calmly through auto-compact. If they accept: in a GSD project set hooks.context_warnings to false in .planning/config.json; otherwise back up the settings file and remove the ${comp} PostToolUse registration from it. Then write the word owned to .claude/playbook/context-calm. If they decline, write the word declined to .claude/playbook/context-calm. Either marker stops this offer repeating. Never edit settings without the user's explicit consent, and always back up first."
       fi
+      # First-run doorbell: suggest the setup check once ever per machine.
+      gdir="${PLAYBOOK_GLOBAL_DIR:-${HOME}/.claude/playbook}"
+      if [ ! -f "${gdir}/setup" ] && [ ! -f "${gdir}/setup-nudged" ]; then
+        nudge="Playbook setup has not run on this machine. At a natural pause in your first reply, add one short line suggesting the user type /playbook so Playbook can check once for plugin conflicts (hooks that re-prompt on Stop or inject context-limit warnings), confirm jq, and optionally set up offline notifications. Do not run the check unasked, and do not repeat the suggestion on later turns."
+        if [ -n "$body" ]; then body="${body}
+
+${nudge}"; else body="$nudge"; fi
+        { mkdir -p "$gdir" && printf 'nudged\n' > "${gdir}/setup-nudged"; } 2>/dev/null || true
+      fi
+      if [ -n "$body" ]; then playbook_emit_context "SessionStart" "$body"; fi
     fi
     ;;
 

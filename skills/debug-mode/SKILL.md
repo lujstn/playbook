@@ -1,11 +1,11 @@
 ---
 name: debug-mode
-description: Triggered by /debug or /pb-debug (keep [debug] as a courtesy alias). Enters a strict read-summarise-diagnose-confirm cycle under a 👾 Playbook · debug marker: reads each file in full before any edit, waits for explicit user confirmation before writing, works one file at a time. Stays active until the bug is resolved, or on /close, /pb-close, or the courtesy aliases [close]/[end]/[exit]/[done].
+description: Triggered by /debug (keep [debug] as a courtesy alias). Enters a strict read-summarise-diagnose-confirm cycle under a 👾 **Playbook** `debug` marker: reads each file in full before any edit, waits for explicit user confirmation before writing, works one file at a time. Stays active until the bug is resolved, or on /close, or the courtesy aliases [close]/[end]/[exit]/[done].
 ---
 
-On `/debug`, `/pb-debug`, or the courtesy alias `[debug]`:
+On `/debug` or the courtesy alias `[debug]`:
 
-1. Print `👾 Playbook · debug`.
+1. Print 👾 **Playbook** `debug`.
 2. Ask the user to describe the bug and identify the file(s) involved.
 3. Follow the cycle below for every file until the bug is resolved.
 
@@ -33,4 +33,4 @@ Context is managed by Playbook's hooks: auto-compact is seamless and the session
 
 ### Exit
 
-When the bug is resolved or the user types `/close`, `/pb-close`, `[close]`, `[end]`, `[exit]`, or `[done]`, print `👾 Playbook · debug: exited` and return to normal operation.
+When the bug is resolved or the user types `/close`, `[close]`, `[end]`, `[exit]`, or `[done]`, print 👾 **Playbook** `debug` *exited* and return to normal operation.

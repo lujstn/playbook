@@ -22,11 +22,12 @@ assert "! jq -e '.hooks.PreCompact or .hooks.PostCompact' '$root/hooks/hooks.jso
 assert "jq -e '.hooks.SessionStart[0].matcher | test(\"compact\")' '$root/hooks/hooks.json'" "SessionStart matcher includes compact (real re-anchor seam)"
 assert "! grep -q 'uncertainty' '$root/hooks/hooks.json'" "no uncertainty reference in hooks.json"
 assert "[ -d '$root/commands' ]" "commands/ directory exists"
-assert "[ -f '$root/commands/pb-fix.md' ]" "commands/pb-fix.md present (dual-name command)"
-assert "[ -f '$root/commands/fix.md' ]" "commands/fix.md present (dual-name command)"
-assert "[ -f '$root/commands/workflow.md' ]" "commands/workflow.md present (dual-name command)"
-assert "[ -f '$root/commands/pb-workflow.md' ]" "commands/pb-workflow.md present (dual-name command)"
+assert "[ -f '$root/commands/fix.md' ]" "commands/fix.md present"
+assert "[ -f '$root/commands/workflow.md' ]" "commands/workflow.md present"
+assert "[ -f '$root/commands/pb.md' ]" "commands/pb.md present (heartbeat shorthand)"
+assert "[ -f '$root/commands/playbook.md' ]" "commands/playbook.md present (heartbeat)"
+assert "[ -f '$root/skills/setup/SKILL.md' ]" "setup skill present"
+assert "[ -z \"\$(ls '$root'/commands/pb-*.md 2>/dev/null)\" ]" "no pb-* command files remain (plain and playbook: forms only)"
 assert "grep -q 'disable-model-invocation: true' '$root/commands/workflow.md'" "workflow.md is user-only (disable-model-invocation: the Workflow-tool opt-in)"
-assert "grep -q 'disable-model-invocation: true' '$root/commands/pb-workflow.md'" "pb-workflow.md is user-only (disable-model-invocation: the Workflow-tool opt-in)"
 
 exit $fail

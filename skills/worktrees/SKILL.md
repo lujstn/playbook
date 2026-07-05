@@ -1,6 +1,6 @@
 ---
 name: worktrees
-description: Triggers on /worktrees or /pb-worktrees. Sets up a git worktree under .worktrees/ on a dedicated branch and assigns it an instance number so parallel Claude Code sessions can run isolated resources (databases, dev-server ports, cache namespaces) without collision. This is for the human running multiple Claude sessions at once, not for subagent parallelism inside one session.
+description: Triggers on /worktrees. Sets up a git worktree under .worktrees/ on a dedicated branch and assigns it an instance number so parallel Claude Code sessions can run isolated resources (databases, dev-server ports, cache namespaces) without collision. This is for the human running multiple Claude sessions at once, not for subagent parallelism inside one session.
 ---
 
 # Worktrees
@@ -14,7 +14,7 @@ This is distinct from interns or hackathon mode. Those fan work across subagents
 Announce at entry:
 
 ```
-🌿 Playbook · worktrees: <one-line description of what this worktree is for>
+🌿 **Playbook** `worktrees` *<one-line description of what this worktree is for>*
 ```
 
 ## When to use
@@ -88,7 +88,7 @@ Fill in only the variables relevant to the detected stack. This file is read by 
 Print a short block:
 
 ```
-🌿 Playbook · worktrees: created .worktrees/<slug>-2 on branch <slug>-2 (instance 2)
+🌿 **Playbook** `worktrees` *created .worktrees/<slug>-2 on branch <slug>-2 (instance 2)*
 
 Resources isolated for this session:
   DB port:       5433

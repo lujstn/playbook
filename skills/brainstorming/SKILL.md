@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming or /pb-brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off into the engine's routed mode. Does not write a design-doc artefact unless asked, and never starts building inside brainstorming.
+description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off into the engine's routed mode. Does not write a design-doc artefact unless asked, and never starts building inside brainstorming.
 ---
 
 # Brainstorming
@@ -12,14 +12,14 @@ Brainstorming is the explore-and-converge phase that runs before routing. It est
 Announce at entry:
 
 ```
-🧭 Playbook · brainstorming: <one-line summary of what is being explored>
+🧭 **Playbook** `brainstorming` *<one-line summary of what is being explored>*
 ```
 
 ## When it triggers
 
 **Auto:** the prompt is fuzzy, open-ended, or explicitly ideation-first: the user says "let's explore", "I'm not sure how to approach this", "what should we build", "help me think through", or otherwise opens with a question rather than a specification. If the intent is clear and buildable immediately, skip brainstorming and route directly.
 
-**Explicit:** `/brainstorming` or `/pb-brainstorming`. Prefer the `/pb-` form if another tool owns the bare name.
+**Explicit:** `/brainstorming` (alias `/playbook:brainstorming`, for when another tool owns the bare name).
 
 ## The method
 

@@ -19,9 +19,9 @@ grep -q 'execute on Sonnet' <<<"$ctx" && grep -q 'plan and review' <<<"$ctx" \
 grep -q 'auto-compact is seamless' <<<"$ctx" && grep -q 'Do not wrap up early' <<<"$ctx" \
   && echo "PASS: context-calm doctrine in overlay" \
   || { echo "FAIL: context-calm doctrine missing"; exit 1; }
-grep -qF 'Playbook · ' <<<"$ctx" \
-  && echo "PASS: Playbook middot brand convention in overlay" \
-  || { echo "FAIL: Playbook middot brand missing"; exit 1; }
+grep -qF '**Playbook**' <<<"$ctx" \
+  && echo "PASS: bold Playbook brand convention in overlay" \
+  || { echo "FAIL: bold Playbook brand missing"; exit 1; }
 jq -e . <<<"$out" >/dev/null && echo "PASS: valid JSON" || { echo FAIL json; exit 1; }
 
 # SubagentStart: the same overlay must reach a spawned subagent, and the
