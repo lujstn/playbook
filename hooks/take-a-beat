@@ -115,7 +115,7 @@ case "$event" in
       # First-run doorbell: suggest the setup check once ever per machine.
       gdir="${PLAYBOOK_GLOBAL_DIR:-${HOME}/.claude/playbook}"
       if [ ! -f "${gdir}/setup" ] && [ ! -f "${gdir}/setup-nudged" ]; then
-        nudge="Playbook setup has not run on this machine. At a natural pause in your first reply, add one short line suggesting the user type /playbook so Playbook can check once for plugin conflicts (hooks that re-prompt on Stop or inject context-limit warnings), confirm jq, and optionally set up offline notifications. Do not run the check unasked, and do not repeat the suggestion on later turns."
+        nudge="Playbook setup has not run on this machine. At a natural pause in your first reply, add one short line suggesting the user type /playbook:hello so Playbook can introduce itself and, with their permission, check once for plugin conflicts (hooks that re-prompt on Stop or inject context-limit warnings), confirm jq, and optionally set up offline notifications. Do not run the check unasked, and do not repeat the suggestion on later turns."
         if [ -n "$body" ]; then body="${body}
 
 ${nudge}"; else body="$nudge"; fi

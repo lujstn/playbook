@@ -13,7 +13,7 @@ Playbook is a Claude Code plugin, so setup is two lines inside Claude Code:
 /plugin install playbook
 ```
 
-You'll know it's live when you see `📚 Playbook skills available in this session` in your chat.
+You'll know it's live when you see `📚 Playbook skills available in this session` in your chat. Say `/playbook:hello` any time to have it introduce itself, check its pulse, and (the first time on a machine) look for plugin conflicts.
 
 You don't need to install anything else, but it's worth having `jq` for goal recovery and smooth compactions. It's on most machines already, and Playbook will tell you if it isn't.
 
@@ -36,7 +36,9 @@ Everything below is one of those jobs done properly, and they all matter; the de
 
 ## Commands
 
-Every command also answers to its namespaced `/playbook:*` form, which behaves identically; if another tool already owns the plain name, use that one.
+Start with `/playbook:hello`. It says hi, reports Playbook's pulse (whether it's active, the current mode, the model split, offline on or off) and, the first time on a machine, offers a read-only check for plugin conflicts. It's also where offline notifications get set up. Run it whenever you like.
+
+The rest are verbs. Each also answers to its namespaced `/playbook:*` form, which behaves identically; if another tool already owns the plain name, use that one.
 
 | Command          | Alias                       | What it does                                                 |
 | ---------------- | --------------------------- | ------------------------------------------------------------ |
@@ -46,7 +48,6 @@ Every command also answers to its namespaced `/playbook:*` form, which behaves i
 | `/workflow`      | `/playbook:workflow`        | ⚙️ run this task as a dynamic workflow, carrying the North Star and the model rule into the script |
 | `/fix`           | `/playbook:fix`             | 🦞 strict, production-ready fix protocol, typed for the stack and validated at the boundaries |
 | `/debug`         | `/playbook:debug`           | 👾 a strict read, summarise, diagnose, confirm debugging cycle |
-| `/playbook`      | `/pb`                       | a status heartbeat: whether Playbook is active, which mode, which model split, offline on or off; its first run also checks your machine for plugin conflicts |
 
 ## The nine tenets
 
@@ -142,7 +143,7 @@ For when **you** want to run several Claude Code sessions at once. This is for h
 
 ### 🧰 First-run setup
 
-The first time you type `/playbook` on a machine, it has a quick look around before doing anything else. A few plugins out there genuinely fight Playbook (the classic ones re-prompt Claude every time it tries to stop, or scare it near the context limit), so it spots those, shows you the evidence, and offers to sort them out. It'll also make sure you've got `jq`, and offer to set up notifications if you fancy offline mode.
+The first time you type `/playbook:hello` on a machine, it introduces itself and asks permission before it does anything else. Say yes and it takes a quick read-only look around. A few plugins out there genuinely fight Playbook (the classic ones re-prompt Claude every time it tries to stop, or scare it near the context limit), so it spots those, shows you the evidence, and offers to sort them out. It'll also make sure you've got `jq`, and offer to set up notifications if you fancy offline mode.
 
 Nothing happens without your say-so: it asks about each change, backs up your settings first, and only ever disables, never uninstalls. It's biased towards leaving your stuff alone, and at the end it offers a wider health check of your Claude Code setup, which you're free to decline. Run `/playbook:setup` whenever you want to do it again.
 

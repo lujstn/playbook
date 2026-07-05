@@ -22,6 +22,9 @@ grep -q 'auto-compact is seamless' <<<"$ctx" && grep -q 'Do not wrap up early' <
 grep -qF '**Playbook**' <<<"$ctx" \
   && echo "PASS: bold Playbook brand convention in overlay" \
   || { echo "FAIL: bold Playbook brand missing"; exit 1; }
+{ grep -q 'Playbook liveness' <<<"$ctx" && grep -q 'last line of your first reply' <<<"$ctx"; } \
+  && echo "PASS: liveness line anchored to the end of the first reply" \
+  || { echo "FAIL: liveness placement wording missing"; exit 1; }
 jq -e . <<<"$out" >/dev/null && echo "PASS: valid JSON" || { echo FAIL json; exit 1; }
 
 # SubagentStart: the same overlay must reach a spawned subagent, and the

@@ -112,7 +112,7 @@ iso
 nh="$(mktemp -d)"; gd="$(mktemp -d)"
 out="$(HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"nudge1"}' \
   | HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" bash "$H")"
-{ grep -q "type /playbook" <<<"$out" && [ -f "$gd/setup-nudged" ]; } \
+{ grep -q "type /playbook:hello" <<<"$out" && [ -f "$gd/setup-nudged" ]; } \
   && echo "PASS: first-run doorbell fires and writes its once-ever marker" \
   || { echo "FAIL doorbell: [$out]"; rm -rf "$nh" "$gd" "$PLAYBOOK_STATE_DIR"; exit 1; }
 out2="$(HOME="$nh" PLAYBOOK_GLOBAL_DIR="$gd" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"nudge1"}' \

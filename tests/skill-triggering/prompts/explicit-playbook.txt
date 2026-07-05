@@ -1,1 +1,1 @@
-/playbook help me ship a small fix
+/playbook:hello help me ship a small fix

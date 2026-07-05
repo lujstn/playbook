@@ -58,8 +58,7 @@ targets=( "$root"/skills/playbook/SKILL.md \
           "$root"/skills/setup/SKILL.md \
           "$root"/skills/offline-mode/decision-log.html.tmpl \
           "$root"/commands/workflow.md \
-          "$root"/commands/pb.md \
-          "$root"/commands/playbook.md )
+          "$root"/commands/hello.md )
 for f in "${targets[@]}"; do
   rel="${f#"$root"/}"
   # A missing target would make every negative grep below pass vacuously (grep on
@@ -96,9 +95,23 @@ chk "grep -qF '🧰 **Playbook**' '$SU'" "setup skill announces with the branded
 chk "grep -qi 'never uninstall' '$SU'" "setup skill never uninstalls"
 chk "grep -qiE 'back(ed)? up|backup' '$SU'" "setup skill requires a settings backup"
 chk "grep -qi 'never execute another plugin' '$SU'" "setup skill reads other plugins, never runs them"
-chk "grep -q 'playbook:setup' '$root/commands/pb.md'" "pb command gates through the setup skill"
-chk "grep -q 'playbook:setup' '$root/commands/playbook.md'" "playbook command gates through the setup skill"
-chk "diff -q '$root/commands/pb.md' '$root/commands/playbook.md'" "pb and playbook commands are identical twins"
+
+# Consent gate: the first-run audit must introduce itself and ask before it
+# reads anything, and it must offer real decline paths. This is the live-run
+# regression: the old flow dived straight into reading other plugins' scripts
+# with no intro and no consent.
+chk "grep -qi 'introduce yourself and ask first' '$SU'" "setup skill introduces and asks before auditing"
+chk "grep -qiE 'strictly read-only|read-only look' '$SU'" "setup skill promises a read-only first look"
+chk "grep -qF '**not now**' '$SU'" "setup skill offers a 'not now' decline"
+chk "grep -qF '**never**' '$SU'" "setup skill offers a 'never' decline"
+intro_ln=$(grep -n 'introduce yourself and ask first' "$SU" | head -1 | cut -d: -f1)
+gather_ln=$(grep -n 'gather the facts' "$SU" | head -1 | cut -d: -f1)
+{ [ -n "$intro_ln" ] && [ -n "$gather_ln" ] && [ "$intro_ln" -lt "$gather_ln" ]; } \
+  && echo "PASS: the setup consent gate precedes the audit" \
+  || { echo "FAIL: the setup audit is not gated behind the intro"; fail=1; }
+
+chk "grep -q 'playbook:setup' '$root/commands/hello.md'" "hello command gates through the setup skill"
+chk "[ ! -f '$root/commands/pb.md' ] && [ ! -f '$root/commands/playbook.md' ]" "the pb/playbook twins are gone; hello is the single entry point"
 
 # The Stop-pulse hook is gone entirely; the seam itself, not its frequency, was
 # the defect, so nothing should remain on Stop.
