@@ -9,6 +9,8 @@ assert "jq -e '.name == \"playbook\"' '$root/.claude-plugin/plugin.json'" "plugi
 assert "jq -e '.version and .description and .license' '$root/.claude-plugin/plugin.json'" "plugin.json has core metadata"
 assert "jq -e 'has(\"skills\") | not' '$root/.claude-plugin/plugin.json'" "plugin.json does NOT list skills (directory discovery)"
 assert "jq -e '.plugins[0].name == \"playbook\" and .plugins[0].source == \"./\"' '$root/.claude-plugin/marketplace.json'" "marketplace lists playbook at ./"
+assert "jq -e '.name == \"lujstn-playbook\"' '$root/.claude-plugin/marketplace.json'" "marketplace name is the production lujstn-playbook (not playbook-dev)"
+assert "jq -e '.name | test(\"^[a-z0-9-]+$\")' '$root/.claude-plugin/marketplace.json'" "marketplace name is valid kebab-case (no @ or / that would break plugin@marketplace refs)"
 assert "[ \"\$(jq -r '.version' '$root/.claude-plugin/plugin.json')\" = \"\$(jq -r '.plugins[0].version' '$root/.claude-plugin/marketplace.json')\" ]" "plugin.json and marketplace.json versions match"
 
 assert "! jq -e '.hooks.Stop' '$root/hooks/hooks.json'" "nothing registered on Stop (the pulse seam is removed)"
