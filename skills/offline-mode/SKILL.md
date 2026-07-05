@@ -54,28 +54,15 @@ Two providers are supported. Config is read from the machine-global `~/.claude/p
 
 ## Provider setup
 
-### First-run setup: Pushover
+First-time setup is a guided walkthrough, shared with `/playbook:setup`, in `notify-setup.md` (this skill's directory). It asks whether the phone is iPhone or Android, explains ntfy (free) versus Pushover (a one-off cost, better iOS wake-through) in plain words, configures the chosen one globally under `~/.claude/playbook/`, offers an Android QR to subscribe in one tap, and finishes by sending a live test ping. Follow it step by step.
 
-1. Create an account at pushover.net and note the User Key shown on the dashboard.
-2. Register a new application at pushover.net/apps/build to obtain an API Token/Key.
-3. Install the Pushover app on your phone and sign in.
-4. In the Pushover app settings, enable Critical Alerts (High and/or Emergency) and accept the iOS prompt when it appears. Without this step, priority-2 messages will not bypass DND.
-5. Save the API token to `~/.claude/playbook/pushover-token` (one line, no quotes).
-6. Save the User Key to `~/.claude/playbook/pushover-user` (one line, no quotes).
-7. Save `pushover` to `~/.claude/playbook/notify-provider`.
+**Offer it, do not assume it.** The first time offline mode needs a channel and none is configured (no `notify-provider` or `ntfy-topic` resolves), offer setup as yes / not now / never, the same three-way choice as the first-run `/playbook:hello`:
 
-That global config applies to every project. To point one project at a different account, drop the same files in that project's gitignored `.claude/playbook/` and they take precedence. From then on, `scripts/notify` reads them and sends via the Pushover API.
+- **yes**: walk the user through `notify-setup.md`.
+- **not now**: run this session without notifications and offer again another time.
+- **never**: write `skipped` to `~/.claude/playbook/notify` and do not offer again unprompted; the user can still set it up later by asking or via `/playbook:setup`.
 
-### First-run setup: ntfy
-
-1. Choose a topic string (a random or memorable identifier; treat it like a password since the URL is the only access control).
-2. Visit `https://ntfy.sh/<your-topic>` to confirm the endpoint exists.
-3. Download the ntfy app and subscribe to that topic.
-4. Save the topic string to `~/.claude/playbook/ntfy-topic` (one line, no quotes).
-5. Optionally save a self-hosted server URL to `~/.claude/playbook/ntfy-server`; the default is `https://ntfy.sh`.
-6. Optionally save `ntfy` to `~/.claude/playbook/notify-provider` (or omit it and let the script detect the topic file).
-
-That global config applies to every project; a project's own gitignored `.claude/playbook/` files override it.
+If a channel is already configured, or `~/.claude/playbook/notify` already reads `skipped`, skip the offer and carry on.
 
 ---
 

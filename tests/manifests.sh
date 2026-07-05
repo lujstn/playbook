@@ -27,6 +27,7 @@ assert "[ -f '$root/commands/workflow.md' ]" "commands/workflow.md present"
 assert "[ -f '$root/commands/hello.md' ]" "commands/hello.md present (the /playbook:hello entry point)"
 assert "[ ! -f '$root/commands/pb.md' ] && [ ! -f '$root/commands/playbook.md' ]" "the pb/playbook heartbeat twins are gone (single hello command)"
 assert "[ -f '$root/skills/setup/SKILL.md' ]" "setup skill present"
+assert "[ -f '$root/skills/offline-mode/notify-setup.md' ]" "guided notification walkthrough present"
 assert "[ -z \"\$(ls '$root'/commands/pb-*.md 2>/dev/null)\" ]" "no pb-* command files remain (plain and playbook: forms only)"
 assert "grep -q 'disable-model-invocation: true' '$root/commands/workflow.md'" "workflow.md is user-only (disable-model-invocation: the Workflow-tool opt-in)"
 

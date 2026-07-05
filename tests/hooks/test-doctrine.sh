@@ -39,6 +39,21 @@ chk "grep -qi 'gated by your in-session unease\\|gated by the in-session unease'
 chk "grep -q '^# Offline Mode' '$O'" "offline-mode H1 has no embedded marker"
 chk "grep -qF '📴 **Playbook**' '$O'" "offline-mode announce uses the branded bold marker"
 
+# Guided notification walkthrough: friendly, platform-aware, both providers, the
+# Android QR, a 32-char no-prefix topic, and a live test to confirm delivery.
+NS="$root/skills/offline-mode/notify-setup.md"
+chk "grep -qi 'iphone or android' '$NS'" "notify guide asks iPhone or Android first"
+chk "grep -qi 'ntfy' '$NS' && grep -qi 'pushover' '$NS'" "notify guide covers both providers"
+chk "grep -q 'qrencode' '$NS'" "notify guide offers the Android QR subscribe"
+chk "grep -qiE 'live test|test ping|send one real notification' '$NS'" "notify guide ends with a live test ping"
+chk "grep -q 'head -c 32' '$NS'" "notify guide generates a 32-char random topic"
+chk "grep -q 'ntfy-topic' '$NS' && grep -q 'notify-provider' '$NS'" "notify guide writes the global config keys"
+chk "grep -q '~/.claude/playbook/' '$NS'" "notify guide configures globally by default"
+# Both entry points hand into the one shared walkthrough with a skippable gate.
+chk "grep -q 'notify-setup.md' '$root/skills/setup/SKILL.md'" "setup skill hands into the guided notification walkthrough"
+chk "grep -q 'notify-setup.md' '$O'" "offline-mode hands into the guided notification walkthrough"
+chk "grep -q 'not now' '$root/skills/setup/SKILL.md' && grep -q 'never' '$root/skills/setup/SKILL.md'" "setup notification offer is yes / not now / never"
+
 H="$root/skills/hackathon-team/SKILL.md"
 chk "! grep -qE '(^|[^-])design\\.md' '$H'" "hackathon-team no bare lowercase design.md vestige"
 chk "! grep -q 'DESIGN\\.md' '$H'" "hackathon-team no stale DESIGN.md reference"
@@ -56,6 +71,7 @@ targets=( "$root"/skills/playbook/SKILL.md \
           "$root"/skills/fix-mode/SKILL.md \
           "$root"/skills/debug-mode/SKILL.md \
           "$root"/skills/setup/SKILL.md \
+          "$root"/skills/offline-mode/notify-setup.md \
           "$root"/skills/offline-mode/decision-log.html.tmpl \
           "$root"/commands/workflow.md \
           "$root"/commands/hello.md )
