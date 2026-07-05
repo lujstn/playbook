@@ -95,6 +95,7 @@ chk "grep -qF '🧰 **Playbook**' '$SU'" "setup skill announces with the branded
 chk "grep -qi 'never uninstall' '$SU'" "setup skill never uninstalls"
 chk "grep -qiE 'back(ed)? up|backup' '$SU'" "setup skill requires a settings backup"
 chk "grep -qi 'never execute another plugin' '$SU'" "setup skill reads other plugins, never runs them"
+chk "grep -qF '**Want a broader health check' '$SU'" "setup skill offers the wider health check in bold after the audit"
 
 # Consent gate: the first-run audit must introduce itself and ask before it
 # reads anything, and it must offer real decline paths. This is the live-run
@@ -112,6 +113,13 @@ gather_ln=$(grep -n 'gather the facts' "$SU" | head -1 | cut -d: -f1)
 
 chk "grep -q 'playbook:setup' '$root/commands/hello.md'" "hello command gates through the setup skill"
 chk "[ ! -f '$root/commands/pb.md' ] && [ ! -f '$root/commands/playbook.md' ]" "the pb/playbook twins are gone; hello is the single entry point"
+
+# Internal, model-only skills must stay out of the user's slash menu. The engine
+# especially: without this, typing /playbook resolves to /playbook:playbook (the
+# engine) instead of the /playbook:hello entry point. They stay model-invocable.
+for internal in playbook model-rule gsd-mode hackathon-team; do
+  chk "grep -q 'user-invocable: false' '$root/skills/$internal/SKILL.md'" "skills/$internal is hidden from the / menu (model-invocable only)"
+done
 
 # The Stop-pulse hook is gone entirely; the seam itself, not its frequency, was
 # the defect, so nothing should remain on Stop.

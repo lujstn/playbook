@@ -1,7 +1,7 @@
 {
   "name": "playbook",
   "description": "Native, invisible-but-visible Claude Code steering layer: task-fit routing across five modes with visible markers, restraint that keeps ultracode from over-reaching for workflows, an always-on Sonnet-execute and Opus-review model rule, calm compaction that stops agents fearing the context limit, and offline notifications via Pushover or ntfy.",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "author": {
     "name": "Lucas Johnston Kurilov",
     "email": "lucas@buildin.london"

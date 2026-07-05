@@ -44,7 +44,7 @@ The choice is not persisted and is not inferred from any previous run. The user 
 
 ## Notification provider
 
-Two providers are supported. The chosen provider is read from `.claude/playbook/notify-provider` (values: `pushover` or `ntfy`). If that file is absent but `.claude/playbook/ntfy-topic` exists, ntfy is used.
+Two providers are supported. Config is read from the machine-global `~/.claude/playbook/` unless the current project keeps its own `.claude/playbook/` files, which override it, so ntfy or Pushover can be set up once and reused everywhere. The provider comes from `notify-provider` (values: `pushover` or `ntfy`); if that is absent but an `ntfy-topic` exists, ntfy is used.
 
 **Pushover is the recommended choice for iOS users.** Pushover holds an Apple Critical Alerts entitlement; when the user enables Critical Alerts in the app, a priority-2 message bypasses Do Not Disturb and Focus modes reliably. This is guaranteed by Apple's entitlement grant, not a best-effort signal.
 
@@ -60,22 +60,22 @@ Two providers are supported. The chosen provider is read from `.claude/playbook/
 2. Register a new application at pushover.net/apps/build to obtain an API Token/Key.
 3. Install the Pushover app on your phone and sign in.
 4. In the Pushover app settings, enable Critical Alerts (High and/or Emergency) and accept the iOS prompt when it appears. Without this step, priority-2 messages will not bypass DND.
-5. Save the API token to `.claude/playbook/pushover-token` (one line, no quotes).
-6. Save the User Key to `.claude/playbook/pushover-user` (one line, no quotes).
-7. Save `pushover` to `.claude/playbook/notify-provider`.
+5. Save the API token to `~/.claude/playbook/pushover-token` (one line, no quotes).
+6. Save the User Key to `~/.claude/playbook/pushover-user` (one line, no quotes).
+7. Save `pushover` to `~/.claude/playbook/notify-provider`.
 
-Both files are gitignored. From then on, `scripts/notify` reads them and sends via the Pushover API.
+That global config applies to every project. To point one project at a different account, drop the same files in that project's gitignored `.claude/playbook/` and they take precedence. From then on, `scripts/notify` reads them and sends via the Pushover API.
 
 ### First-run setup: ntfy
 
 1. Choose a topic string (a random or memorable identifier; treat it like a password since the URL is the only access control).
 2. Visit `https://ntfy.sh/<your-topic>` to confirm the endpoint exists.
 3. Download the ntfy app and subscribe to that topic.
-4. Save the topic string to `.claude/playbook/ntfy-topic` (one line, no quotes).
-5. Optionally save a self-hosted server URL to `.claude/playbook/ntfy-server`; the default is `https://ntfy.sh`.
-6. Optionally save `ntfy` to `.claude/playbook/notify-provider` (or omit it and let the script detect the topic file).
+4. Save the topic string to `~/.claude/playbook/ntfy-topic` (one line, no quotes).
+5. Optionally save a self-hosted server URL to `~/.claude/playbook/ntfy-server`; the default is `https://ntfy.sh`.
+6. Optionally save `ntfy` to `~/.claude/playbook/notify-provider` (or omit it and let the script detect the topic file).
 
-Both files are gitignored.
+That global config applies to every project; a project's own gitignored `.claude/playbook/` files override it.
 
 ---
 
@@ -143,11 +143,13 @@ The skill specifies a single integration point: the `scripts/notify` contract sh
 
 The script is invoked at the notify-and-wait step (ladder step 1) when the work blocks while offline mode is active and option A was declared this run, and again for any further send that the decision log records. Under option B (waiting disabled) the notify-and-wait step is skipped, so `notify` is not called for the block.
 
-**Provider selection.** `scripts/notify` reads `.claude/playbook/notify-provider` to choose between `pushover` and `ntfy`. If that file is absent but `.claude/playbook/ntfy-topic` exists, ntfy is used.
+**Config resolution.** Every key below is read from the project's `.claude/playbook/` first, then the machine-global `~/.claude/playbook/`. A project file overrides the global one for that key, so notifications are configured once globally and only overridden where a project needs its own account or topic.
 
-**ntfy config.** Topic at `.claude/playbook/ntfy-topic`. Optional server override at `.claude/playbook/ntfy-server` (default `https://ntfy.sh`).
+**Provider selection.** `scripts/notify` reads `notify-provider` to choose between `pushover` and `ntfy`. If that file is absent but an `ntfy-topic` exists, ntfy is used.
 
-**Pushover config.** App token at `.claude/playbook/pushover-token`. User key at `.claude/playbook/pushover-user`. Emergency (priority 2 / `--level critical`) requires retry and expire fields; the script sets `retry=60` and `expire=1800` automatically. A critical send returns a `receipt` token in the Pushover API response; `scripts/notify` captures it to `.claude/playbook/last-receipt` (overwritten on each critical send). Wiring this receipt into an acknowledgement-polling loop is a future step: the file is capture-only for now.
+**ntfy config.** Topic at `ntfy-topic`. Optional server override at `ntfy-server` (default `https://ntfy.sh`).
+
+**Pushover config.** App token at `pushover-token`. User key at `pushover-user`. Emergency (priority 2 / `--level critical`) requires retry and expire fields; the script sets `retry=60` and `expire=1800` automatically. A critical send returns a `receipt` token in the Pushover API response; `scripts/notify` captures it to the project's `.claude/playbook/last-receipt` (overwritten on each critical send). Wiring this receipt into an acknowledgement-polling loop is a future step: the file is capture-only for now.
 
 **Remote-control deep-link.** When `/remote-control` is active in the live session, the notification carries a tappable link that opens the recovered session URL straight from the lock screen (ntfy: Click header; Pushover: url field). The URL is read from the current transcript (the latest record of `type=="system"` and `subtype=="bridge_status"` whose content carries `is active`). When the bridge is inactive or absent the link is omitted: silent degradation, never a wrong link. `--link <url>` attaches an explicit URL instead.
 

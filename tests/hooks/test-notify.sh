@@ -14,6 +14,12 @@ source "$root/hooks/lib/playbook-common.sh"
 sandbox="$(mktemp -d)"
 trap 'rm -rf "$sandbox"' EXIT
 
+# Isolate the machine-global notification config so these tests never read the
+# tester's real ~/.claude/playbook (which the new global fallback would otherwise
+# reach). Global-config tests below point PLAYBOOK_GLOBAL_DIR at a populated dir.
+export PLAYBOOK_GLOBAL_DIR="$sandbox/global-empty"
+mkdir -p "$PLAYBOOK_GLOBAL_DIR"
+
 # --- unit: helpers --------------------------------------------------------
 
 proj="$sandbox/proj"
@@ -364,3 +370,49 @@ run_notify --level info "Just an update" >/dev/null
 [ ! -f "$proj/.claude/playbook/last-receipt" ] \
   && echo "PASS: non-critical send does not write last-receipt" \
   || { echo "FAIL: last-receipt unexpectedly created on non-critical send"; exit 1; }
+
+# --- global notification config: set once, override per project -----------
+# Every config key falls back to the machine-global dir when the project has no
+# file of its own, and a project file overrides the global value for that key.
+gdir="$sandbox/global-populated"
+mkdir -p "$gdir"
+printf 'global-topic\n' > "$gdir/ntfy-topic"
+printf 'pushover\n'     > "$gdir/notify-provider"
+printf 'gtoken\n'       > "$gdir/pushover-token"
+printf 'guser\n'        > "$gdir/pushover-user"
+
+noconf="$sandbox/noconf"; mkdir -p "$noconf"     # a project with no .claude/playbook
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_ntfy_topic "$noconf")" = "global-topic" ] \
+  && echo "PASS: ntfy-topic falls back to global config" \
+  || { echo "FAIL: global ntfy-topic not read"; exit 1; }
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_notify_provider "$noconf")" = "pushover" ] \
+  && echo "PASS: notify-provider falls back to global config" \
+  || { echo "FAIL: global provider not read"; exit 1; }
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_pushover_token "$noconf")" = "gtoken" ] \
+  && echo "PASS: pushover-token falls back to global config" \
+  || { echo "FAIL: global token not read"; exit 1; }
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_pushover_user "$noconf")" = "guser" ] \
+  && echo "PASS: pushover-user falls back to global config" \
+  || { echo "FAIL: global user not read"; exit 1; }
+
+ovr="$sandbox/ovr"; mkdir -p "$ovr/.claude/playbook"
+printf 'project-topic\n' > "$ovr/.claude/playbook/ntfy-topic"
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_ntfy_topic "$ovr")" = "project-topic" ] \
+  && echo "PASS: a project ntfy-topic overrides the global one" \
+  || { echo "FAIL: project override not honoured"; exit 1; }
+[ "$(PLAYBOOK_GLOBAL_DIR="$gdir" playbook_notify_provider "$ovr")" = "pushover" ] \
+  && echo "PASS: keys the project omits still come from global" \
+  || { echo "FAIL: global fall-through for an unset project key broke"; exit 1; }
+
+[ -z "$(PLAYBOOK_GLOBAL_DIR="$sandbox/global-empty" playbook_ntfy_topic "$noconf")" ] \
+  && echo "PASS: no project config and an empty global dir yields empty" \
+  || { echo "FAIL: absent config did not yield empty"; exit 1; }
+
+# End-to-end: scripts/notify sends using global config alone, no project files.
+gproj="$sandbox/gproj"; mkdir -p "$gproj"
+rm -f "$LOG"
+CURL_LOG="$LOG" HOME="$fake_home" PLAYBOOK_GLOBAL_DIR="$gdir" PATH="$stub_bin:$PATH" \
+  bash -c "cd '$gproj' && '$NOTIFY' 'Global send' 'via global config'" >/dev/null 2>&1
+{ grep -qx '  token=gtoken' "$LOG" && grep -qx '  user=guser' "$LOG"; } \
+  && echo "PASS: scripts/notify sends via global Pushover creds when the project has no config" \
+  || { echo "FAIL: global-config send wrong in [$(cat "$LOG" 2>/dev/null)]"; exit 1; }

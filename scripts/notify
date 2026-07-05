@@ -11,17 +11,20 @@
 # Title format: "📚 <Level>: <headline>" (the text shown on the lock screen).
 # Detail defaults to the headline when omitted.
 #
-# Provider is read from .claude/playbook/notify-provider (values: pushover|ntfy).
-# If that file is absent but .claude/playbook/ntfy-topic exists, ntfy is used.
+# Config is read from the project's .claude/playbook/ first, then the machine-
+# global ~/.claude/playbook/ (set once, applies everywhere; a project file
+# overrides). Provider comes from notify-provider (values: pushover|ntfy); if
+# that is absent but an ntfy-topic exists, ntfy is used.
 #
 # Level mapping:
 #   info     -> ntfy Priority 3 / Pushover priority 0
 #   action   -> ntfy Priority 4 / Pushover priority 1
 #   critical -> ntfy Priority 5 / Pushover priority 2 (retry=60 expire=1800 sound=siren)
 #
-# Pushover creds: .claude/playbook/pushover-token and .claude/playbook/pushover-user.
-# ntfy topic:     .claude/playbook/ntfy-topic
-# ntfy server:    .claude/playbook/ntfy-server (default https://ntfy.sh)
+# Keys (in project .claude/playbook/ or global ~/.claude/playbook/):
+#   Pushover creds: pushover-token and pushover-user
+#   ntfy topic:     ntfy-topic
+#   ntfy server:    ntfy-server (default https://ntfy.sh)
 #
 # When /remote-control is active in the current session, a tappable deep-link
 # is attached (ntfy: Click header; Pushover: url field). --link overrides it
@@ -51,9 +54,8 @@ Usage: notify [--level info|action|critical] [--link <url>]
   --link <url>      attach a tappable URL to the notification
 
 Back-compat: --category=action and --category=info are accepted as aliases.
-Provider is read from .claude/playbook/notify-provider (pushover|ntfy).
-Pushover creds: .claude/playbook/pushover-token and .claude/playbook/pushover-user.
-ntfy topic:     .claude/playbook/ntfy-topic
+Config: project .claude/playbook/ first, then global ~/.claude/playbook/.
+  notify-provider (pushover|ntfy); pushover-token + pushover-user; ntfy-topic.
 EOF
   exit 64
 }
@@ -115,7 +117,7 @@ case "$PROVIDER" in
   ntfy)
     TOPIC="$(playbook_ntfy_topic "$PWD")"
     if [ -z "$TOPIC" ]; then
-      echo "ERROR: no ntfy topic configured. Save your topic to .claude/playbook/ntfy-topic." >&2
+      echo "ERROR: no ntfy topic configured. Save it to ~/.claude/playbook/ntfy-topic (global) or .claude/playbook/ntfy-topic (this project)." >&2
       exit 4
     fi
     SERVER="$(playbook_ntfy_server "$PWD")"
@@ -135,7 +137,7 @@ case "$PROVIDER" in
     TOKEN="$(playbook_pushover_token "$PWD")"
     USER_KEY="$(playbook_pushover_user "$PWD")"
     if [ -z "$TOKEN" ] || [ -z "$USER_KEY" ]; then
-      echo "ERROR: Pushover credentials missing. Save your app token to .claude/playbook/pushover-token and your user key to .claude/playbook/pushover-user." >&2
+      echo "ERROR: Pushover credentials missing. Save pushover-token and pushover-user under ~/.claude/playbook/ (global) or .claude/playbook/ (this project)." >&2
       exit 4
     fi
 
@@ -184,7 +186,7 @@ case "$PROVIDER" in
     ;;
 
   *)
-    echo "ERROR: no notification provider configured. Save 'pushover' or 'ntfy' to .claude/playbook/notify-provider." >&2
+    echo "ERROR: no notification provider configured. Save 'pushover' or 'ntfy' to ~/.claude/playbook/notify-provider (global) or .claude/playbook/notify-provider (this project)." >&2
     exit 4
     ;;
 esac

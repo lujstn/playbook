@@ -1,6 +1,7 @@
 ---
 name: model-rule
 description: Always-on model selection doctrine; never entered or exited, never inferred off. Sonnet executes; Opus plans, reviews, and thinks hard; bump up a tier when stuck. Propagates across every nesting level via the session overlay and explicit model params on each dispatch. This skill is the detailed reference; the rule itself is stated in the overlay for every agent and subagent.
+user-invocable: false
 ---
 
 This is always-live doctrine, not a mode. It is carried in the session overlay and the SubagentStart overlay so every agent, subagent, and workflow stage operates under it automatically. Nothing here is turned on or off.

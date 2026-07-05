@@ -77,7 +77,7 @@ Worked examples, as illustrations of the reasoning rather than a list to match a
 
 - **jq**: if missing, offer the installer for the detected OS (`brew install jq`, `apt-get install jq`, `dnf install jq`, `pacman -S jq`, or `winget install jqlang.jq`), and run it only with consent.
 - **GSD**: only mention it if it is absent and the user cares about the `gsd` mode (`npx get-shit-done-cc@latest`). It is not a Playbook prerequisite.
-- **Offline notifications**: check the project's `.claude/playbook/` for a `notify-provider` (with `ntfy-topic` or `pushover-token` and `pushover-user`). If unconfigured, offer to set up Pushover or ntfy now, following `scripts/notify`, or to defer; deferring is a fine answer, and offline mode will prompt again when it is actually enabled. Note that this config is per project, so set it up in the project the user will run offline mode from.
+- **Offline notifications**: check for a notification config, the machine-global `~/.claude/playbook/` first, then the current project's `.claude/playbook/` (a `notify-provider` with an `ntfy-topic`, or `pushover-token` and `pushover-user`). If nothing is set up, offer to configure Pushover or ntfy now, following `scripts/notify`, or to defer; deferring is a fine answer, and offline mode will prompt again when it is actually enabled. Set it up globally by default (in `~/.claude/playbook/`) so it applies to every project, and mention that a single project can override it later by dropping its own files in `.claude/playbook/`.
 
 ## Step 5: record the check
 
@@ -90,7 +90,14 @@ mkdir -p ~/.claude/playbook
 
 ## Step 6: offer the health check
 
-Setup proper ends there. Close by offering an optional, wider Claude Code health check, and run it only if the user says yes: plugin updates available (`/plugin`), duplicate or dead marketplaces, long-disabled plugins worth uninstalling, whether a statusline is configured, and whether auto-updates are on. All of it is advice; the consent rules above still apply to any change.
+Setup proper ends there. Close by printing this offer as written, then stop and wait for the answer:
+
+> **Want a broader health check while I'm here?** A quick read-only look over the rest of your Claude Code setup: missing plugin updates, duplicate or dead marketplaces, plugins you disabled long ago and could remove, whether you have a statusline, and whether auto-updates are on. All advice, and nothing changes without your say-so.
+>
+> - **yes**: run the health check
+> - **no thanks**: all done
+
+Only on yes, run the read-only check and report what you find: plugin updates available (`/plugin`), duplicate or dead marketplaces, long-disabled plugins worth uninstalling, whether a statusline is configured, and whether auto-updates are on. All of it is advice; the consent rules above still apply to any change.
 
 ## Red flags
 

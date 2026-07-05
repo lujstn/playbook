@@ -1,6 +1,7 @@
 ---
 name: hackathon-team
 description: Use when coupled work in one shared codebase needs peers that talk to each other directly with lightweight coordination, after the playbook engine has routed here internally.
+user-invocable: false
 ---
 
 # Hackathon Team

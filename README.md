@@ -119,7 +119,7 @@ For when Claude is working and you aren't watching, whether that's overnight or 
 2. **Falls back to an external manager** if you don't answer inside the window you set.
 3. **Makes the call and logs it** if it must, writing every decision taken without you into a morning-readable HTML log.
 
-Notifications go through **ntfy or Pushover**, whichever you pick at setup. Pushover is the one for a guaranteed wake-up: it punches through iOS Do Not Disturb once you enable Critical Alerts in its app. ntfy is the free, self-hostable, Android-friendly option.
+Notifications go through **ntfy or Pushover**, whichever you pick at setup, and you configure it once for the whole machine so every project can use it, with a per-project override when one needs its own. Pushover is the one for a guaranteed wake-up: it punches through iOS Do Not Disturb once you enable Critical Alerts in its app. ntfy is the free, self-hostable, Android-friendly option.
 
 It's built to sit alongside Claude's native `/goal`, which owns the "am I actually finished" loop while offline mode holds the North Star, the pull-back, the ladder and the log.
 
@@ -150,8 +150,8 @@ Nothing happens without your say-so: it asks about each change, backs up your se
 ### 👻 It writes nothing into your project
 
 - No `.playbook/` directory, no anchor file, no state in your repo. The goal, the routing and the unease all live in the conversation itself, steered by the hooks.
-- One tiny throttle file lives at `~/.claude/hook-state/playbook/`, outside your project and cleaned up on its own, and the one-time setup marker sits under `~/.claude/playbook/`.
-- The only things that ever land in your project are the ones you opt into: offline mode's notification config under the gitignored `.claude/playbook/`, and your `.worktrees/`.
+- One tiny throttle file lives at `~/.claude/hook-state/playbook/`, outside your project and cleaned up on its own. Your one-time setup marker and, by default, your notification config sit under `~/.claude/playbook/`, also outside any repo.
+- The only things that ever land in your project are the ones you opt into: a per-project notification override under the gitignored `.claude/playbook/`, and your `.worktrees/`.
 
 ## Licence
 

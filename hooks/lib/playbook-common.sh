@@ -342,19 +342,46 @@ playbook_claude_file() {
   } 2>/dev/null || printf ''
 }
 
-# The gitignored ntfy topic and the optional server override, read from
-# .claude/playbook/ in the project tree.
-playbook_ntfy_topic()  { playbook_claude_file "${1:-$PWD}" "ntfy-topic"; }
-playbook_ntfy_server() { playbook_claude_file "${1:-$PWD}" "ntfy-server"; }
+# Read a single-line scalar from the machine-global config directory,
+# ${PLAYBOOK_GLOBAL_DIR:-~/.claude/playbook}/<name>. Same trimming and
+# silent-degradation contract as playbook_claude_file. This is where a user
+# sets ntfy/Pushover once so it applies to every project.
+playbook_global_file() {
+  local name="${1:-}" dir path
+  [ -n "$name" ] || { printf ''; return 0; }
+  dir="${PLAYBOOK_GLOBAL_DIR:-${HOME}/.claude/playbook}"
+  path="${dir}/${name}"
+  [ -f "$path" ] || { printf ''; return 0; }
+  { tr -d '\r' <"$path" \
+      | awk 'NF{print; exit}' \
+      | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'
+  } 2>/dev/null || printf ''
+}
 
-# The chosen notification provider (pushover|ntfy). Empty if not configured;
-# scripts/notify falls back to ntfy when an ntfy-topic is present.
-playbook_notify_provider() { playbook_claude_file "${1:-$PWD}" "notify-provider"; }
+# Resolve a notification config scalar with project override: a project
+# .claude/playbook/<name> wins when present, otherwise the machine-global
+# config. This makes ntfy/Pushover a set-once-globally setup that any single
+# project can override by dropping its own file in place.
+playbook_config_scalar() {
+  local proj="${1:-}" name="${2:-}" v
+  v="$(playbook_claude_file "$proj" "$name")"
+  [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+  playbook_global_file "$name"
+}
 
-# Pushover app token and user/group key, read from .claude/playbook/ in the
-# project tree. Silent degradation: empty, never a wrong value.
-playbook_pushover_token() { playbook_claude_file "${1:-$PWD}" "pushover-token"; }
-playbook_pushover_user()  { playbook_claude_file "${1:-$PWD}" "pushover-user"; }
+# The ntfy topic and optional server override: project .claude/playbook/ first,
+# then the machine-global ~/.claude/playbook/.
+playbook_ntfy_topic()  { playbook_config_scalar "${1:-$PWD}" "ntfy-topic"; }
+playbook_ntfy_server() { playbook_config_scalar "${1:-$PWD}" "ntfy-server"; }
+
+# The chosen notification provider (pushover|ntfy), project then global. Empty
+# if not configured; scripts/notify falls back to ntfy when an ntfy-topic is present.
+playbook_notify_provider() { playbook_config_scalar "${1:-$PWD}" "notify-provider"; }
+
+# Pushover app token and user/group key, project then global. Silent
+# degradation: empty, never a wrong value.
+playbook_pushover_token() { playbook_config_scalar "${1:-$PWD}" "pushover-token"; }
+playbook_pushover_user()  { playbook_config_scalar "${1:-$PWD}" "pushover-user"; }
 
 # Candidate settings files that may register hooks: the user's global config and
 # the project-local configs. Echoed one per line, only those that exist.

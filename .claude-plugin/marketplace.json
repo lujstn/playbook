@@ -9,7 +9,7 @@
     {
       "name": "playbook",
       "description": "Native, invisible-but-visible Claude Code steering layer: task-fit mode routing with visible markers, restraint that keeps ultracode from over-reaching for workflows, an always-on model rule, calm compaction, and offline notifications.",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "source": "./",
       "author": {
         "name": "Lucas Johnston Kurilov",

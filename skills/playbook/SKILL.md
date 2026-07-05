@@ -1,6 +1,7 @@
 ---
 name: playbook
 description: Activates at the start of non-trivial work to restate the North Star, route internally across five modes, and keep the nine-tenet overlay live throughout. It announces the route with a branded marker; it does not gate the user or ask them to pick a mode.
+user-invocable: false
 ---
 
 # Playbook

@@ -1,6 +1,7 @@
 ---
 name: gsd-mode
 description: The 🏗️ gsd route. Front-loads user involvement and research, pre-seeds the GSD stage files so the interactive pass is skipped, and post-processes generated plan frontmatter to force parallel execution. Reached from the playbook engine when work is an MVP in an unknown area requiring durable cross-session state.
+user-invocable: false
 ---
 
 # GSD Mode
