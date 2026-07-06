@@ -3,7 +3,7 @@ description: Playbook workflows mode: run this task as a dynamic workflow at sca
 disable-model-invocation: true
 ---
 
-If another tool defines `/workflow`, the `/playbook:workflow` alias behaves identically.
+A bare `/workflow` alias can be installed by `/playbook:setup`; this `/playbook:workflow` form always works, and setup leaves the bare name alone if another tool already owns it.
 
 Run the task below as a dynamic workflow using the Workflow tool. The user invoking this command is the opt-in, so authoring and running the workflow is sanctioned.
 
