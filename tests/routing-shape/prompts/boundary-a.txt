@@ -1,0 +1,3 @@
+Append a short, realistic usage example to each of the command docs under docs/commands/, showing an example invocation and the output a user would see, so someone reading the file can tell at a glance what the command does.
+
+There's no one around to answer questions, so make sensible assumptions and go.

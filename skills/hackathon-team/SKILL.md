@@ -1,6 +1,6 @@
 ---
 name: hackathon-team
-description: Use when coupled work in one shared codebase needs peers that talk to each other directly with lightweight coordination, after the playbook engine has routed here internally.
+description: Use when a living build spans different specialisms that must land together against one shared North Star, needing a cross-communicating crew of expert peers, after the playbook engine has routed here internally.
 user-invocable: false
 ---
 
@@ -8,9 +8,9 @@ user-invocable: false
 
 ## Overview
 
-A thin choreography over Claude Code's native agent-teams primitive. Teams are spawned via the `Agent` tool and auto-form; peers are addressed by name via `SendMessage`; coordination flows through a shared task list and direct peer messages. The `playbook:playbook` engine routes here when work is coupled in one shared codebase and peers need to talk to each other directly. The engine announces and proceeds; there is no vetoable staffing gate. This skill adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below).
+A thin choreography over Claude Code's native agent-teams primitive. Teams are spawned via the `Agent` tool and auto-form; peers are addressed by name via `SendMessage`; coordination flows through a shared task list and direct peer messages. The `playbook:playbook` engine routes here when a living build, still taking shape, spans different specialisms that must land together against one shared North Star: a cross-communicating crew of experts, each owning their own piece, talking simply and often to converge. The engine announces and proceeds; Playbook adds no staffing gate of its own, though the substrate asks the user to confirm before teammates spawn, so expect that platform consent step and honour it rather than treating it as a blocker. This skill adds choreography, not a new primitive, and does not re-explain how native agent-teams works mechanically beyond the one place it must (the lead-authority gap below).
 
-**Note:** Claude Code agent teams are experimental and disabled by default. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your environment to enable them. If the flag is absent this mode is unavailable; the engine will route to an alternative.
+**Note:** Claude Code agent teams are experimental and disabled by default. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in your environment to enable them. The engine checks the variable mechanically (one shell echo) rather than guessing; if the flag is absent this mode is unavailable and the engine routes to an alternative, saying so in the marker reason.
 
 **Core principle:** Co-located peers, partitioned once by file ownership, then left to self-organise. The lead coordinates and steps back; it does not think for the team. Less is more (tenet 8): the smallest team that fits the partition.
 
@@ -59,7 +59,7 @@ digraph hackathon_team {
     "Partition the work by file ownership (one owner per file)" [shape=box];
     "Clean partition, no file shared by two owners?" [shape=diamond];
     "Re-partition until disjoint" [shape=box];
-    "Create the team and spawn co-located peers (small, ~3 to 5 default)" [shape=box];
+    "Spawn co-located peers (the team auto-forms; small, ~3 to 5 default)" [shape=box];
     "Peers self-organise, message by name, call each other out" [shape=box];
     "Peer goes idle, notifies the lead" [shape=box];
     "All work owned and complete?" [shape=diamond];
@@ -71,8 +71,8 @@ digraph hackathon_team {
     "Partition the work by file ownership (one owner per file)" -> "Clean partition, no file shared by two owners?";
     "Clean partition, no file shared by two owners?" -> "Re-partition until disjoint" [label="no"];
     "Re-partition until disjoint" -> "Clean partition, no file shared by two owners?";
-    "Clean partition, no file shared by two owners?" -> "Create the team and spawn co-located peers (small, ~3 to 5 default)" [label="yes"];
-    "Create the team and spawn co-located peers (small, ~3 to 5 default)" -> "Peers self-organise, message by name, call each other out";
+    "Clean partition, no file shared by two owners?" -> "Spawn co-located peers (the team auto-forms; small, ~3 to 5 default)" [label="yes"];
+    "Spawn co-located peers (the team auto-forms; small, ~3 to 5 default)" -> "Peers self-organise, message by name, call each other out";
     "Peers self-organise, message by name, call each other out" -> "Peer goes idle, notifies the lead";
     "Peer goes idle, notifies the lead" -> "All work owned and complete?";
     "All work owned and complete?" -> "Lead routes, unblocks, rallies (coordination only, not intellectual authority)" [label="no"];
@@ -104,7 +104,7 @@ digraph hackathon_team {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` routes here internally. The engine announces and proceeds; it does not make a visible vetoable staffing call. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
+- `playbook:playbook` routes here internally. The engine announces and proceeds; it does not add a staffing gate of its own, and the substrate's own teammate-approval prompt is expected and honoured. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
 
 **Substrate:**
 - Native Claude Code agent-teams: spawn peers via the `Agent` tool (the team auto-forms), address peers by name via `SendMessage`, coordinate via the shared task list. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the flag is set.

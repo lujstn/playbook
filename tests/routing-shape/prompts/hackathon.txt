@@ -1,0 +1,3 @@
+In a fresh subfolder, build a small realtime collaborative pixel-art app as one working MVP. It has three parts, each a different discipline deserving real depth in its own right: a Node websocket server that owns canvas state, history and presence; a browser client with the drawing UI, live cursors and a user list; and a headless load-bot that simulates several concurrent artists drawing at once. The three must land together as one product, and the protocol between them should be settled during the build as real constraints surface rather than pinned down up front.
+
+There's no one around to answer questions, so make sensible assumptions and go.

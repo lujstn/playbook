@@ -13,11 +13,13 @@ SK="$root/skills"
 fail=0
 chk() { if eval "$1" >/dev/null 2>&1; then echo "PASS: $2"; else echo "FAIL: $2"; fail=1; fi; }
 
-# Nine v2 tenets live in the overlay inside hooks/session-start.
-n=$(grep -cE '^[1-9]\. ' "$SS" 2>/dev/null || echo 0)
+# Nine v2 tenets live in the overlay inside hooks/session-start. Count only the
+# numbered lines inside the tenets block itself; the routing spine legitimately
+# carries its own short numbered tie-break list.
+n=$(awk '/The nine tenets, always live:/{t=1; next} t&&/^[1-9]\. /{n++} t&&/^$/{exit} END{print n+0}' "$SS" 2>/dev/null)
 [ "$n" -eq 9 ] \
   && echo "PASS: nine tenets in overlay" \
-  || { echo "FAIL: found $n tenets in overlay, expected 9"; fail=1; }
+  || { echo "FAIL: found $n tenets in the tenets block, expected 9"; fail=1; }
 
 # Model rule.
 chk "grep -q 'execute on Sonnet' '$SS'" "model rule: execute on Sonnet"

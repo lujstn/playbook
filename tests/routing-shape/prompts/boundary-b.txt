@@ -1,0 +1,3 @@
+Build a small library of sixteen independent input validators, each in its own file under lib/validators/ with its own test file, sharing no code: an IBAN checker with the mod-97 check, a credit-card Luhn validator, an ISBN-13 validator, an E.164 phone validator, a semver range matcher, a cron expression validator, a hex colour validator, a UUID v4 and v7 validator, an IPv6 address validator, a MAC address validator, a base64url validator, a JWT structural validator, an ISO-8601 duration validator, a UK postcode validator, a US ZIP+4 validator, and a Canadian postal code validator. Each has real edge cases and deserves genuine care.
+
+There's no one around to answer questions, so make sensible assumptions and go.

@@ -29,6 +29,22 @@ chk "grep -qi 'match the tool to the task, never to the mode' '$S'" "engine carr
 chk "grep -q 'is interns at most' '$S'" "engine rebuts fan-out-for-small-task with the bounded-set tie-break"
 chk "grep -qi 'degenerate result' '$S'" "engine warns against trusting a degenerate workflow result"
 
+# Corrected delegation economics: the doctrine prices staffing on agent facts in
+# both directions (cheap dispatch, no peer chatter, fresh context each; but
+# brief-bounded knowledge and integration owed), names wall-clock speed and
+# main-context preservation as routing inputs, keeps the exceeds-one-context
+# valve on the bounded-set tie-break, and includes hackathon in the rule-out
+# ladder rather than only in the emoji legend.
+chk "grep -q 'not colleagues' '$S'" "engine states the subagent price list"
+chk "grep -q 'live routing inputs' '$S'" "engine names speed and context preservation as routing inputs"
+chk "grep -q 'unless that bulk exceeds' '$S'" "engine tie-break carries the exceeds-one-context escape valve"
+chk "grep -q 'crew of experts' '$S'" "engine carries the expert-crew hackathon definition"
+chk "grep -q 'interns logic' '$S'" "engine rebuts the interns-logic category error against hackathon"
+chk "grep -q 'spine density' '$S'" "engine carries the spine-density tie-break against lone-wolf"
+chk "grep -q 'fresh, complete marker line' '$S'" "engine forbids hybrid two-mode marker lines"
+chk "grep -q 'will the plan survive contact unchanged' '$S'" "engine carries the frozen-plan tie-break against workflows"
+chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$S'" "engine detects team availability mechanically, not by guessing"
+
 O="$root/skills/offline-mode/SKILL.md"
 chk "! grep -qi 'uncertaint' '$O'" "offline-mode has no uncertainty word anywhere"
 chk "! grep -qiE 'uncertainty ledger|the ledger' '$O'" "offline-mode has no ledger reference"
@@ -86,6 +102,7 @@ for f in "${targets[@]}"; do
   chk "! grep -qi 'ntfy sends' '$f'" "$rel: provider-agnostic notification wording"
   chk "! grep -qiw 'ledger' '$f'" "$rel: no ledger vocabulary (log is canonical)"
   chk "! grep -qiE 'synchronised-(development|subagent)' '$f'" "$rel: no dropped synchronised-development skill name"
+  chk "! grep -qE 'TeamCreate|TeamDelete|team_name' '$f'" "$rel: no removed agent-teams setup API (teams auto-form since CLI 2.1.178)"
   chk "{ ! grep -q 'front door' '$f'; } || grep -q 'not a front door' '$f'" "$rel: no rejected front-door framing"
   chk "! grep -q '—' '$f'" "$rel: no em-dash (house style)"
   chk "! grep -qi 'judgment' '$f'" "$rel: British spelling Judgement"
@@ -100,10 +117,31 @@ done
 SS="$root/hooks/session-start"
 chk "grep -q 'Assume ultracode is the baseline' '$SS'" "overlay states the ultracode baseline"
 chk "grep -qi 'match the tool to the task, never to the mode' '$SS'" "overlay carries ultracode restraint guidance"
+chk "grep -q 'not colleagues' '$SS'" "overlay states the subagent price list"
+chk "grep -q 'live routing inputs' '$SS'" "overlay names speed and context preservation as routing inputs"
+chk "grep -q 'unless that bulk exceeds' '$SS'" "overlay tie-break carries the exceeds-one-context escape valve"
+chk "grep -q 'crew of experts' '$SS'" "overlay carries the expert-crew hackathon definition"
+chk "grep -q 'interns logic' '$SS'" "overlay rebuts the interns-logic category error against hackathon"
+chk "grep -q 'spine density' '$SS'" "overlay carries the spine-density tie-break against lone-wolf"
+chk "grep -q 'fresh, complete marker line' '$SS'" "overlay forbids hybrid two-mode marker lines"
+chk "grep -q 'will the plan survive contact unchanged' '$SS'" "overlay carries the frozen-plan tie-break against workflows"
+chk "grep -q 'dozens or more frozen units' '$SS'" "overlay carries the interns-or-workflows scale tie-break"
+chk "grep -q 'counted in units, never in writers' '$SS'" "overlay counts scale in units so batching cannot launder the count"
+chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$SS'" "overlay detects team availability mechanically, not by guessing"
+chk "grep -qi 'solo bias' '$SS'" "overlay names the solo bias as a failure alongside the workflow bias"
 chk "grep -q '🌿 worktrees' '$SS'" "overlay registers the worktrees marker"
 chk "grep -q '🌡️ unease' '$SS'" "overlay registers the unease thermometer marker"
 chk "grep -q '🧰 setup' '$SS'" "overlay registers the setup marker"
 chk "! grep -q 'playbook-window' '$SS'" "overlay no longer instructs a window declaration"
+chk "grep -q 'ultracode nudge' '$SS'" "overlay nudges the user onto /effort ultracode at session start"
+chk "grep -qF 'Playbook runs best on ultracode' '$SS'" "overlay carries the exact ultracode nudge wording"
+# The nudge must sit in the fresh-start block just above the liveness line, so a
+# once-per-session reminder never fires on subagents or compaction resumes.
+nudge_ln=$(grep -n 'ultracode nudge' "$SS" | head -1 | cut -d: -f1)
+live_ln=$(grep -n 'Playbook liveness' "$SS" | head -1 | cut -d: -f1)
+{ [ -n "$nudge_ln" ] && [ -n "$live_ln" ] && [ "$nudge_ln" -lt "$live_ln" ]; } \
+  && echo "PASS: the ultracode nudge precedes the liveness line" \
+  || { echo "FAIL: the ultracode nudge is not positioned above the liveness line"; fail=1; }
 
 # Setup skill invariants.
 SU="$root/skills/setup/SKILL.md"
@@ -144,7 +182,7 @@ chk "[ ! -f '$root/hooks/unease' ]" "the Stop-pulse hook (hooks/unease) is delet
 # Both workflow commands must teach validating the workflow's own result.
 chk "grep -qi 'degenerate result' '$root/commands/workflow.md'" "workflow command warns against a degenerate result"
 chk "[ -z \"\$(ls '$root'/commands/pb-*.md 2>/dev/null)\" ]" "no pb-* command files remain"
-chk "! grep -rq 'Playbook · ' '$root/hooks' '$root/skills' '$root/commands' '$root/README.md'" "no middot marker leftovers in the shipped surface"
+chk "! grep -rq 'Playbook ·' '$root/hooks' '$root/skills' '$root/commands' '$root/README.md'" "no middot marker leftovers in the shipped surface"
 
 R="$root/README.md"
 chk "! grep -qE '\.playbook/[A-Za-z._-]' '$R'" "README has no .playbook/ path references"
@@ -152,6 +190,10 @@ chk "! grep -qi 'uncertaint' '$R'" "README uses unease naming, no uncertainty wo
 chk "! grep -qiw 'ledger' '$R'" "README uses log naming, no ledger vocabulary"
 chk "grep -qi 'writes nothing into your project' '$R'" "README states no file is written into the tree"
 chk "grep -qi 'baseline is ultracode' '$R'" "README states the ultracode baseline"
+chk "grep -q 'crew of different experts' '$R'" "README chooser carries the expert-crew hackathon line"
+chk "grep -q 'will the plan survive contact unchanged' '$R'" "README carries the frozen-plan tie-break"
+chk "grep -qi 'solo bias' '$R' && grep -qi 'workflow bias' '$R'" "README names both routing biases"
+chk "grep -q 'spine density' '$R'" "README carries the spine-density tie-break"
 chk "! grep -q '\.playbook/' '$root/.gitignore'" ".gitignore has no .playbook vestige"
 GA="$root/.gitattributes"
 chk "! grep -qi 'uncertaint' '$GA'" ".gitattributes has no old uncertainty hook name"

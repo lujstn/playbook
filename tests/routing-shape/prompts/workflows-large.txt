@@ -1,0 +1,3 @@
+Produce a tailored, self-contained migration note for every built-in Node.js module: there are roughly a hundred of them (fs, path, http, crypto, stream, worker_threads, and all the rest). Each note is around 500 words and genuinely specific to its module: what changed across the last three major Node versions, the deprecations that bite in practice, and a worked before-and-after code example unique to that module. No templating or boilerplate reuse; each note must be considered and written on its own merits. Save each note as its own file under notes/. The full collection is far larger than could be reviewed in one sitting, and the deliverable is the complete set.
+
+There's no one around to answer questions, so make sensible assumptions and go.

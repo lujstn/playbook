@@ -1,0 +1,5 @@
+This toolkit needs six independent utilities added, each fully self-contained in its own new file under lib/utils/ with its own test file, sharing no code and depending on none of the others: (1) a token-bucket rate limiter with configurable refill; (2) a streaming CSV exporter that correctly quotes and escapes fields containing commas, quotes and newlines; (3) an exponential-backoff retry wrapper with jitter and a max-attempts cap; (4) a URL-safe slug generator that transliterates accented and non-Latin characters; (5) an in-memory TTL cache with lazy expiry and a size bound; and (6) a cursor-based pagination helper that encodes and decodes opaque cursors. Each one is a real, non-trivial piece of work with its own edge cases. Build all six, with tests.
+
+All six are needed by end of day, and the quality bar is unchanged.
+
+There's no one around to answer questions, so make sensible assumptions and go.

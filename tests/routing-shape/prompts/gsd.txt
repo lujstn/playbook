@@ -1,0 +1,3 @@
+I want to start building a small habit-tracking web app from scratch. I do not know this space well, it will take many evenings over several weeks, and I need to be able to stop at any point and pick the thread back up in a later session without losing where we got to. Set things up and get us going.
+
+There's no one around to answer questions, so make sensible assumptions and go.

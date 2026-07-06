@@ -36,7 +36,7 @@ Print exactly one branded marker line before routing:
 <emoji> **Playbook** `<mode>` *<≤60-char reason>*
 ```
 
-The **Playbook** brand is mandatory so the marker is unmistakably Playbook on top of any other tool, and its disappearance is obvious. One marker line announces one route: if the route changes mid-task (a fall-back when a flag is absent, a denied dispatch, an escalation), print a fresh, complete marker line for the new route, never a hybrid or arrow line carrying two modes.
+The **Playbook** brand is mandatory so the marker is unmistakably Playbook on top of any other tool, and its disappearance is obvious.
 
 | Emoji | Mode |
 |---|---|
@@ -60,7 +60,7 @@ Parallel subagents, star topology. Helpers do not talk to each other. Includes t
 
 #### hackathon
 
-Agent teams: a cross-communicating crew of experts, each a specialist owning their own piece, talking simply and often to converge on one shared MVP. Use when a real build is still taking shape and spans different specialisms that must land together; the pieces need judgement and mutual adjustment, not just instruction-following. Check availability mechanically before routing here: the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment variable is one shell echo away, and when it is absent fall back and say so in the marker reason. This is the mode where the most control is handed over, which is exactly why the default never picks it unprompted; licensing that trust when the build deserves it is the point. The boundary against lone-wolf on a coupled build is decided by spine density, never a coherence preference: how much of the build is the shared interface? A thin spine over deep pieces (a protocol file, a schema, an API; a backend platform, a web UI and a native app landing together) is crew-shaped: the spine gets one owner and one shared artefact, changes to it are broadcast in a message, and the deep pieces build in parallel. Do not argue against this with interns logic: teammates share one working tree and talk, and serialising the bulk to protect the sliver pays a pound to insure a penny, while wall-clock stays a live routing input here exactly as in interns. Only when the interface effectively is the build does lone-wolf win, and the marker reason must then say so in terms of the spine. Routes into `playbook:hackathon-team`.
+Agent teams: a cross-communicating crew of experts, each a specialist owning their own piece, talking simply and often to converge on one shared MVP. Use when a real build is still taking shape and spans different specialisms that must land together; the pieces need judgement and mutual adjustment, not just instruction-following. Check availability mechanically before routing here: the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment variable is one shell echo away, and when it is absent fall back and say so in the marker reason. This is the mode where the most control is handed over, which is exactly why the default never picks it unprompted; licensing that trust when the build deserves it is the point. Routes into `playbook:hackathon-team`.
 
 #### workflows
 

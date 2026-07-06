@@ -1,0 +1,3 @@
+Rename the shell function `store_load` to `store_read` across this project: its definition in lib/, every place it is called, and any comment or doc that mentions it, so that nothing anywhere still refers to the old name and the test script still passes.
+
+There's no one around to answer questions, so make sensible assumptions and go.
