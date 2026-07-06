@@ -73,32 +73,51 @@ Work is routed on **separability and durability, not size**. Size only decides w
 
 | Marker | Mode        | Claude Code primitive | When it runs                                                 |
 | ------ | ----------- | --------------------- | ------------------------------------------------------------ |
-| 🐺      | `lone-wolf` | main thread           | quick or coherent work that one mind should hold from start to finish |
-| 🐜      | `interns`   | parallel subagents    | a list of separable chores, each handed to a Sonnet helper as one crisp brief |
-| 🤝      | `hackathon` | agent teams           | an expert crew sprinting on one shared MVP: each peer owns their specialism, and they talk to converge |
-| ⚙️      | `workflows` | dynamic workflows     | lone-wolf thinking at parallel scale: a medium-or-larger plan, frozen before launch, executed wide |
-| 🏗️      | `gsd`       | GSD                   | a full MVP spanning multiple sessions, a day's work or more, with plans that must survive between them |
+| 🐺      | `lone-wolf` | main thread           | quick or coherent work that one mind should hold from start to finish *(claude's  typical bias)* |
+| 🐜      | `interns`   | parallel **subagents**    | a list of separable chores, each handed to a Sonnet helper as one crisp brief |
+| 🤝      | `hackathon` | agent **teams**           | an expert crew sprinting towards a shared north star: each peer owns their specialism, and they **actively communicate** to converge |
+| ⚙️      | `workflows` | dynamic workflows     | lone-wolf thinking at parallel scale: a medium-or-larger plan, frozen before launch, executed wide *(claude's typical bias when using `/effort ultracode`)* |
+| 🏗️      | `gsd`       | [GSD](https://github.com/open-gsd/gsd-core)                   | a full MVP spanning multiple sessions, a day's work or more, with plans that must survive between them |
 
-**🐺 lone-wolf: one mind on one thread, for work that is quick, or so coherent that a single head should hold all of it from start to finish.**
-Reach for it when the thinking *is* the work and splitting it would shred it. The wrong fit is anything with a hidden list inside: this is Claude's comfort zone, and the smell of over-picking it is one mind grinding through separable items one at a time. Sounds like: "fix this failing test", "rename this and update the call sites", "explain this module".
-
-**🐜 interns: many cheap, obedient hands, parallel Sonnet lone-wolves, each handed one crisp brief, racing through separable chores so the whole batch lands sooner.**
-Reach for it for research sweeps, code crawls, repetitive edits and bulk data changes: chains of action that need following, not debating. The wrong fit is pieces that must negotiate with each other, or units you can't specify in a single brief. One hand per genuine unit, never a headcount. Sounds like: "write tests for these eight modules", "check all fifteen repos for the deprecated API", "apply this refactor everywhere".
-
-**🤝 hackathon: a cross-communicating crew of experts, each a specialist owning their own piece, talking simply and often, shipping one shared MVP faster than heavyweight process ever could.**
-The analogy is literal. The people at a hackathon are already brilliant at their day jobs, and for money or love of the game they build in a weekend what a big organisation takes months to deliver, because each of them builds in their own field and they coordinate by actually talking rather than by process. That's this mode: cross-functional specialists (server, client, bot; backend, frontend, tests), one shared North Star, simple communication, fast iteration. Reach for it when a real build is still taking shape and spans specialisms that must land together. The tie-break against 🐺 is spine density: a thin shared interface over deep pieces is crew-shaped, and a backend platform, a web UI and a native app landing together is the canonical case; only when the interface effectively *is* the build does one mind win. The wrong fit is mechanical chores (that's interns), a plan already frozen (that's workflows), or a solo methodical build across sessions (that's gsd, this mode's single-mind sibling). It needs the agent-teams flag switched on, and it's the mode where Claude hands over the most control, which is exactly why it never picks it unprompted; Playbook's job is to license that trust when the build deserves it. Sounds like: "build this three-part app and work the protocol out as you go", "ship the backend, the web app and the mobile app for this feature together", "you three each take a layer and argue the interfaces out amongst yourselves".
-
-**⚙️ workflows: lone-wolf thinking at parallel scale, where one mind writes a frozen plan, a script executes it wide, the bulk stays out of the context and control stays at home.**
-Reach for it when the steps are known before launch and the scale is medium or larger: volume beyond one context, or verification as the deliverable (generate, then independently check). The wrong fit is anything that will need re-planning mid-run, because a workflow cannot change its mind; the tie-break against 🤝 is one question: *will the plan survive contact unchanged?* Workflows are how the big organisation ships the frozen plan; hackathon is the crew of experts outbuilding it while the plan is still alive. Ultracode over-picks this mode, so a workflow must earn its place, never inherit it. Sounds like: "a tailored, fact-checked note for every built-in Node module", "migrate four hundred files with a verify stage".
-
-**🏗️ gsd: the long game, a full MVP, a day's work or more, spanning multiple sessions, with plans and state that must outlive each one.**
-Reach for it for greenfield products and anything that would die if the session were cleared. The wrong fit is anything that finishes inside one session, however big it feels. Sounds like: "build me this product from scratch", "take this idea to a working MVP".
-
-This routing fights two biases, and they pull in opposite directions:
-
-- **The solo bias.** Claude's comfort zone is doing everything itself, which quietly turns separable work into slow serial work. Playbook prices staffing on what helpers actually cost (a brief, not a hire) and treats finishing sooner and keeping the main thread sharp as real routing inputs.
-- **The workflow bias.** The assumed baseline is ultracode, where Claude can launch a whole dynamic workflow on its own, and left alone it over-reaches: the tool is sized to the task, never to the mode, so a read-and-fix over a known set of files is `lone-wolf` or a handful of `interns`, never a twenty-agent swarm, and "ultracode is on" is never by itself a reason to fan out.
-- When ultracode is off, `workflows` becomes opt-in, and Playbook points you at `/workflow` rather than reaching for it itself.
+<details>
+<summary>View more detail on each of these execution modes:</summary>
+<ul>
+<!-- lone-wolf -->
+<li>🐺 lone-wolf</li>
+<ul>
+	<li>TL;DR: One mind on one thread, for work that is quick, or so coherent that a single head should hold all of it from start to finish.</li>
+	<li>Reach for it when the thinking *is* the work and splitting it would shred it. The wrong fit is anything with a hidden list inside: this is Claude's comfort zone, and the smell of over-picking it is one mind grinding through separable items one at a time. Sounds like: "fix this failing test", "rename this and update the call sites", "explain this module".</li>
+	<li>Note on model selection bias: Claude's comfort zone is doing everything itself, which quietly turns separable work into slow serial work, so Playbook prices staffing on what helpers actually cost (a brief, not a hire) and treats finishing sooner and keeping the main thread sharp as real routing inputs.</li>
+</ul>
+<!-- interns -->
+<li>🐜 interns</li>
+<ul>
+	<li>TL;DR: Many cheap, obedient hands, parallel Sonnet lone-wolves, each handed one crisp brief, racing through separable chores so the whole batch lands sooner.</li>
+	<li>Reach for it for research sweeps, code crawls, repetitive edits and bulk data changes: chains of action that need following, not debating. The wrong fit is pieces that must negotiate with each other, or units you can't specify in a single brief. One hand per genuine unit, never a headcount. Sounds like: "write tests for these eight modules", "check all fifteen repos for the deprecated API", "apply this refactor everywhere".</li>
+</ul>
+<!-- hackathon -->
+<li>🤝 hackathon</li>
+<ul>
+	<li>TL;DR: A cross-communicating crew of experts, each a specialist owning their own piece, talking simply and often, shipping one shared MVP faster than heavyweight process ever could.</li>
+	<li>The analogy is literal. The people at a hackathon are already brilliant at their day jobs, and for money or love of the game they build in a weekend what a big organisation takes months to deliver, because each of them builds in their own field and they coordinate by actually talking rather than by process. That's this mode: cross-functional specialists (server, client, bot; backend, frontend, tests), one shared North Star, simple communication, fast iteration.</li>
+	<li>Reach for it when a real build is still taking shape and spans specialisms that must land together. The tie-break against 🐺 is spine density: a thin shared interface over deep pieces is crew-shaped, and a backend platform, a web UI and a native app landing together is the canonical case; only when the interface effectively *is* the build does one mind win. The wrong fit is mechanical chores (that's interns), a plan already frozen (that's workflows), or a solo methodical build across sessions (that's gsd, this mode's single-mind sibling).</li>
+	<li>It needs the agent-teams flag switched on, and it's the mode where Claude hands over the most control, which is exactly why it never picks it unprompted; Playbook's job is to license that trust when the build deserves it. Sounds like: "build this three-part app and work the protocol out as you go", "ship the backend, the web app and the mobile app for this feature together", "you three each take a layer and argue the interfaces out amongst yourselves".</li>
+</ul>
+<!-- workflows -->
+<li>⚙️ workflows</li>
+<ul>
+	<li>TL;DR: Lone-wolf thinking at parallel scale, where one mind writes a frozen plan, a script executes it wide, the bulk stays out of the context and control stays at home.</li>
+	<li>Reach for it when the steps are known before launch and the scale is medium or larger: volume beyond one context, or verification as the deliverable (generate, then independently check). The wrong fit is anything that will need re-planning mid-run, because a workflow cannot change its mind; the tie-break against 🤝 is one question: *will the plan survive contact unchanged?* Workflows are how the big organisation ships the frozen plan; hackathon is the crew of experts outbuilding it while the plan is still alive. Ultracode over-picks this mode, so a workflow must earn its place, never inherit it. Sounds like: "a tailored, fact-checked note for every built-in Node module", "migrate four hundred files with a verify stage".</li>
+	<li>Note on model selection bias: When the effort level is set to ultracode (which we reccomend so  Claude has permission launch dynamic workflows on its own), it can easily over-reach. To counter this, we remind Claude that the tool should be sized to the task, never to the mode, so a read-and-fix over a known set of files is `lone-wolf` or a handful of `interns`, never a twenty-agent swarm, and "ultracode is on" is never by itself a reason to fan out. When ultracode is off, `workflows` becomes opt-in, and Playbook points you at `/workflow` rather than reaching for it itself.</li>
+</ul>
+<!-- gsd -->
+<li>🏗️ gsd</li>
+<ul>
+	<li>TL;DR: The long game, a full MVP, a day's work or more, spanning multiple sessions, with plans and state that must outlive each one.</li>
+	<li>Reach for it for greenfield products and anything that would die if the session were cleared. The wrong fit is anything that finishes inside one session, however big it feels. Sounds like: "build me this product from scratch", "take this idea to a working MVP".</li>
+</ul>
+</ul>
+</details>
 
 ### 🧘 Calm compaction
 
