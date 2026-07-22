@@ -125,6 +125,19 @@ chk "grep -q 'interns logic' '$SS'" "overlay rebuts the interns-logic category e
 chk "grep -q 'spine density' '$SS'" "overlay carries the spine-density tie-break against lone-wolf"
 chk "grep -q 'fresh, complete marker line' '$SS'" "overlay forbids hybrid two-mode marker lines"
 chk "grep -q 'will the plan survive contact unchanged' '$SS'" "overlay carries the frozen-plan tie-break against workflows"
+
+# The time rule is always-on doctrine like the model rule: stated in the
+# overlay, detailed in its reference skill.
+chk "grep -q 'Time rule, always on' '$SS'" "overlay carries the time rule"
+chk "grep -q 'divide by ten' '$SS'" "overlay states the divide-by-ten correction"
+chk "grep -q 'items times rate' '$SS'" "overlay exempts external-system waits from the divisor"
+chk "grep -q 'already observed' '$SS'" "overlay exempts observed command durations"
+TR="$root/skills/time-rule/SKILL.md"
+chk "test -f '$TR'" "time-rule reference skill exists"
+chk "grep -q 'user-invocable: false' '$TR'" "time-rule skill is not user-invocable"
+chk "grep -q 'divide by ten' '$TR'" "time-rule skill states the correction"
+chk "grep -q '12m52s' '$TR'" "time-rule skill carries the founding measurement"
+chk "grep -q 'playbook:time-rule' '$root/skills/playbook/SKILL.md'" "engine registry lists the time rule"
 chk "grep -q 'dozens or more frozen units' '$SS'" "overlay carries the interns-or-workflows scale tie-break"
 chk "grep -q 'counted in units, never in writers' '$SS'" "overlay counts scale in units so batching cannot launder the count"
 chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$SS'" "overlay detects team availability mechanically, not by guessing"

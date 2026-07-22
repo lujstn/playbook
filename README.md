@@ -138,6 +138,14 @@ Playbook fixes this in one move:
 - The test is what happens when Claude is wrong: a loud, locally fixable mistake can run on a lighter model; a quiet mistake that propagates into other agents keeps the flagship.
 - It's doctrine rather than a mode you enter, applied inside every workflow stage and nested subagent, and announced (as above) whenever a spawn drops to a cheaper tier.
 
+### ⏱️ Honest time estimates
+
+> A plan estimated at "about two hours" landing in thirteen minutes is not a fluke, it's the constant.
+
+- **Form the human-engineer estimate, then divide by ten**, and give a range: a "2 hours" feel becomes "10-15 min". Agent intuition is trained on humans estimating human effort, then executes at machine speed; measured, the bias is uniform across subtasks, so one scalar corrects it.
+- External-system waits (CI, deploys, rate-limited APIs, paid crawl or LLM runs) are never divided: they're items × rate, and hours are a legitimate answer. Commands with already-observed durations are added at face value.
+- User round-trips are a count, never a duration, and an actual landing outside the stated range gets said out loud so the divisor can be recalibrated.
+
 ### 🌡️ Knowing when it's out of its depth
 
 > 🌡️ **Playbook** `unease: watchful` *three edits in a row failed to apply*
