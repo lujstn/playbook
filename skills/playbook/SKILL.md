@@ -126,3 +126,4 @@ Sibling skills reached from this engine:
 - `playbook:offline-mode`: enables offline behaviour for tenet 5; explicit and per-run, never implicit.
 - `playbook:worktrees`: for genuinely separate work launched as distinct Claude Code sessions.
 - `playbook:model-rule`: always-on; Sonnet executes, Opus plans and reviews, bump up when stuck. Propagated into every subagent and workflow stage via the `SubagentStart` overlay and explicit `model:` on each dispatch.
+- `playbook:time-rule`: always-on; form the human-engineer estimate, divide by ten, give a range. External-system waits and already-observed command durations are never divided; user round-trips are a count, never a duration. Stated in the overlay for every agent and subagent; the skill is the detailed reference.
