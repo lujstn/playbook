@@ -48,6 +48,7 @@ The rest are verbs. Each ships as its namespaced `/playbook:*` form, which alway
 | `/workflow`      | `/playbook:workflow`        | ⚙️ run this task as a dynamic workflow, carrying the North Star and the model rule into the script |
 | `/fix`           | `/playbook:fix`             | 🦞 strict, production-ready fix protocol, typed for the stack and validated at the boundaries |
 | `/debug`         | `/playbook:debug`           | 👾 a strict read, summarise, diagnose, confirm debugging cycle |
+| `/review-panel`  | `/playbook:review-panel`    | ⚖️ four independent reviewers (🧬 architect, 💰 CTPO, 🌱 junior, ⚔️ devil's advocate) over a plan, design doc, diff or PR |
 
 ## The nine tenets
 

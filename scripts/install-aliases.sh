@@ -47,7 +47,7 @@ delegates=(
 # Bare names backed by a plugin command with its own body (arguments,
 # model-invocation control): mirror the plugin file verbatim so behaviour stays
 # identical and there is a single source of truth.
-copies=(hello workflow)
+copies=(hello workflow review-panel)
 
 owned_by_playbook() { [ -e "$1" ] && grep -q "$marker" "$1"; }
 

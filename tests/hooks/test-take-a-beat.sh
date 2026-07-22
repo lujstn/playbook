@@ -72,16 +72,18 @@ out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"assumed","transc
   || { echo "FAIL assumed calm: [$out]"; exit 1; }
 rm -rf "$PLAYBOOK_STATE_DIR"
 
-# Subagent calm beat: North Star primary, task relabelled, no "Original request, verbatim:".
+# Subagent calm beat: North Star only. The helper's task is its dispatch brief, which
+# the hook cannot see, so the anchor must never quote a task at it.
 iso
 da="$(playbook_state_dir '{"session_id":"sub","agent_id":"a1"}')"; playbook_state_reset "$da" 700020
 out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"sub","agent_id":"a1","transcript_path":"%s"}' "$SB" | PLAYBOOK_WINDOW=1000000 PLAYBOOK_CALM_PCT=70 bash "$H")"
 { grep -qi "auto-compact is seamless" <<<"$out" \
   && grep -q "Overall goal (what success means for the whole project):" <<<"$out" \
   && grep -q "Ship a zero-dependency context anchor" <<<"$out" \
-  && grep -q "Your part of it, verbatim:" <<<"$out" \
-  && ! grep -q "Original request, verbatim:" <<<"$out"; } \
-  && echo "PASS: subagent calm beat with North Star primacy and task label" \
+  && grep -q "It does NOT state your task" <<<"$out" \
+  && ! grep -q "verbatim:" <<<"$out" \
+  && ! grep -q "Wave 2 Task 3" <<<"$out"; } \
+  && echo "PASS: subagent calm beat carries the North Star only, never a quoted task" \
   || { echo "FAIL subagent beat: [$out]"; exit 1; }
 rm -rf "$PLAYBOOK_STATE_DIR"
 

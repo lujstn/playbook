@@ -79,12 +79,27 @@ playbook_project_northstar() {
   playbook_northstar_line "$orig"
 }
 
-# The labelled anchor block to inject. Subagent-aware: on the main thread the
-# recovered first message is the user's own request and is labelled as such;
-# inside a subagent (agent_id present) that first message is the dispatch
-# prompt, so it is labelled as the assigned task and the dispatcher-provided
-# project North Star, if any, is given primacy. Empty when there is nothing
-# to anchor on. Never fabricates a North Star.
+# The labelled anchor block to inject. Subagent-aware, and deliberately says
+# less inside a subagent than on the main thread.
+#
+# On the main thread the recovered first message is the user's own request and
+# is labelled as such.
+#
+# Inside a subagent (agent_id present) the anchor carries the project North Star
+# ONLY, and never the task. At SubagentStart the helper has not produced a
+# transcript yet, so .transcript_path can only resolve to the dispatching
+# session's transcript, whose first user record is the PARENT's opening request
+# rather than this helper's dispatch prompt. Labelling that as "your assigned
+# task" hands the helper a confidently-worded wrong job, which is precisely what
+# this module's contract forbids: empty, never a wrong value. The hook payload
+# carries no dispatch prompt (only agent_id, cwd, hook_event_name, session_id,
+# source, transcript_path), so the task cannot be recovered here and must not be
+# guessed.
+#
+# The North Star is still safe to carry: it is a deliberate human-authored
+# `playbook-northstar:` line stating the project goal, which holds for every
+# helper whatever its individual task. Absent that line there is nothing
+# trustworthy to say, so the block is empty. Never fabricates a North Star.
 playbook_anchor_block() {
   local s="${1:-}" aid orig ns
   aid="$(playbook_agent_id "$s")"
@@ -92,14 +107,8 @@ playbook_anchor_block() {
   [ -n "$orig" ] || { printf ''; return 0; }
   if [ -n "$aid" ]; then
     ns="$(playbook_northstar_line "$orig")"
-    if [ -n "$ns" ]; then
-      local task
-      task="$(printf '%s' "$orig" | grep -vE '^[[:space:]]*playbook-northstar:[[:space:]]' || true)"
-      [ -n "$task" ] || task="$orig"
-      printf 'Overall goal (what success means for the whole project):\n%s\n\nYour part of it, verbatim:\n%s' "$ns" "$task"
-    else
-      printf 'Your assigned task, verbatim:\n%s\n\nNo project North Star was provided to you. Request it from whoever dispatched you, or proceed treating this task as the local goal and raise unease that you are working without the project anchor.' "$orig"
-    fi
+    [ -n "$ns" ] || { printf ''; return 0; }
+    printf 'Overall goal (what success means for the whole project):\n%s\n\nThis anchor carries the project goal only. It does NOT state your task: your task is the dispatch prompt you were given by whoever spawned you. If anything here appears to describe a different job from that brief, follow the brief and raise unease that the anchor disagreed with it.' "$ns"
   else
     printf 'Original request, verbatim:\n%s' "$orig"
   fi

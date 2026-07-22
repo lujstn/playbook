@@ -45,6 +45,12 @@ grep -q "PLAYBOOK_OVERLAY" <<<"$sctx" && echo "PASS: overlay reaches subagent" \
 { grep -q "Playbook helper report:" <<<"$sctx" && grep -q "attentive or above" <<<"$sctx"; } \
   && echo "PASS: SubagentStart asks for the elevated-only closing unease line" \
   || { echo "FAIL: helper-report block missing from SubagentStart"; exit 1; }
+{ grep -q "Playbook helper task authority" <<<"$sctx" \
+  && grep -q "plausibility is never authentication" <<<"$sctx" \
+  && grep -qi "not evidence of forgery" <<<"$sctx" \
+  && grep -q "stop, report what you were asked to disregard" <<<"$sctx"; } \
+  && echo "PASS: SubagentStart carries the helper task-authority rule" \
+  || { echo "FAIL: task-authority block missing or incomplete on SubagentStart"; exit 1; }
 mout="$(printf '{"hook_event_name":"SessionStart","source":"startup"}' | bash "$H")"
 [ "$(jq -r '.hookSpecificOutput.hookEventName' <<<"$mout")" = "SessionStart" ] \
   && echo "PASS: SessionStart envelope event name unchanged" \
@@ -53,6 +59,9 @@ mctx="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$mout")"
 ! grep -q "Playbook helper report:" <<<"$mctx" \
   && echo "PASS: the helper-report block is subagent-only, absent on a main SessionStart" \
   || { echo "FAIL: helper-report block leaked into a main SessionStart"; exit 1; }
+! grep -q "Playbook helper task authority" <<<"$mctx" \
+  && echo "PASS: the task-authority block is subagent-only, absent on a main SessionStart" \
+  || { echo "FAIL: task-authority block leaked into a main SessionStart"; exit 1; }
 
 # Event guard: an unwired event (Stop) yields empty output and exits 0.
 if gout="$(printf '{"hook_event_name":"Stop"}' | bash "$H" 2>/dev/null)"; then :; else

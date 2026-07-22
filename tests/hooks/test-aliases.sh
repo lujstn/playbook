@@ -24,13 +24,13 @@ version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
 
 bash "$script" >/dev/null
 
-for name in brainstorming debug fix offline-mode worktrees hello workflow; do
+for name in brainstorming debug fix offline-mode worktrees hello workflow review-panel; do
   [ -f "$PLAYBOOK_COMMANDS_DIR/$name.md" ] \
     || die "fresh install did not create /$name"
   grep -q 'playbook-managed' "$PLAYBOOK_COMMANDS_DIR/$name.md" \
     || die "/$name missing the ownership marker"
 done
-pass "fresh install writes all seven bare aliases, each marked"
+pass "fresh install writes all eight bare aliases, each marked"
 
 # Delegates point at the right skill (short name maps to the *-mode skill).
 grep -q 'Invoke the `playbook:fix-mode` skill' "$PLAYBOOK_COMMANDS_DIR/fix.md" \
@@ -44,12 +44,14 @@ grep -q 'disable-model-invocation: true' "$PLAYBOOK_COMMANDS_DIR/workflow.md" \
   || die "workflow copy lost disable-model-invocation"
 grep -q '\$ARGUMENTS' "$PLAYBOOK_COMMANDS_DIR/workflow.md" \
   || die "workflow copy lost its \$ARGUMENTS body"
+grep -q '\$ARGUMENTS' "$PLAYBOOK_COMMANDS_DIR/review-panel.md" \
+  || die "review-panel copy lost its \$ARGUMENTS body"
 pass "command-backed names are mirrored verbatim, guard intact"
 
 # Manifest records version and the full installed set.
 grep -q "version=$version" "$PLAYBOOK_GLOBAL_DIR/aliases" \
   || die "manifest missing version=$version"
-grep -q 'installed=brainstorming,debug,fix,offline-mode,worktrees,hello,workflow' \
+grep -q 'installed=brainstorming,debug,fix,offline-mode,worktrees,hello,workflow,review-panel' \
   "$PLAYBOOK_GLOBAL_DIR/aliases" \
   || die "manifest installed list wrong"
 pass "manifest records version and installed set"
