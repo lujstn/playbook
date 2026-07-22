@@ -74,10 +74,10 @@ Work is routed on **separability and durability, not size**. Size only decides w
 
 | Marker | Mode        | Claude Code primitive | When it runs                                                 |
 | ------ | ----------- | --------------------- | ------------------------------------------------------------ |
-| 🐺      | `lone-wolf` | main thread           | quick or coherent work that one mind should hold from start to finish *(claude's  typical bias)* |
+| 🐺      | `lone-wolf` | main thread           | quick or coherent work that one mind should hold from start to finish *(Claude's solo bias)* |
 | 🐜      | `interns`   | parallel **subagents**    | a list of separable chores, each handed to a Sonnet helper as one crisp brief |
 | 🤝      | `hackathon` | agent **teams**           | an expert crew sprinting towards a shared north star: each peer owns their specialism, and they **actively communicate** to converge |
-| ⚙️      | `workflows` | dynamic workflows     | lone-wolf thinking at parallel scale: a medium-or-larger plan, frozen before launch, executed wide *(claude's typical bias when using `/effort ultracode`)* |
+| ⚙️      | `workflows` | dynamic workflows     | lone-wolf thinking at parallel scale: a medium-or-larger plan, frozen before launch, executed wide *(Claude's workflow bias under `/effort ultracode`)* |
 | 🏗️      | `gsd`       | [GSD](https://github.com/open-gsd/gsd-core)                   | a full MVP spanning multiple sessions, a day's work or more, with plans that must survive between them |
 
 <details>
@@ -88,7 +88,7 @@ Work is routed on **separability and durability, not size**. Size only decides w
 <ul>
 	<li>TL;DR: One mind on one thread, for work that is quick, or so coherent that a single head should hold all of it from start to finish.</li>
 	<li>Reach for it when the thinking *is* the work and splitting it would shred it. The wrong fit is anything with a hidden list inside: this is Claude's comfort zone, and the smell of over-picking it is one mind grinding through separable items one at a time. Sounds like: "fix this failing test", "rename this and update the call sites", "explain this module".</li>
-	<li>Note on model selection bias: Claude's comfort zone is doing everything itself, which quietly turns separable work into slow serial work, so Playbook prices staffing on what helpers actually cost (a brief, not a hire) and treats finishing sooner and keeping the main thread sharp as real routing inputs.</li>
+	<li>Note on routing bias: this is the <strong>solo bias</strong>, Claude's comfort zone of doing everything itself, which quietly turns separable work into slow serial work. Playbook treats it as a failure rather than a preference, so it prices staffing on what helpers actually cost (a brief, not a hire) and treats finishing sooner and keeping the main thread sharp as real routing inputs.</li>
 </ul>
 <!-- interns -->
 <li>🐜 interns</li>
@@ -109,7 +109,7 @@ Work is routed on **separability and durability, not size**. Size only decides w
 <ul>
 	<li>TL;DR: Lone-wolf thinking at parallel scale, where one mind writes a frozen plan, a script executes it wide, the bulk stays out of the context and control stays at home.</li>
 	<li>Reach for it when the steps are known before launch and the scale is medium or larger: volume beyond one context, or verification as the deliverable (generate, then independently check). The wrong fit is anything that will need re-planning mid-run, because a workflow cannot change its mind; the tie-break against 🤝 is one question: *will the plan survive contact unchanged?* Workflows are how the big organisation ships the frozen plan; hackathon is the crew of experts outbuilding it while the plan is still alive. Ultracode over-picks this mode, so a workflow must earn its place, never inherit it. Sounds like: "a tailored, fact-checked note for every built-in Node module", "migrate four hundred files with a verify stage".</li>
-	<li>Note on model selection bias: When the effort level is set to ultracode (which we reccomend so  Claude has permission launch dynamic workflows on its own), it can easily over-reach. To counter this, we remind Claude that the tool should be sized to the task, never to the mode, so a read-and-fix over a known set of files is `lone-wolf` or a handful of `interns`, never a twenty-agent swarm, and "ultracode is on" is never by itself a reason to fan out. When ultracode is off, `workflows` becomes opt-in, and Playbook points you at `/workflow` rather than reaching for it itself.</li>
+	<li>Note on routing bias: this is the <strong>workflow bias</strong>, reaching for a frozen fan-out because ultracode makes it easy. Playbook assumes the baseline is ultracode (which we recommend, so that Claude has permission to launch dynamic workflows on its own), and that power is exactly why the discipline here is restraint rather than reach. The tool is sized to the task, never to the mode, so a read-and-fix over a known set of files is `lone-wolf` or a handful of `interns`, never a twenty-agent swarm, and "ultracode is on" is never by itself a reason to fan out. When ultracode is off, `workflows` becomes opt-in, and Playbook points you at `/workflow` rather than reaching for it itself.</li>
 </ul>
 <!-- gsd -->
 <li>🏗️ gsd</li>
