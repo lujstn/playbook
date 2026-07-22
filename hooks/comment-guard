@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+IFS= read -r -d '' payload || true
+command -v jq >/dev/null 2>&1 || exit 0
+
+parsed="$(jq -r '
+  (.tool_name // "") + "\t" + (.tool_input.file_path // ""),
+  (if .tool_name == "Write" then (.tool_input.content // "")
+   else (.tool_input.new_string // "") end)
+' <<<"$payload" 2>/dev/null)" || exit 0
+
+header="${parsed%%$'\n'*}"
+tool="${header%%$'\t'*}"
+path="${header#*$'\t'}"
+
+case "$tool" in
+  Edit | Write) ;;
+  *) exit 0 ;;
+esac
+[ -n "$path" ] || exit 0
+
+case "${path##*/}" in
+  *.md | *.mdx | *.markdown | *.txt | *.rst | *.json | *.yml | *.yaml | *.toml | *.ini | *.cfg | \
+  *.csv | *.tsv | *.lock | *.svg | *.snap | *.xml | *.plist | *.pbxproj | *.storyboard | *.xib | \
+  *.xcscheme | *.strings) exit 0 ;;
+esac
+for skip in node_modules .git .worktrees .next .nuxt .svelte-kit dist build out coverage \
+            vendor Pods Carthage DerivedData .build target .gradle __pycache__ .venv venv \
+            .terraform; do
+  case "/$path" in
+    */"$skip"/*) exit 0 ;;
+  esac
+done
+
+inserted="${parsed#*$'\n'}"
+[ -n "$inserted" ] || exit 0
+
+report="$(awk '
+function lower(s) { return tolower(s) }
+
+function is_directive(c) {
+  return c ~ /^(eslint|globals?|exported|prettier-|@ts-|shellcheck|istanbul|c8|v8|#region|#endregion|<reference|jshint|jslint|type:|swiftlint|ktlint|noinspection|pylint|mypy|flake8|ruff|coverage)/
+}
+
+function is_preprocessor(t) {
+  return t ~ /^#[[:space:]]*(include|import|define|undef|pragma|if|ifdef|ifndef|elif|else|endif|error|warning|line|available|selector|keyPath|sourceLocation|colorLiteral|imageLiteral|file|function|column)/
+}
+
+function is_comment(t) {
+  if (t ~ /^#!/) return 0
+  if (is_preprocessor(t)) return 0
+  return (t ~ /^\/\//) || (t ~ /^#/) || (t ~ /^--/) || (t ~ /^\/\*/) || (t ~ /^\*/) || (t ~ /^<!--/) || (t ~ /^%/)
+}
+
+function strip_marker(t,   s) {
+  s = t
+  sub(/^(\/\/+|#+|--+|\/\*+|\*+|<!--|%+)[[:space:]]?/, "", s)
+  sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", s)
+  sub(/^[[:space:]]+/, "", s)
+  sub(/[[:space:]]+$/, "", s)
+  return s
+}
+
+function is_banner(c,   s) {
+  s = c
+  gsub(/[[:alnum:][:space:]]/, "", s)
+  return (length(s) >= 8)
+}
+
+function is_plan_label(c) {
+  return lower(c) ~ /^(step|phase|wave|route|task|item|option)[[:space:]]+([0-9]{1,3}|[ivx]{1,4}|[a-z])([[:space:]]|[.:)-]|$)/
+}
+
+function is_narration(c,   l) {
+  l = lower(c)
+  return l ~ /(as requested|as discussed|as agreed|as mentioned above|we decided|per the plan|the plan above|as described above|for clarity|as noted above)/
+}
+
+function split_ident(s,   out, i, ch, prev, res) {
+  res = ""
+  prev = ""
+  for (i = 1; i <= length(s); i++) {
+    ch = substr(s, i, 1)
+    if (ch ~ /[A-Z]/ && prev ~ /[a-z0-9]/) res = res " "
+    if (ch ~ /[A-Za-z0-9]/) res = res ch
+    else res = res " "
+    prev = ch
+  }
+  return lower(res)
+}
+
+function is_stopword(w) {
+  return w ~ /^(the|and|for|are|was|were|this|that|these|those|its|you|not|all|any|will|can|must|should|when|which|what|here|there|but|does|did|has|have|had|our|their|them|they|each|per|via|one|with|from|into|out|only|also|than|then|use|used|uses|new|get|set)$/
+}
+
+function restates(c, codeline,   cw, n, i, w, ids, hits, total) {
+  if (codeline == "") return 0
+  ids = " " split_ident(codeline) " "
+  n = split(lower(c), cw, /[^a-z0-9]+/)
+  hits = 0; total = 0
+  for (i = 1; i <= n; i++) {
+    w = cw[i]
+    if (length(w) < 3 || is_stopword(w)) continue
+    total++
+    if (index(ids, " " w " ") > 0) hits++
+    else if (length(w) > 3 && substr(w, length(w)) == "s" && index(ids, " " substr(w, 1, length(w) - 1) " ") > 0) hits++
+    else if (index(ids, " " w "s ") > 0) hits++
+  }
+  if (total == 0) return 0
+  return (hits * 10 >= total * 7)
+}
+
+function problem(line, msg) {
+  printf "  line %d: %s\n", line, msg
+  bad++
+}
+
+{ raw[NR] = $0 }
+
+END {
+  n = NR
+  for (i = 1; i <= n; i++) {
+    t = raw[i]
+    sub(/^[[:space:]]+/, "", t)
+    if (t == "") { kind[i] = "blank"; continue }
+    if (is_comment(t)) {
+      body[i] = strip_marker(t)
+      if (is_directive(body[i]) || (i == 1 && t ~ /^#!/)) { kind[i] = "code"; continue }
+      kind[i] = "comment"
+      comments++
+    } else {
+      kind[i] = "code"
+      code++
+    }
+  }
+
+  for (i = 1; i <= n; i++) {
+    if (kind[i] != "comment") continue
+    if (i > 1 && kind[i - 1] == "comment") continue
+
+    runlen = 0
+    first = ""
+    for (j = i; j <= n && kind[j] == "comment"; j++) {
+      runlen++
+      if (first == "" && body[j] != "") first = body[j]
+    }
+    nextcode = ""
+    for (j = i + runlen; j <= n; j++) {
+      if (kind[j] == "code") { nextcode = raw[j]; break }
+    }
+
+    tagged = (first ~ /^@nonobvious\([a-z-]+\)/)
+    if (!tagged) {
+      problem(i, "comment has no @nonobvious(<category>) tag")
+      continue
+    }
+    cat = first
+    sub(/^@nonobvious\(/, "", cat)
+    sub(/\).*$/, "", cat)
+    if (cat !~ /^(forced-by|mirrors|must-hold|deliberately-missing|means)$/) {
+      problem(i, "unknown category \"" cat "\"")
+      continue
+    }
+    reason = first
+    sub(/^@nonobvious\([a-z-]+\)[[:space:]]*/, "", reason)
+    if (reason == "") {
+      problem(i, "@nonobvious(" cat ") needs the reason on the same line")
+      continue
+    }
+    if (runlen > 5) {
+      problem(i, "comment run is " runlen " lines; the cap is 5")
+      continue
+    }
+    if (is_banner(reason)) { problem(i, "separator banner"); continue }
+    if (is_plan_label(reason)) { problem(i, "plan-step label refers to work that will not exist when this is read"); continue }
+    if (is_narration(reason)) { problem(i, "narrates the work rather than the code"); continue }
+    if (restates(reason, nextcode)) { problem(i, "restates the code below it"); continue }
+  }
+
+  if (comments > 0 && code > 0 && comments > code) {
+    printf "  this edit adds %d comment lines against %d line%s of code\n", comments, code, (code == 1 ? "" : "s")
+    bad++
+  }
+  if (bad > 0) printf "COUNT %d\n", bad
+}
+' <<<"$inserted")"
+
+[ -n "$report" ] || exit 0
+
+{
+  echo "Comment policy blocked this write to ${path##*/}"
+  echo
+  grep -v '^COUNT ' <<<"$report"
+  cat <<'EOF'
+
+Delete the comments. Do not reword them, split them across lines, or move them
+elsewhere. The default is no comment at all.
+
+A one-line fix gets a one-line change. The time you spent finding the bug is not
+a reason to memorialise it. If the surrounding code carries no comments, yours
+has to be so incredibly vital and unclear that it deserves to be the only comment
+in the entire file.
+
+If a comment truly earns its place, open it with @nonobvious(<category>):
+
+  forced-by             an outside system made the code this shape
+  mirrors               must stay in sync with a named place
+  must-hold             a condition types and tests do not enforce
+  deliberately-missing  why the expected thing is not here
+  means                 what a value means beyond its type
+
+None of these fits "explains what the code does". If that is what yours does,
+it does not earn its place.
+EOF
+} >&2
+
+exit 2
