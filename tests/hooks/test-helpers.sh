@@ -86,18 +86,22 @@ case "$main_ab" in
   "Original request, verbatim:"*"Build me a widget that does X."*) echo "PASS: main-thread anchor labelled original request" ;;
   *) echo "FAIL: main anchor was [$main_ab]"; exit 1 ;;
 esac
+# A subagent anchor carries the North Star and nothing else. At SubagentStart the
+# transcript can only be the dispatching session's, so its first user record is the
+# PARENT's request, not this helper's dispatch prompt: quoting it as the helper's
+# task hands over a confidently-worded wrong job.
 sub_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"a1"}' "$SB")")"
 { grep -q "Overall goal (what success means for the whole project):" <<<"$sub_ab" \
-  && grep -q "Your part of it, verbatim:" <<<"$sub_ab" \
-  && ! grep -q "Original request, verbatim:" <<<"$sub_ab" \
+  && grep -q "It does NOT state your task" <<<"$sub_ab" \
+  && ! grep -q "verbatim:" <<<"$sub_ab" \
+  && ! grep -q "Wave 2 Task 3" <<<"$sub_ab" \
   && ! grep -q "^playbook-northstar:" <<<"$sub_ab"; } \
-  && echo "PASS: subagent anchor relabelled, North Star primary, task de-duped" \
+  && echo "PASS: subagent anchor carries the North Star only, never a quoted task" \
   || { echo "FAIL: subagent anchor was [$sub_ab]"; exit 1; }
 nons_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"a1"}' "$T")")"
-{ grep -q "Your assigned task, verbatim:" <<<"$nons_ab" \
-  && grep -q "No project North Star was provided" <<<"$nons_ab"; } \
-  && echo "PASS: subagent without North Star gets honest task label + raise-unease" \
-  || { echo "FAIL: no-NS subagent anchor was [$nons_ab]"; exit 1; }
+[ -z "$nons_ab" ] \
+  && echo "PASS: subagent with no North Star gets an empty anchor, never a guessed task" \
+  || { echo "FAIL: no-NS subagent anchor should be empty, was [$nons_ab]"; exit 1; }
 
 removed=0
 for fn in playbook_dir playbook_anchor playbook_ledger playbook_ensure_dir \
