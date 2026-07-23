@@ -185,6 +185,34 @@ For when **you** want to run several Claude Code sessions at once. This is for h
 - Offsets every resource that has to be isolated by that number: a per-instance Docker database, a dev-server port, a cache namespace.
 - Any number of sessions run side by side without treading on each other; where there's nothing to isolate, it falls back to plain branch isolation.
 
+### 🤐 No comment sludge
+
+Claude loves explaining itself in the margin. Spend fifty minutes chasing a one-line bug and it wants to leave four lines of commentary next to the fix, and the result is a codebase where half of what you read is narration of what the line below already says. Telling it not to doesn't hold: the instruction is read once and the habit reasserts itself every time it writes a line.
+
+So Playbook refuses the comment as it is being written, in any language, before it reaches your file. It reads only the text an edit inserts, so deleting comments is always allowed and code you never touched is never held against you.
+
+Write none by default. A one-line fix gets a one-line change, and the time you spent finding the bug is not a reason to memorialise it. If the surrounding code carries no comments, yours has to be so incredibly vital and unclear that it deserves to be the only comment in the entire file.
+
+A comment that genuinely earns its place says so out loud:
+
+```swift
+/// @nonobvious(forced-by) Safari collapses the flex gap here, so the row needs a spacer
+```
+
+The category comes from a closed set, and each one is a claim you have to mean:
+
+| category | the claim |
+|---|---|
+| `forced-by` | an outside system made the code this shape |
+| `mirrors` | it must stay in sync with a named place |
+| `must-hold` | a condition the types and tests do not enforce |
+| `deliberately-missing` | why the expected thing is not here |
+| `means` | what a value means beyond its type |
+
+There is deliberately no category for "explains what the code does". That reflex has nowhere to file itself, which is the entire point. Banners, `Step 2:` labels, work narration and any comment restating the line beneath it are refused whether they carry a tag or not, and an edit may never add more comment lines than lines of code.
+
+It needs `jq` and `awk`, and stays out of the way of generated trees, vendored dependencies, prose and config.
+
 ### 🧰 First-run setup
 
 The first time you type `/playbook:hello` on a machine, it introduces itself and asks permission before it does anything else. Say yes and it takes a quick read-only look around. A few plugins out there genuinely fight Playbook (the classic ones re-prompt Claude every time it tries to stop, or scare it near the context limit), so it spots those, shows you the evidence, and offers to sort them out. It'll also make sure you've got `jq`, offer to set up notifications if you fancy offline mode, and offer to install the bare command aliases (`/fix`, `/debug` and the rest) so you don't have to type the `/playbook:` prefix, skipping any name another tool already owns.
