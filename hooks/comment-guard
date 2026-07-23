@@ -3,27 +3,44 @@ set -uo pipefail
 
 IFS= read -r -d '' payload || true
 command -v jq >/dev/null 2>&1 || exit 0
+command -v awk >/dev/null 2>&1 || exit 0
 
-parsed="$(jq -r '
-  (.tool_name // "") + "\t" + (.tool_input.file_path // ""),
-  (if .tool_name == "Write" then (.tool_input.content // "")
-   else (.tool_input.new_string // "") end)
-' <<<"$payload" 2>/dev/null)" || exit 0
+field() { jq -r "$1" <<<"$payload" 2>/dev/null; }
 
-header="${parsed%%$'\n'*}"
-tool="${header%%$'\t'*}"
-path="${header#*$'\t'}"
-
+tool="$(field '.tool_name // ""')" || exit 0
 case "$tool" in
   Edit | Write) ;;
   *) exit 0 ;;
 esac
+
+path="$(field '.tool_input.file_path // ""')"
 [ -n "$path" ] || exit 0
 
-case "${path##*/}" in
-  *.md | *.mdx | *.markdown | *.txt | *.rst | *.json | *.yml | *.yaml | *.toml | *.ini | *.cfg | \
-  *.csv | *.tsv | *.lock | *.svg | *.snap | *.xml | *.plist | *.pbxproj | *.storyboard | *.xib | \
-  *.xcscheme | *.strings) exit 0 ;;
+if [ "$tool" = "Write" ]; then
+  inserted="$(field '.tool_input.content // ""')"
+  oldtext=""
+else
+  inserted="$(field '.tool_input.new_string // ""')"
+  oldtext="$(field '.tool_input.old_string // ""')"
+fi
+[ -n "$inserted" ] || exit 0
+
+base="${path##*/}"
+lc="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')"
+case "$lc" in
+  *.*) ext="${lc##*.}" ;;
+  *) ext="" ;;
+esac
+
+case "$ext" in
+  md | mdx | markdown | txt | rst | json | yml | yaml | toml | ini | cfg | \
+  csv | tsv | lock | svg | snap | xml | plist | pbxproj | storyboard | xib | \
+  xcscheme | strings) exit 0 ;;
+esac
+case "$lc" in
+  .gitignore | .gitattributes | .dockerignore | .npmignore | .prettierignore | \
+  .eslintignore | .editorconfig | .gitmodules | codeowners | license | license.* | \
+  .env | .env.*) exit 0 ;;
 esac
 for skip in node_modules .git .worktrees .next .nuxt .svelte-kit dist build out coverage \
             vendor Pods Carthage DerivedData .build target .gradle __pycache__ .venv venv \
@@ -33,24 +50,32 @@ for skip in node_modules .git .worktrees .next .nuxt .svelte-kit dist build out 
   esac
 done
 
-inserted="${parsed#*$'\n'}"
-[ -n "$inserted" ] || exit 0
+case "$ext" in
+  c | h | cc | cpp | cxx | hh | hpp | hxx | m | mm | swift | java | kt | kts | scala | \
+  js | jsx | mjs | cjs | ts | tsx | go | rs | dart | groovy | gradle | proto | sol | \
+  zig | glsl | vert | frag | metal | cu | cuh | scss | less | sass | styl)
+    markers="slash block" ;;
+  php) markers="slash block hash" ;;
+  css) markers="block" ;;
+  py | rb | sh | bash | zsh | fish | pl | pm | r | jl | nim | tf | tfvars | ex | exs | \
+  cr | coffee | ps1 | psm1 | rake | gemspec)
+    markers="hash" ;;
+  sql) markers="dash block" ;;
+  lua | hs | lhs | adb | ads | elm | moon) markers="dash" ;;
+  erl | hrl | tex | sty | cls | bib) markers="percent" ;;
+  html | htm) markers="html" ;;
+  vue | svelte | astro) markers="slash block html" ;;
+  "") markers="hash" ;;
+  *) markers="slash block hash" ;;
+esac
 
-report="$(awk '
+report="$(OLD="$oldtext" LC_ALL=C awk -v mk=" $markers " '
+function has(m) { return index(mk, " " m " ") > 0 }
 function lower(s) { return tolower(s) }
 
-function is_directive(c) {
-  return c ~ /^(eslint|globals?|exported|prettier-|@ts-|shellcheck|istanbul|c8|v8|#region|#endregion|<reference|jshint|jslint|type:|swiftlint|ktlint|noinspection|pylint|mypy|flake8|ruff|coverage)/
-}
-
-function is_preprocessor(t) {
-  return t ~ /^#[[:space:]]*(include|import|define|undef|pragma|if|ifdef|ifndef|elif|else|endif|error|warning|line|available|selector|keyPath|sourceLocation|colorLiteral|imageLiteral|file|function|column)/
-}
-
-function is_comment(t) {
-  if (t ~ /^#!/) return 0
-  if (is_preprocessor(t)) return 0
-  return (t ~ /^\/\//) || (t ~ /^#/) || (t ~ /^--/) || (t ~ /^\/\*/) || (t ~ /^\*/) || (t ~ /^<!--/) || (t ~ /^%/)
+function is_directive(c,   l) {
+  l = lower(c)
+  return l ~ /^(eslint|prettier-|@ts-|ts-nocheck|tslint|stylelint|shellcheck|swiftlint|ktlint|jshint|jslint|istanbul ignore|c8 ignore|v8 ignore|#?region|#?endregion|<reference|type:|pylint:|pyright:|mypy:|flake8:|ruff:|noqa|noinspection|fmt:|isort:|coding[:=]|-\*-|%%|global |globals |exported |pragma)/
 }
 
 function strip_marker(t,   s) {
@@ -62,10 +87,18 @@ function strip_marker(t,   s) {
   return s
 }
 
-function is_banner(c,   s) {
-  s = c
-  gsub(/[[:alnum:][:space:]]/, "", s)
-  return (length(s) >= 8)
+function line_comment(t) {
+  if (has("slash") && t ~ /^\/\//) return 1
+  if (has("hash") && t ~ /^#/ && t !~ /^#!/) return 1
+  if (has("dash") && t ~ /^--/) return 1
+  if (has("percent") && t ~ /^%/) return 1
+  return 0
+}
+
+function is_banner(c,   s, sym, an) {
+  s = c; sym = gsub(/[^[:alnum:][:space:]]/, "", s)
+  s = c; an = gsub(/[[:alnum:]]/, "", s)
+  return (sym >= 8 && sym >= 2 * an)
 }
 
 function is_plan_label(c) {
@@ -77,9 +110,8 @@ function is_narration(c,   l) {
   return l ~ /(as requested|as discussed|as agreed|as mentioned above|we decided|per the plan|the plan above|as described above|for clarity|as noted above)/
 }
 
-function split_ident(s,   out, i, ch, prev, res) {
-  res = ""
-  prev = ""
+function split_ident(s,   i, ch, prev, res) {
+  res = ""; prev = ""
   for (i = 1; i <= length(s); i++) {
     ch = substr(s, i, 1)
     if (ch ~ /[A-Z]/ && prev ~ /[a-z0-9]/) res = res " "
@@ -94,12 +126,12 @@ function is_stopword(w) {
   return w ~ /^(the|and|for|are|was|were|this|that|these|those|its|you|not|all|any|will|can|must|should|when|which|what|here|there|but|does|did|has|have|had|our|their|them|they|each|per|via|one|with|from|into|out|only|also|than|then|use|used|uses|new|get|set)$/
 }
 
-function restates(c, codeline,   cw, n, i, w, ids, hits, total) {
+function restates(c, codeline,   cw, nn, i, w, ids, hits, total) {
   if (codeline == "") return 0
   ids = " " split_ident(codeline) " "
-  n = split(lower(c), cw, /[^a-z0-9]+/)
+  nn = split(lower(c), cw, /[^a-z0-9]+/)
   hits = 0; total = 0
-  for (i = 1; i <= n; i++) {
+  for (i = 1; i <= nn; i++) {
     w = cw[i]
     if (length(w) < 3 || is_stopword(w)) continue
     total++
@@ -111,75 +143,147 @@ function restates(c, codeline,   cw, n, i, w, ids, hits, total) {
   return (hits * 10 >= total * 7)
 }
 
+function trailing_comment(line,   i, ch, c2, q, fns) {
+  fns = 0
+  for (i = 1; i <= length(line); i++) {
+    if (substr(line, i, 1) !~ /[[:space:]]/) { fns = i; break }
+  }
+  if (fns == 0) return ""
+  q = ""
+  for (i = fns; i <= length(line); i++) {
+    ch = substr(line, i, 1)
+    c2 = substr(line, i, 2)
+    if (q != "") {
+      if (ch == "\\") { i++; continue }
+      if (ch == q) q = ""
+      continue
+    }
+    if (ch == "\"" || ch == "'"'"'" || ch == "`") { q = ch; continue }
+    if (i > fns) {
+      if (has("slash") && c2 == "//") return substr(line, i + 2)
+      if (has("block") && c2 == "/*") return substr(line, i + 2)
+      if (has("hash") && ch == "#") return substr(line, i + 1)
+      if (has("dash") && c2 == "--") return substr(line, i + 2)
+      if (has("percent") && ch == "%") return substr(line, i + 1)
+      if (has("html") && substr(line, i, 4) == "<!--") return substr(line, i + 4)
+    }
+  }
+  return ""
+}
+
 function problem(line, msg) {
   printf "  line %d: %s\n", line, msg
   bad++
 }
 
-{ raw[NR] = $0 }
+BEGIN {
+  have_old = (ENVIRON["OLD"] != "")
+  if (have_old) {
+    no = split(ENVIRON["OLD"], oldarr, "\n")
+    for (k = 1; k <= no; k++) oldset[oldarr[k]] = 1
+  }
+}
+
+{ raw[NR] = $0; isold[NR] = (have_old && ($0 in oldset)) }
 
 END {
   n = NR
+  inblock = ""
   for (i = 1; i <= n; i++) {
     t = raw[i]
     sub(/^[[:space:]]+/, "", t)
-    if (t == "") { kind[i] = "blank"; continue }
-    if (is_comment(t)) {
-      body[i] = strip_marker(t)
-      if (is_directive(body[i]) || (i == 1 && t ~ /^#!/)) { kind[i] = "code"; continue }
+
+    if (inblock != "") {
       kind[i] = "comment"
-      comments++
-    } else {
-      kind[i] = "code"
-      code++
+      body[i] = strip_marker(t)
+      if (index(t, inblock) > 0) inblock = ""
+      continue
     }
+    if (t == "") { kind[i] = "blank"; continue }
+
+    if (has("block") && t ~ /^\/\*/) {
+      body[i] = strip_marker(t)
+      closes = (index(t, "*/") > 0)
+      if (closes && is_directive(body[i])) kind[i] = "code"
+      else { kind[i] = "comment"; if (!closes) inblock = "*/" }
+      continue
+    }
+    if (has("html") && t ~ /^<!--/) {
+      body[i] = strip_marker(t)
+      closes = (index(t, "-->") > 0)
+      if (closes && is_directive(body[i])) kind[i] = "code"
+      else { kind[i] = "comment"; if (!closes) inblock = "-->" }
+      continue
+    }
+    if (line_comment(t)) {
+      body[i] = strip_marker(t)
+      if (is_directive(body[i])) kind[i] = "code"
+      else kind[i] = "comment"
+      continue
+    }
+    kind[i] = "code"
+  }
+
+  for (i = 1; i <= n; i++) {
+    if (isold[i]) continue
+    if (kind[i] == "comment") comments++
+    else if (kind[i] == "code") code++
+  }
+
+  for (i = 1; i <= n; i++) {
+    if (kind[i] != "code" || isold[i]) continue
+    tc = trailing_comment(raw[i])
+    if (tc == "") continue
+    sub(/^[[:space:]]+/, "", tc)
+    sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", tc)
+    sub(/[[:space:]]+$/, "", tc)
+    if (tc == "" || is_directive(tc)) continue
+    problem(i, "trailing comment (put an earned @nonobvious note on its own line, or delete it)")
   }
 
   for (i = 1; i <= n; i++) {
     if (kind[i] != "comment") continue
     if (i > 1 && kind[i - 1] == "comment") continue
 
-    runlen = 0
-    first = ""
+    runlen = 0; first = ""; firstline = 0; anynew = 0
     for (j = i; j <= n && kind[j] == "comment"; j++) {
       runlen++
-      if (first == "" && body[j] != "") first = body[j]
+      if (first == "" && body[j] != "") { first = body[j]; firstline = j }
+      if (!isold[j]) anynew = 1
     }
+    if (!anynew) continue
+    if (firstline == 0) firstline = i
+
     nextcode = ""
     for (j = i + runlen; j <= n; j++) {
       if (kind[j] == "code") { nextcode = raw[j]; break }
     }
 
-    tagged = (first ~ /^@nonobvious\([a-z-]+\)/)
-    if (!tagged) {
-      problem(i, "comment has no @nonobvious(<category>) tag")
-      continue
-    }
+    if (first !~ /^@nonobvious\([a-z-]+\)/) { problem(firstline, "comment has no @nonobvious(<category>) tag"); continue }
     cat = first
     sub(/^@nonobvious\(/, "", cat)
     sub(/\).*$/, "", cat)
-    if (cat !~ /^(forced-by|mirrors|must-hold|deliberately-missing|means)$/) {
-      problem(i, "unknown category \"" cat "\"")
-      continue
-    }
+    if (cat !~ /^(forced-by|mirrors|must-hold|deliberately-missing|means)$/) { problem(firstline, "unknown category \"" cat "\""); continue }
     reason = first
     sub(/^@nonobvious\([a-z-]+\)[[:space:]]*/, "", reason)
-    if (reason == "") {
-      problem(i, "@nonobvious(" cat ") needs the reason on the same line")
-      continue
+    if (reason == "") { problem(firstline, "@nonobvious(" cat ") needs the reason on the same line"); continue }
+    if (runlen > 5) { problem(firstline, "comment run is " runlen " lines; the cap is 5"); continue }
+
+    hit = 0
+    for (j = i; j < i + runlen; j++) {
+      b = body[j]
+      if (b == "") continue
+      if (j == firstline) b = reason
+      if (is_banner(b)) { problem(j, "separator banner"); hit = 1; break }
+      if (is_plan_label(b)) { problem(j, "plan-step label refers to work that will not exist when this is read"); hit = 1; break }
+      if (is_narration(b)) { problem(j, "narrates the work rather than the code"); hit = 1; break }
+      if (restates(b, nextcode)) { problem(j, "restates the code below it"); hit = 1; break }
     }
-    if (runlen > 5) {
-      problem(i, "comment run is " runlen " lines; the cap is 5")
-      continue
-    }
-    if (is_banner(reason)) { problem(i, "separator banner"); continue }
-    if (is_plan_label(reason)) { problem(i, "plan-step label refers to work that will not exist when this is read"); continue }
-    if (is_narration(reason)) { problem(i, "narrates the work rather than the code"); continue }
-    if (restates(reason, nextcode)) { problem(i, "restates the code below it"); continue }
+    if (hit) continue
   }
 
-  if (comments > 0 && code > 0 && comments > code) {
-    printf "  this edit adds %d comment lines against %d line%s of code\n", comments, code, (code == 1 ? "" : "s")
+  if (comments > 0 && comments > code) {
+    printf "  this edit adds %d comment line%s against %d line%s of code\n", comments, (comments == 1 ? "" : "s"), code, (code == 1 ? "" : "s")
     bad++
   }
   if (bad > 0) printf "COUNT %d\n", bad
@@ -189,7 +293,7 @@ END {
 [ -n "$report" ] || exit 0
 
 {
-  echo "Comment policy blocked this write to ${path##*/}"
+  echo "Comment policy blocked this write to ${base}"
   echo
   grep -v '^COUNT ' <<<"$report"
   cat <<'EOF'
