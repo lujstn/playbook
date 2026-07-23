@@ -80,8 +80,8 @@ function is_directive(c,   l) {
 
 function strip_marker(t,   s) {
   s = t
-  sub(/^(\/\/+|#+|--+|\/\*+|\*+|<!--|%+)[[:space:]]?/, "", s)
   sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", s)
+  sub(/^(\/\/+|#+|--+|\/\*+|\*+|<!--|%+)[[:space:]]?/, "", s)
   sub(/^[[:space:]]+/, "", s)
   sub(/[[:space:]]+$/, "", s)
   return s
@@ -209,8 +209,8 @@ END {
       continue
     }
     if (inblock != "") {
-      kind[i] = "comment"
       body[i] = strip_marker(t)
+      kind[i] = (body[i] == "" ? "blank" : "comment")
       if (index(t, inblock) > 0) inblock = ""
       continue
     }
@@ -220,20 +220,20 @@ END {
       body[i] = strip_marker(t)
       closes = (index(t, "*/") > 0)
       if (closes && is_directive(body[i])) kind[i] = "code"
-      else { kind[i] = "comment"; if (!closes) inblock = "*/" }
+      else { kind[i] = (body[i] == "" ? "blank" : "comment"); if (!closes) inblock = "*/" }
       continue
     }
     if (has("html") && t ~ /^<!--/) {
       body[i] = strip_marker(t)
       closes = (index(t, "-->") > 0)
       if (closes && is_directive(body[i])) kind[i] = "code"
-      else { kind[i] = "comment"; if (!closes) inblock = "-->" }
+      else { kind[i] = (body[i] == "" ? "blank" : "comment"); if (!closes) inblock = "-->" }
       continue
     }
     if (line_comment(t)) {
       body[i] = strip_marker(t)
       if (is_directive(body[i])) kind[i] = "code"
-      else kind[i] = "comment"
+      else kind[i] = (body[i] == "" ? "blank" : "comment")
       continue
     }
     kind[i] = "code"

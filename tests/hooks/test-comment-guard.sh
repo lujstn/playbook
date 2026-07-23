@@ -290,4 +290,22 @@ blocks "a left-shift in a non-hash language is not a heredoc" src/a.js "const x 
 // this sludge is still caught
 run();"
 
+echo "-- empty block-comment wrapper lines neither count nor flag"
+allows "a tagged note wrapped in a JSDoc block" src/a.ts "/**
+ * @nonobvious(must-hold) the counter never goes negative
+ */
+let counter = 0;"
+allows "a multi-line tagged note in a block wrapper" src/a.ts "/**
+ * @nonobvious(means) a real reason for the value
+ */
+const a = 1;"
+blocks "but an untagged JSDoc block still needs a tag" src/a.ts "/**
+ * Builds the widget.
+ */
+function build() {}"
+allows "a bare empty line comment is neutral" src/a.ts "//
+const a = 1;"
+allows "a bare block-comment close strips to empty" src/a.ts "/* @nonobvious(means) the parsed shape */
+const a = 1;"
+
 exit $fail
