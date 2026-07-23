@@ -254,4 +254,40 @@ for f in .gitignore .dockerignore .env .env.local CODEOWNERS; do
 value"
 done
 
+echo "-- test-runner environment pragmas are tooling directives, not sludge"
+allows "vitest single-line block pragma" src/x.test.ts "/** @vitest-environment jsdom */
+test('x', () => {})"
+allows "jest multi-line block pragma" src/x.test.ts "/**
+ * @jest-environment jsdom
+ */
+test('x', () => {})"
+allows "a vitest line-comment pragma" src/x.test.ts "// @vitest-environment node
+test('x', () => {})"
+allows "jest environment options" src/x.test.ts "/** @jest-environment-options {\"url\":\"http://x\"} */
+test('x', () => {})"
+blocks "but a real multi-line JSDoc block still needs a tag" src/x.test.ts "/**
+ * Builds the widget.
+ */
+function build() {}"
+
+echo "-- heredoc bodies are program output, not comments"
+allows "an unquoted heredoc body" deploy.sh "cat <<EOF
+# a generated header line
+# another output line
+EOF
+echo done"
+allows "a quoted heredoc body" deploy.sh "cat <<'EOF'
+# literal output
+EOF
+echo done"
+allows "a dash-heredoc body with tabbed close" deploy.sh "$(printf 'cat <<-EOF\n\t# tabbed body\n\tEOF\necho done')"
+blocks "a real shell comment outside a heredoc still blocks" deploy.sh "# TODO explain this
+cat file"
+blocks "a here-string does not start heredoc suppression" deploy.sh "grep x <<< \"\$var\"
+# this sludge is still caught
+foo"
+blocks "a left-shift in a non-hash language is not a heredoc" src/a.js "const x = a << b;
+// this sludge is still caught
+run();"
+
 exit $fail

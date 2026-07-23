@@ -75,7 +75,7 @@ function lower(s) { return tolower(s) }
 
 function is_directive(c,   l) {
   l = lower(c)
-  return l ~ /^(eslint|prettier-|@ts-|ts-nocheck|tslint|stylelint|shellcheck|swiftlint|ktlint|jshint|jslint|istanbul ignore|c8 ignore|v8 ignore|#?region|#?endregion|<reference|type:|pylint:|pyright:|mypy:|flake8:|ruff:|noqa|noinspection|fmt:|isort:|coding[:=]|-\*-|%%|global |globals |exported |pragma)/
+  return l ~ /^(eslint|prettier-|@ts-|@?(vitest|jest)-environment|ts-nocheck|tslint|stylelint|shellcheck|swiftlint|ktlint|jshint|jslint|istanbul ignore|c8 ignore|v8 ignore|#?region|#?endregion|<reference|type:|pylint:|pyright:|mypy:|flake8:|ruff:|noqa|noinspection|fmt:|isort:|coding[:=]|-\*-|%%|global |globals |exported |pragma)/
 }
 
 function strip_marker(t,   s) {
@@ -93,6 +93,15 @@ function line_comment(t) {
   if (has("dash") && t ~ /^--/) return 1
   if (has("percent") && t ~ /^%/) return 1
   return 0
+}
+
+function heredoc_open(line,   d) {
+  if (!has("hash")) return ""
+  if (!match(line, /<<-?[ \t]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*/)) return ""
+  if (substr(line, RSTART, 3) == "<<<" || substr(line, RSTART - 1, 1) == "<") return ""
+  d = substr(line, RSTART, RLENGTH)
+  sub(/^<<-?[ \t]*["'"'"']?/, "", d)
+  return d
 }
 
 function is_banner(c,   s, sym, an) {
@@ -189,10 +198,16 @@ BEGIN {
 END {
   n = NR
   inblock = ""
+  heredoc = ""
   for (i = 1; i <= n; i++) {
     t = raw[i]
     sub(/^[[:space:]]+/, "", t)
 
+    if (heredoc != "") {
+      if (t == heredoc) { kind[i] = "code"; heredoc = "" }
+      else kind[i] = "heredoc"
+      continue
+    }
     if (inblock != "") {
       kind[i] = "comment"
       body[i] = strip_marker(t)
@@ -222,23 +237,8 @@ END {
       continue
     }
     kind[i] = "code"
-  }
-
-  for (i = 1; i <= n; i++) {
-    if (isold[i]) continue
-    if (kind[i] == "comment") comments++
-    else if (kind[i] == "code") code++
-  }
-
-  for (i = 1; i <= n; i++) {
-    if (kind[i] != "code" || isold[i]) continue
-    tc = trailing_comment(raw[i])
-    if (tc == "") continue
-    sub(/^[[:space:]]+/, "", tc)
-    sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", tc)
-    sub(/[[:space:]]+$/, "", tc)
-    if (tc == "" || is_directive(tc)) continue
-    problem(i, "trailing comment (put an earned @nonobvious note on its own line, or delete it)")
+    d = heredoc_open(raw[i])
+    if (d != "") heredoc = d
   }
 
   for (i = 1; i <= n; i++) {
@@ -251,8 +251,12 @@ END {
       if (first == "" && body[j] != "") { first = body[j]; firstline = j }
       if (!isold[j]) anynew = 1
     }
-    if (!anynew) continue
     if (firstline == 0) firstline = i
+    if (is_directive(first)) {
+      for (j = i; j < i + runlen; j++) kind[j] = "directive"
+      continue
+    }
+    if (!anynew) continue
 
     nextcode = ""
     for (j = i + runlen; j <= n; j++) {
@@ -280,6 +284,23 @@ END {
       if (restates(b, nextcode)) { problem(j, "restates the code below it"); hit = 1; break }
     }
     if (hit) continue
+  }
+
+  for (i = 1; i <= n; i++) {
+    if (isold[i]) continue
+    if (kind[i] == "comment") comments++
+    else if (kind[i] == "code") code++
+  }
+
+  for (i = 1; i <= n; i++) {
+    if (kind[i] != "code" || isold[i]) continue
+    tc = trailing_comment(raw[i])
+    if (tc == "") continue
+    sub(/^[[:space:]]+/, "", tc)
+    sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", tc)
+    sub(/[[:space:]]+$/, "", tc)
+    if (tc == "" || is_directive(tc)) continue
+    problem(i, "trailing comment (put an earned @nonobvious note on its own line, or delete it)")
   }
 
   if (comments > 0 && comments > code) {
