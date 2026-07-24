@@ -258,6 +258,23 @@ ${nudge}"; else body="$nudge"; fi
       decay_floor "$dir"
     fi
 
+    # Edit churn: one path rewritten four times inside the last ten edits. The
+    # log is consumed on a trip, which is what stops a single burst asserting
+    # twice, and bounded here rather than in the hot append path.
+    ef="${dir}/edits"
+    if [ -f "$ef" ]; then
+      if [ -n "$(tail -n 10 "$ef" 2>/dev/null | sort | uniq -c | sort -rn | awk 'NR==1 && $1>=4{print "trip"}')" ]; then
+        : > "$ef" 2>/dev/null || true
+        body="$(append_seg "$body" "$(trip_floor "$dir" uneasy edit-churn)")"
+      fi
+      lines="$(wc -l < "$ef" 2>/dev/null | tr -d ' ')"
+      case "$lines" in ''|*[!0-9]*) lines=0 ;; esac
+      if [ "$lines" -gt 200 ]; then
+        { tail -n 100 "$ef" > "${ef}.trim.$$" && mv -f "${ef}.trim.$$" "$ef"; } 2>/dev/null \
+          || rm -f "${ef}.trim.$$" 2>/dev/null || true
+      fi
+    fi
+
     # No usable usage figure: the failure bookkeeping above still ran, and any
     # floor assertion still goes out; only the context beats need the figure.
     case "$used" in

@@ -13,7 +13,8 @@
     ],
     "PreToolUse": [
       { "matcher": "Edit|Write", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" comment-guard", "async": false }
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" comment-guard", "async": false },
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" edit-log", "async": false }
       ] },
       { "matcher": "Agent|Workflow", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" dispatch-guard", "async": false }
