@@ -12,7 +12,7 @@ Playbook is an invisible-but-visible native steering layer. It activates at the 
 
 **Core principle:** Route on separability and durability, never on size. Size only triggers decompose-as-judgement. Announce, never gate.
 
-The overlay is the persistence mechanism, carried by the hooks across compaction and into every subagent and workflow stage. The nine tenets live in `hooks/session-start`; this skill references them, it does not restate them.
+The overlay is the persistence mechanism, carried by the hooks across compaction and into every subagent and workflow stage. The nine tenets live in this skill; the always-on overlay and the per-prompt card point here.
 
 ## The engine
 
@@ -26,7 +26,15 @@ One line, derived verbatim from the user's request, kept load-bearing at every d
 - **Durability** decides whether state must survive `/clear`: if yes, gsd; if no, the session-scoped modes.
 - **Size** decides only whether to decompose first. If the work is too large to route as one unit, propose the cut and recurse per piece (decompose-as-judgement). There is no sixth mode for this; it is a decision that lives in the engine.
 
-Ultracode is the assumed baseline: most substantial work runs under `/effort ultracode`, where you can launch a dynamic workflow yourself. Match the tool to the task, never to the mode, and right-size the number of hands to the number of genuinely independent units the task actually has. The hand count follows the work; it is never a target to scale up to, and this governs the count inside interns just as much as the choice to run a workflow. Ask what this task actually requires before reaching for scale, and cost the hands correctly when you ask it: subagents are not colleagues. A dispatch costs one written brief, not a hire; interns never talk to each other, so coordination does not grow with their number; and each works in its own fresh context, keeping its churn out of yours. The true costs sit elsewhere: a subagent knows nothing beyond its brief, so a unit is only separable if one crisp brief fully specifies it, and integrating the results is yours. Price staffing on these facts, not on human-team instincts. Wall-clock speed and main-context preservation are live routing inputs on genuinely independent units: when parallel hands would finish separable work sooner, or fanning the bulk out would keep the main thread sharp, weigh that gain against the briefs it costs and say so in the marker reason. A workflow earns its place only when one of these genuinely holds: the plan is frozen before launch and runs at parallel scale, medium or larger, or the bulk exceeds what one context can hold, or independent verification is itself the deliverable (an answer re-derived through several independent agents to defeat correlated error on a high-stakes or ambiguous result). The tie-break against hackathon is one question, asked before reaching for the script: will the plan survive contact unchanged? Frozen and known up front is a workflow; alive and negotiated as it lands belongs to a crew of experts, not a script. Reading and fixing a known, bounded set of files is none of these: even a couple of dozen files is lone-wolf or interns, because the set fits one plan, and an audit's own checking is self-review or a single reviewer subagent, not a fan-out. This tie-break is decisive: a read-and-fix or audit over a known file set is interns at most unless that bulk exceeds what one context can hold, and it overrides the units-count and verification justifiers. "Ultracode is on, so this is the right scale" is the wrong reasoning; the mode being on is never itself the reason to fan out, and relabelling a 23-agent fan-out as interns is just as wrong as calling it a workflow. When ultracode is not on, workflows are opt-in instead: run interns and point the user at the `/workflow` command or the ultracode keyword to scale further.
+Route by shape. Quick or coherent work one mind should hold from start to finish is lone-wolf. A list of separable chores, one crisp brief each, is interns: parallel Sonnet lone-wolves, one hand per genuine unit. A living build spanning different specialisms that must land together on the shared North Star is hackathon: a cross-communicating crew of experts, each owning their own piece. A frozen plan at parallel scale, medium or larger, is workflows: lone-wolf thinking executed wide by a script that keeps control and cannot change its mind. A full MVP spanning multiple sessions, a day's work or more, is gsd. Four tie-breaks settle every boundary, asked in order:
+1. Instructions or judgement? Chores that follow instructions are interns; pieces that must think and mutually adjust are hackathon.
+2. A coupled build is decided by spine density, never a coherence preference: how much of the build is the shared interface? A thin spine over deep pieces (a protocol file, a schema, an API; a backend platform, web UI and native app landing together) is hackathon: the spine gets one owner, changes to it are broadcast in a message, and the deep pieces build in parallel. Do not argue against this with interns logic: teammates share one working tree and talk, and serialising the bulk to protect the sliver pays a pound to insure a penny. Only when the interface effectively is the build does lone-wolf win, and the marker reason must then say so in terms of the spine. Hackathon needs agent teams: check the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment variable with one shell echo; when it is absent, fall back and say so in the marker reason.
+3. The interns-or-workflows question is scale, counted in units, never in writers: batching many units into fewer briefs does not change the count. A handful of separable units is interns; dozens or more frozen units, bulk beyond one context, or independent verification as the deliverable is workflows.
+4. The workflows-or-hackathon question: will the plan survive contact unchanged? Frozen and known up front is workflows; alive and negotiated as it lands is hackathon.
+
+Price the hands on facts, not human-team instincts: subagents are not colleagues; a dispatch costs one written brief, not a hire; interns never talk to each other; each works in a fresh context, keeping its churn out of yours; a subagent knows nothing beyond its brief, so a unit is only separable if one brief fully specifies it, and integration is yours. Wall-clock speed and main-context preservation are live routing inputs on separable work, in hackathon exactly as in interns: a serial build makes the user wait several times longer. Both inherited biases are failures, not preferences: the solo bias (grinding separable work serially because keeping control feels safe) and the workflow bias (reaching for a frozen fan-out because ultracode makes it easy). When parallel hands would finish separable work sooner, or fanning the bulk out would keep the main thread sharp, weigh that gain against the briefs it costs and say so in the marker reason.
+
+Assume ultracode is the baseline: most substantial work runs under /effort ultracode, where you can launch a dynamic workflow yourself; that power is exactly why the discipline is restraint, not reach. Match the tool to the task, never to the mode, and right-size the hands to the genuinely independent units; the count is never a target. Reading and fixing a known file set, even a couple of dozen files, is interns at most and never a fan-out unless that bulk exceeds one context. 'Ultracode is on, so this is the right scale' is the wrong reasoning, and relabelling a large fan-out as interns is just as wrong as calling it a workflow. If ultracode is not on, workflows are opt-in instead: run interns now and point the user at the /workflow command or the ultracode keyword to scale further. An audit's own checking is self-review or a single reviewer subagent, not a fan-out, and this tie-break overrides the units-count and verification justifiers. Independent verification as a workflow's deliverable means an answer re-derived through several independent agents to defeat correlated error on a high-stakes or ambiguous result.
 
 ### 3. Announce the route
 
@@ -45,6 +53,13 @@ The **Playbook** brand is mandatory so the marker is unmistakably Playbook on to
 | 🤝 | hackathon |
 | ⚙️ | workflows |
 | 🏗️ | gsd |
+| 🧭 | brainstorming |
+| 🦞 | fix |
+| 👾 | debug |
+| 📴 | offline |
+| 🌿 | worktrees |
+| 🧰 | setup |
+| 🌡️ | unease (printed only when unease rises) |
 
 ### 4. Route
 
@@ -85,6 +100,19 @@ A full MVP in an unknown area, a day's work or more, spanning multiple sessions.
 
 Before handing work back, run the tenet 6 sweep: no scaffolding vocabulary (plan, wave, mission) in shipped code, no comment sludge, no plan references.
 
+## The nine tenets
+
+The nine tenets, always live:
+1. Remember what matters: the original request is recovered with primacy after compaction; keep the one-line North Star load-bearing, and pass it into every subagent and workflow stage you dispatch.
+2. Front-load the questions: explore first, ask the batch once and early so downstream can run unattended; do not drip-feed, though stopping to ask later is allowed.
+3. Team of equals: a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents and peers push back with technical reasoning; peer sanity-check is the routine cheap path before escalating.
+4. Unease: hold a quiet internal register (clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking); restate it only when it increases, as one branded line 🌡️ **Playbook** `unease: <level>` *<reason of at most 50 characters>*, measured against the North Star and the whole project; the escalation ladder is offered on an increase and usually declined.
+5. Offline behaviour is enabled only by the offline-mode skill, explicitly and per run.
+6. Production-ready: no scaffolding vocabulary (plan, wave, mission) or comment sludge in shipped code; sweep before handing work back. Write no comments by default: a one-line fix gets a one-line change, and the time you spent finding the bug is not a reason to memorialise it; if the surrounding code carries no comments, yours has to be so incredibly vital and unclear that it deserves to be the only comment in the entire file. A comment that survives that test opens with @nonobvious(<category>) and a reason, where the category is one of forced-by, mirrors, must-hold, deliberately-missing or means. None of them fits explaining what the code does. The comment-guard hook rejects the rest as you write them; when it does, delete the comment rather than rewording it.
+7. Ride the compaction, do not fear it: see Context calm above; compaction is a steered breath, not a wipe.
+8. Less is more: pick the cheapest sufficient mode and model; short questions, plans and comments; longer thinking and shorter output; give subagents freedom.
+9. Speed via more hands, not rushing: fan only genuinely separable work across subagents and workflows, and only as many hands as there are independent units; more hands is never the goal, finishing the separable work at the same completeness bar is; partial work to save time is forbidden; never rush unless the user says to rush.
+
 ### Standing override
 
 At every step: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the mode or the unease level.
@@ -106,7 +134,7 @@ Playbook writes into `.planning/` only via the declared pre-seed and post-proces
 - Ship scaffolding vocabulary (plan, wave, mission) or plan references in delivered code (tenet 6).
 - Follow `writing-plans`' built-in `subagent-driven-development` pointer; that route is dropped in v2.
 - Write into `.planning/` outside the declared gsd-mode touches.
-- Restate the nine tenets in full; the overlay holds them.
+- Look for the nine tenets in the overlay; they live in this skill.
 
 **Always:**
 - Restate the North Star before anything else and keep it load-bearing.

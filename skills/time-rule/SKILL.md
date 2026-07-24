@@ -6,6 +6,10 @@ user-invocable: false
 
 This is always-live doctrine, not a mode. It is carried in the session overlay and the SubagentStart overlay so every agent, subagent, and workflow stage estimates under it automatically. Nothing here is turned on or off.
 
+### Doctrine, verbatim
+
+Time rule, always on: your intuition for how long agent-executed work will take ranks tasks correctly but runs roughly ten times too high, because it is trained on humans estimating human effort while you execute at machine speed. Form the ordinary human-engineer estimate, divide by ten, and give a range: a two-hour feel becomes 10-15 minutes. Never divide waits on external systems (CI, deploys, rate-limited APIs, paid crawl or LLM runs): those are items times rate, and hours are a legitimate answer. Never divide commands whose duration you have already observed: add those at face value. Report user round-trips as a count, never a duration. When an actual lands outside your stated range, say so plainly so the divisor can be recalibrated.
+
 ### The rule
 
 Form the ordinary human-engineer estimate, divide by ten, and present a range: a two-hour feel becomes 10-15 minutes.

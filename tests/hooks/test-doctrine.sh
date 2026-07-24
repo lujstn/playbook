@@ -45,6 +45,29 @@ chk "grep -q 'fresh, complete marker line' '$S'" "engine forbids hybrid two-mode
 chk "grep -q 'will the plan survive contact unchanged' '$S'" "engine carries the frozen-plan tie-break against workflows"
 chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$S'" "engine detects team availability mechanically, not by guessing"
 
+# Doctrine absorbed verbatim from the overlay into the engine skill: the
+# routing procedure text now lives here, not only in hooks/session-start.
+chk "grep -q 'Assume ultracode is the baseline' '$S'" "engine states the ultracode baseline verbatim from the overlay"
+chk "grep -q 'Route by shape' '$S'" "engine carries the route-by-shape procedure verbatim from the overlay"
+chk "grep -q 'Four tie-breaks' '$S'" "engine corrects the tie-break count to four"
+chk "! grep -q 'Three tie-breaks' '$S'" "engine no longer carries the miscounted three-tie-break phrasing"
+chk "grep -q 'counted in units, never in writers' '$S'" "engine counts scale in units so batching cannot launder the count"
+chk "grep -q 'dozens or more frozen units' '$S'" "engine carries the interns-or-workflows scale tie-break"
+chk "grep -qi 'solo bias' '$S'" "engine names the solo bias as a failure alongside the workflow bias"
+
+# The nine tenets now live in the engine skill; the overlay points here.
+chk "grep -q 'The nine tenets, always live:' '$S'" "engine carries the nine-tenet header"
+n_s=$(awk '/The nine tenets, always live:/{t=1; next} t&&/^[1-9]\. /{n++} t&&/^$/{exit} END{print n+0}' "$S" 2>/dev/null)
+[ "$n_s" -eq 9 ] \
+  && echo "PASS: nine tenets in engine skill" \
+  || { echo "FAIL: found $n_s tenets in the engine skill tenets block, expected 9"; fail=1; }
+
+# Extended marker legend: the emoji table grows from five rows to the full
+# twelve-marker set carried by the overlay.
+chk "grep -q '🧭' '$S'" "engine marker table registers brainstorming"
+chk "grep -q '🌿' '$S'" "engine marker table registers worktrees"
+chk "grep -q '🧰' '$S'" "engine marker table registers setup"
+
 O="$root/skills/offline-mode/SKILL.md"
 chk "! grep -qi 'uncertaint' '$O'" "offline-mode has no uncertainty word anywhere"
 chk "! grep -qiE 'uncertainty ledger|the ledger' '$O'" "offline-mode has no ledger reference"
@@ -136,6 +159,9 @@ TR="$root/skills/time-rule/SKILL.md"
 chk "test -f '$TR'" "time-rule reference skill exists"
 chk "grep -q 'user-invocable: false' '$TR'" "time-rule skill is not user-invocable"
 chk "grep -q 'divide by ten' '$TR'" "time-rule skill states the correction"
+chk "grep -q 'Time rule, always on' '$TR'" "time-rule skill carries the overlay doctrine header verbatim"
+chk "grep -q 'items times rate' '$TR'" "time-rule skill exempts external-system waits verbatim"
+chk "grep -q 'already observed' '$TR'" "time-rule skill exempts already-observed durations verbatim"
 chk "grep -q '12m52s' '$TR'" "time-rule skill carries the founding measurement"
 chk "grep -q 'playbook:time-rule' '$root/skills/playbook/SKILL.md'" "engine registry lists the time rule"
 chk "grep -q 'dozens or more frozen units' '$SS'" "overlay carries the interns-or-workflows scale tie-break"
