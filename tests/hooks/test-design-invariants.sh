@@ -13,21 +13,21 @@ SK="$root/skills"
 fail=0
 chk() { if eval "$1" >/dev/null 2>&1; then echo "PASS: $2"; else echo "FAIL: $2"; fail=1; fi; }
 
-# Nine v2 tenets live in the overlay inside hooks/session-start. Count only the
-# numbered lines inside the tenets block itself; the routing spine legitimately
-# carries its own short numbered tie-break list.
-n=$(awk '/The nine tenets, always live:/{t=1; next} t&&/^[1-9]\. /{n++} t&&/^$/{exit} END{print n+0}' "$SS" 2>/dev/null)
+# Nine v2 tenets live in the engine skill; the overlay points there rather than
+# restating them. Count only the numbered lines inside the tenets block itself;
+# the routing spine legitimately carries its own short numbered tie-break list.
+n=$(awk '/The nine tenets, always live:/{t=1; next} t&&/^[1-9]\. /{n++} t&&/^$/{exit} END{print n+0}' "$SK/playbook/SKILL.md" 2>/dev/null)
 [ "$n" -eq 9 ] \
-  && echo "PASS: nine tenets in overlay" \
+  && echo "PASS: nine tenets in the engine skill" \
   || { echo "FAIL: found $n tenets in the tenets block, expected 9"; fail=1; }
 
-# Model rule.
+# Model rule, carried into every dispatched helper.
 chk "grep -q 'execute on Sonnet' '$SS'" "model rule: execute on Sonnet"
 chk "grep -q 'plan and review' '$SS'" "model rule: plan and review on Opus"
 
-# Context-calm doctrine.
-chk "grep -q 'auto-compact is seamless' '$SS'" "context-calm: auto-compact is seamless"
-chk "grep -q 'Do not wrap up early' '$SS'" "context-calm: do not wrap up early"
+# Context-calm doctrine, emitted by the meter rather than stated up front.
+chk "grep -qi 'auto-compact is seamless' '$TB'" "context-calm: auto-compact is seamless"
+chk "grep -q 'Do not wrap up early' '$TB'" "context-calm: do not wrap up early"
 
 # Marker/brand convention: the bold Playbook brand with a code-chip mode.
 chk "grep -qF '**Playbook**' '$SS'" "brand convention: bold Playbook in overlay"

@@ -7,19 +7,21 @@ out="$(printf '{"cwd":"%s","hook_event_name":"SessionStart","source":"startup"}'
 ctx="$(jq -r '.hookSpecificOutput.additionalContext // .additional_context // .additionalContext' <<<"$out")"
 [ -n "$ctx" ] && echo "PASS: overlay injected" || { echo FAIL; exit 1; }
 grep -q "PLAYBOOK_OVERLAY" <<<"$ctx" && echo "PASS: sentinel tag" || { echo FAIL tag; exit 1; }
-n=$(awk '/^The nine tenets, always live:/{f=1;next} f&&/^[1-9]\. /{c++;next} f&&c{exit} END{print c+0}' <<<"$ctx")
-[ "$n" -eq 9 ] && echo "PASS: nine tenets" || { echo "FAIL: $n tenets"; exit 1; }
+! grep -q 'The nine tenets' <<<"$ctx" \
+  && echo "PASS: the tenets are not restated in the overlay; the engine skill holds them" \
+  || { echo "FAIL: the overlay still restates the nine tenets"; exit 1; }
+# Size ceiling on the always-on block, so the overlay cannot silently regrow past
+# the point where a model reliably reads all of it.
+ob="$(sed -n '/<PLAYBOOK_OVERLAY>/,/<\/PLAYBOOK_OVERLAY>/p' <<<"$ctx")"
+bytes=$(printf '%s' "$ob" | wc -c | tr -d ' ')
+{ [ "$bytes" -gt 0 ] && [ "$bytes" -lt 2500 ]; } \
+  && echo "PASS: overlay block is $bytes bytes, under the 2500-byte ceiling" \
+  || { echo "FAIL: overlay block is $bytes bytes, outside the 1..2499 byte range"; exit 1; }
 grep -q "regardless of the unease level or the mode" <<<"$ctx" \
   && echo "PASS: standing override verbatim, no ledger" || { echo FAIL override; exit 1; }
 ! grep -q '\.playbook/' <<<"$ctx" && ! grep -qi 'anchor file is the persistence' <<<"$ctx" \
   && echo "PASS: no file-persistence claim" || { echo "FAIL: still claims a file persists"; exit 1; }
 ! grep -qi 'uncertainty' <<<"$ctx" && echo "PASS: unease naming" || { echo "FAIL: uncertainty word present"; exit 1; }
-grep -q 'execute on Sonnet' <<<"$ctx" && grep -q 'plan and review' <<<"$ctx" \
-  && echo "PASS: model rule present in overlay" \
-  || { echo "FAIL: model rule missing"; exit 1; }
-grep -q 'auto-compact is seamless' <<<"$ctx" && grep -q 'Do not wrap up early' <<<"$ctx" \
-  && echo "PASS: context-calm doctrine in overlay" \
-  || { echo "FAIL: context-calm doctrine missing"; exit 1; }
 grep -qF '**Playbook**' <<<"$ctx" \
   && echo "PASS: bold Playbook brand convention in overlay" \
   || { echo "FAIL: bold Playbook brand missing"; exit 1; }
@@ -40,9 +42,12 @@ sctx="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$sout")"
   || { echo "FAIL: envelope event was [$sev]"; exit 1; }
 grep -q "PLAYBOOK_OVERLAY" <<<"$sctx" && echo "PASS: overlay reaches subagent" \
   || { echo FAIL subagent overlay; exit 1; }
-{ grep -q "playbook-northstar" <<<"$sctx" && grep -qi "sub-goal serving it" <<<"$sctx"; } \
-  && echo "PASS: overlay carries the project North Star precedence clause" \
+{ grep -q "playbook-northstar:" <<<"$sctx" && grep -qi "sub-goal serving it" <<<"$sctx"; } \
+  && echo "PASS: the helper block carries the project North Star precedence clause" \
   || { echo FAIL northstar clause; exit 1; }
+grep -q "Set an explicit model on anything you dispatch" <<<"$sctx" \
+  && echo "PASS: SubagentStart pushes an explicit model onto every onward dispatch" \
+  || { echo "FAIL: model rule missing from SubagentStart"; exit 1; }
 { grep -q "Playbook helper report:" <<<"$sctx" && grep -q "attentive or above" <<<"$sctx"; } \
   && echo "PASS: SubagentStart asks for the elevated-only closing unease line" \
   || { echo "FAIL: helper-report block missing from SubagentStart"; exit 1; }

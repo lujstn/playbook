@@ -67,6 +67,7 @@ n_s=$(awk '/The nine tenets, always live:/{t=1; next} t&&/^[1-9]\. /{n++} t&&/^$
 chk "grep -q '🧭' '$S'" "engine marker table registers brainstorming"
 chk "grep -q '🌿' '$S'" "engine marker table registers worktrees"
 chk "grep -q '🧰' '$S'" "engine marker table registers setup"
+chk "grep -q '🌡️' '$S'" "engine marker table registers the unease thermometer"
 
 O="$root/skills/offline-mode/SKILL.md"
 chk "! grep -qi 'uncertaint' '$O'" "offline-mode has no uncertainty word anywhere"
@@ -135,26 +136,17 @@ for f in "${targets[@]}"; do
   chk "! grep -qE '543N|300M' '$f'" "$rel: no malformed instance-offset placeholders"
 done
 
-# The session-start overlay is the always-on doctrine; assert it carries the
-# ultracode-baseline restraint and registers every command-triggered marker.
+# The session-start overlay is a short routing prompt: the routing procedure it
+# used to carry verbatim now lives in the engine skill, so what stays pinned
+# here is the pointer into that skill plus the state only the overlay can carry.
 SS="$root/hooks/session-start"
-chk "grep -q 'Assume ultracode is the baseline' '$SS'" "overlay states the ultracode baseline"
-chk "grep -qi 'match the tool to the task, never to the mode' '$SS'" "overlay carries ultracode restraint guidance"
-chk "grep -q 'not colleagues' '$SS'" "overlay states the subagent price list"
-chk "grep -q 'live routing inputs' '$SS'" "overlay names speed and context preservation as routing inputs"
-chk "grep -q 'unless that bulk exceeds' '$SS'" "overlay tie-break carries the exceeds-one-context escape valve"
-chk "grep -q 'crew of experts' '$SS'" "overlay carries the expert-crew hackathon definition"
-chk "grep -q 'interns logic' '$SS'" "overlay rebuts the interns-logic category error against hackathon"
-chk "grep -q 'spine density' '$SS'" "overlay carries the spine-density tie-break against lone-wolf"
-chk "grep -q 'fresh, complete marker line' '$SS'" "overlay forbids hybrid two-mode marker lines"
-chk "grep -q 'will the plan survive contact unchanged' '$SS'" "overlay carries the frozen-plan tie-break against workflows"
+chk "grep -q 'load the playbook skill' '$SS'" "overlay sends the agent into the engine skill for the modes, tie-breaks and tenets"
+chk "grep -q 'A Playbook card arrives with every user prompt' '$SS'" "overlay tells the agent the per-prompt card is live state"
+chk "grep -q 'faintly_uneasy' '$SS'" "overlay carries the unease register in full"
+chk "grep -q 'Set an explicit model on anything you dispatch' '$SS'" "overlay puts an explicit model on every dispatched helper"
 
-# The time rule is always-on doctrine like the model rule: stated in the
-# overlay, detailed in its reference skill.
-chk "grep -q 'Time rule, always on' '$SS'" "overlay carries the time rule"
-chk "grep -q 'divide by ten' '$SS'" "overlay states the divide-by-ten correction"
-chk "grep -q 'items times rate' '$SS'" "overlay exempts external-system waits from the divisor"
-chk "grep -q 'already observed' '$SS'" "overlay exempts observed command durations"
+# The time rule is always-on doctrine like the model rule: too long for the
+# shrunken overlay, so it is pinned on its reference skill alone.
 TR="$root/skills/time-rule/SKILL.md"
 chk "test -f '$TR'" "time-rule reference skill exists"
 chk "grep -q 'user-invocable: false' '$TR'" "time-rule skill is not user-invocable"
@@ -164,13 +156,6 @@ chk "grep -q 'items times rate' '$TR'" "time-rule skill exempts external-system 
 chk "grep -q 'already observed' '$TR'" "time-rule skill exempts already-observed durations verbatim"
 chk "grep -q '12m52s' '$TR'" "time-rule skill carries the founding measurement"
 chk "grep -q 'playbook:time-rule' '$root/skills/playbook/SKILL.md'" "engine registry lists the time rule"
-chk "grep -q 'dozens or more frozen units' '$SS'" "overlay carries the interns-or-workflows scale tie-break"
-chk "grep -q 'counted in units, never in writers' '$SS'" "overlay counts scale in units so batching cannot launder the count"
-chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$SS'" "overlay detects team availability mechanically, not by guessing"
-chk "grep -qi 'solo bias' '$SS'" "overlay names the solo bias as a failure alongside the workflow bias"
-chk "grep -q '🌿 worktrees' '$SS'" "overlay registers the worktrees marker"
-chk "grep -q '🌡️ unease' '$SS'" "overlay registers the unease thermometer marker"
-chk "grep -q '🧰 setup' '$SS'" "overlay registers the setup marker"
 chk "! grep -q 'playbook-window' '$SS'" "overlay no longer instructs a window declaration"
 chk "grep -q 'ultracode nudge' '$SS'" "overlay nudges the user onto /effort ultracode at session start"
 chk "grep -qF 'Playbook runs best on ultracode' '$SS'" "overlay carries the exact ultracode nudge wording"
