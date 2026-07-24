@@ -84,9 +84,7 @@ emit_spike() {
   playbook_emit_context "$1" "Playbook unease spike: several tool calls have failed in a row without a clean batch between them. Take a beat before the next attempt: re-read the North Star and check whether the approach itself is what is failing. If you agree unease has risen, print one branded line before continuing: 🌡️ **Playbook** \`unease: <level>\` *<reason of at most 50 characters>*; if it has not, print nothing about this. The escalation ladder is open and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
 }
 
-emit_micro_anchor() {
-  playbook_emit_context "$1" "Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
-}
+MICRO_ANCHOR="Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
 
 case "$event" in
   SessionStart)
@@ -102,6 +100,12 @@ case "$event" in
       used="$(playbook_context_used "$stdin" || true)"
       playbook_state_reset "$dir" "$used"
       playbook_state_gc
+      # A /clear keeps the session id, so every conversation-scoped key must be
+      # blanked here or the previous conversation's state leaks into the new one.
+      playbook_state_put "$dir" "northstar_excerpt=" "unease_level=" "unease_reason=" "unease_at=" \
+        "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "argue_downs="
+      exc="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
+      if [ -n "$exc" ]; then playbook_state_put "$dir" "northstar_excerpt=${exc}"; fi
       # Fresh start: if a competing context-warning hook is registered and the
       # context-calm channel has not been resolved, offer once to let Playbook
       # own it, so agents are not scared into stopping near the context limit.
@@ -183,19 +187,59 @@ ${nudge}"; else body="$nudge"; fi
     fi
     ;;
 
+  # The card: the live rules and the current unease, delivered on every prompt so
+  # behaviour never depends on what survived in the model's memory. Exactly one
+  # card is emitted per prompt; no branch may return before it.
   UserPromptSubmit)
     dir="$(playbook_state_dir "$stdin")"
-    used="$(playbook_context_used "$stdin" || true)"
-    if ! heal_or_baseline "$dir" "$used"; then exit 0; fi
-    # No assistant record yet this session: nothing to anchor against, stay silent.
-    case "$used" in ''|*[!0-9]*) exit 0 ;; esac
-    ratchet_window "$dir" "$used"
-    base="$(playbook_state_int "$dir" last_anchor_used 0)"
-    delta=$(( used - base ))
-    if [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
-      emit_micro_anchor "UserPromptSubmit"
-      playbook_state_put "$dir" "last_anchor_used=${used}"
+    ns="$(playbook_state_get "$dir" northstar_excerpt)"
+    if [ -z "$ns" ]; then
+      ns="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
+      if [ -n "$ns" ]; then playbook_state_put "$dir" "northstar_excerpt=${ns}"; fi
     fi
+    [ -n "$ns" ] || ns="(not yet captured)"
+
+    lvl="$(playbook_state_get "$dir" unease_level)"
+    lreason="$(playbook_state_get "$dir" unease_reason)"
+    flvl="$(playbook_state_get "$dir" floor_level)"
+    freason="$(playbook_state_get "$dir" floor_reason)"
+    shown="$lvl"; [ -n "$shown" ] || shown="none stated yet"
+    said=""; if [ -n "$lvl" ] && [ -n "$lreason" ]; then said=" *${lreason}*"; fi
+    if [ -n "$flvl" ]; then
+      uline="Unease: ${shown}; floor: ${flvl} (${freason}): acknowledge it or argue it down with a 🌡️ line."
+    else
+      uline="Unease: ${shown}${said}; no floor."
+    fi
+
+    card="📚 **Playbook** card
+North Star: ${ns}
+${uline}
+
+- Route non-trivial work before starting it: 🐺 lone-wolf, 🐜 interns, 🤝 hackathon, ⚙️ workflows, 🏗️ gsd. Announce as <emoji> **Playbook** \`<mode>\` *<reason>*; depth in the /playbook:* skills.
+- Every dispatch carries \`playbook-northstar: <line>\` and an explicit model: Sonnet executes, Opus plans and reviews.
+- Divide your felt time estimate by ten; never divide external waits or observed durations.
+- Compaction is safe: never wrap up early. If your unease has changed, print the 🌡️ **Playbook** \`unease: <level>\` *<reason>* line."
+
+    # The 75k pulse rides along as a suffix rather than its own emission. Unhealthy
+    # state or a missing usage figure costs the suffix only, never the card.
+    used="$(playbook_context_used "$stdin" || true)"
+    if heal_or_baseline "$dir" "$used"; then
+      case "$used" in
+        ''|*[!0-9]*) : ;;
+        *)
+          ratchet_window "$dir" "$used"
+          base="$(playbook_state_int "$dir" last_anchor_used 0)"
+          delta=$(( used - base ))
+          if [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
+            card="${card}
+
+${MICRO_ANCHOR}"
+            playbook_state_put "$dir" "last_anchor_used=${used}"
+          fi
+          ;;
+      esac
+    fi
+    playbook_emit_context "UserPromptSubmit" "$card"
     ;;
 
   *) : ;;
