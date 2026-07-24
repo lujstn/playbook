@@ -215,10 +215,18 @@ blocks "restatement after a valid tag" src/a.ts "// @nonobvious(means) a genuine
 const userProfile = await fetchUserProfile(id);
 $PAD"
 
-echo "-- trailing comments are refused, but not markers inside strings"
-blocks "a trailing line comment" src/a.ts "const a = 1; // just narrating this"
-blocks "a trailing block comment" src/a.ts "const a = 1; /* narrating this */"
-blocks "a trailing hash comment" app/x.py "x = build()  # narrating this"
+echo "-- a trailing comment is judged on whether it restates, not on being trailing"
+allows "a trailing comment clarifying units" src/a.ts "const LOOP_MS = 1.5 * 3_600_000; // 1.5 hours in ms"
+allows "a trailing comment naming an opaque tuple" src/a.ts "const EASING = [0.16, 1, 0.3, 1] as const; // expo ease-out"
+allows "a trailing comment giving a bare id meaning" src/a.ts "const CATEGORY_ID = 39; // Funding"
+blocks "a trailing comment restating its own line" src/a.ts "const userProfile = await fetchUserProfile(id); // fetch the user profile"
+blocks "a trailing block comment restating its own line" src/a.ts "setUserName(name); /* set the user name */"
+blocks "a trailing hash comment restating its own line" app/x.py "widgets = build_widgets()  # build the widgets"
+blocks "a trailing separator banner" src/a.ts "const a = 1; // ========================="
+blocks "trailing work narration" src/a.ts "const a = 1; // as requested, we decided to keep this"
+blocks "a trailing plan-step label" src/a.ts "const a = 1; // Step 2: wire the payload"
+
+echo "-- markers inside strings are not comments"
 allows "a URL inside a string is not a comment" src/a.ts "const u = \"http://example.com/a//b\";
 const x = 1;"
 allows "a hash inside a string is not a comment" app/x.py "s = 'a # b'
