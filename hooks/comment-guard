@@ -44,7 +44,7 @@ case "$lc" in
 esac
 for skip in node_modules .git .worktrees .next .nuxt .svelte-kit dist build out coverage \
             vendor Pods Carthage DerivedData .build target .gradle __pycache__ .venv venv \
-            .terraform; do
+            .terraform drizzle; do
   case "/$path" in
     */"$skip"/*) exit 0 ;;
   esac
@@ -75,7 +75,7 @@ function lower(s) { return tolower(s) }
 
 function is_directive(c,   l) {
   l = lower(c)
-  return l ~ /^(eslint|prettier-|@ts-|@?(vitest|jest)-environment|ts-nocheck|tslint|stylelint|shellcheck|swiftlint|ktlint|jshint|jslint|istanbul ignore|c8 ignore|v8 ignore|#?region|#?endregion|<reference|type:|pylint:|pyright:|mypy:|flake8:|ruff:|noqa|noinspection|fmt:|isort:|coding[:=]|-\*-|%%|global |globals |exported |pragma)/
+  return l ~ /^(eslint|prettier-|@ts-|@?(vitest|jest)-environment|ts-nocheck|tslint|stylelint|shellcheck|swiftlint|ktlint|jshint|jslint|istanbul ignore|c8 ignore|v8 ignore|#?region|#?endregion|<reference|type:|pylint:|pyright:|mypy:|flake8:|ruff:|noqa|noinspection|fmt:|isort:|coding[:=]|-\*-|%%|>?[[:space:]]*statement-breakpoint|global |globals |exported |pragma)/
 }
 
 function strip_marker(t,   s) {

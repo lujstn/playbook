@@ -316,4 +316,22 @@ const a = 1;"
 allows "a bare block-comment close strips to empty" src/a.ts "/* @nonobvious(means) the parsed shape */
 const a = 1;"
 
+echo "-- generated migration markers are tooling directives, wherever the file lives"
+MIGRATION='CREATE TABLE "users" (
+	"id" serial PRIMARY KEY NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "posts" ("id" serial);'
+allows "a migration in the default drizzle output dir" drizzle/0000_init.sql "$MIGRATION"
+allows "a migration in a configured out dir" src/db/migrations/0000_init.sql "$MIGRATION"
+allows "a migration in a nested out dir" apps/api/db/migrations/0001_add.sql "$MIGRATION"
+blocks "but an untagged SQL comment is still policed" db/query.sql "-- select the active rows
+SELECT * FROM t;"
+allows "and a tagged SQL comment is still accepted" db/query.sql "-- @nonobvious(forced-by) the vendor view omits soft-deleted rows
+SELECT * FROM t;"
+blocks "sludge sitting beside a breakpoint is still caught" src/db/migrations/0002.sql 'CREATE TABLE a (id int);
+--> statement-breakpoint
+-- this creates the b table
+CREATE TABLE b (id int);'
+
 exit $fail
