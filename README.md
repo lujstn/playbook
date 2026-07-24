@@ -211,6 +211,14 @@ The category comes from a closed set, and each one is a claim you have to mean:
 
 There is deliberately no category for "explains what the code does". That reflex has nowhere to file itself, which is the entire point. Banners, `Step 2:` labels, work narration and any comment restating the line beneath it are refused whether they carry a tag or not, and an edit may never add more comment lines than lines of code.
 
+A comment sitting at the end of a line of code is judged on what it says rather than on where it sits, so it needs no tag and is refused only when it restates the line it belongs to, or is one of the shapes above. This is the one place the short form earns its keep, because the thing worth saying is usually a unit, a bare value's meaning, or the intent behind an opaque literal:
+
+```ts
+const LOOP_MS = 1.5 * 3_600_000;            // 1.5 hours in ms
+const EASING = [0.16, 1, 0.3, 1] as const;  // expo ease-out
+const CATEGORY_ID = 39;                     // Funding
+```
+
 It needs `jq` and `awk`, and stays out of the way of generated trees, vendored dependencies, prose and config.
 
 ### 🧰 First-run setup

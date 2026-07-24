@@ -169,6 +169,7 @@ function trailing_comment(line,   i, ch, c2, q, fns) {
     }
     if (ch == "\"" || ch == "'"'"'" || ch == "`") { q = ch; continue }
     if (i > fns) {
+      tc_code = substr(line, 1, i - 1)
       if (has("slash") && c2 == "//") return substr(line, i + 2)
       if (has("block") && c2 == "/*") return substr(line, i + 2)
       if (has("hash") && ch == "#") return substr(line, i + 1)
@@ -300,7 +301,11 @@ END {
     sub(/[[:space:]]*(\*\/|-->)[[:space:]]*$/, "", tc)
     sub(/[[:space:]]+$/, "", tc)
     if (tc == "" || is_directive(tc)) continue
-    problem(i, "trailing comment (put an earned @nonobvious note on its own line, or delete it)")
+    codepart = tc_code
+    if (is_banner(tc)) { problem(i, "separator banner"); continue }
+    if (is_plan_label(tc)) { problem(i, "plan-step label refers to work that will not exist when this is read"); continue }
+    if (is_narration(tc)) { problem(i, "narrates the work rather than the code"); continue }
+    if (restates(tc, codepart)) { problem(i, "trailing comment restates the code it sits on"); continue }
   }
 
   if (comments > 0 && comments > code) {
