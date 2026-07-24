@@ -104,7 +104,7 @@ digraph hackathon_team {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` routes here internally. The engine announces and proceeds; it does not add a staffing gate of its own, and the substrate's own teammate-approval prompt is expected and honoured. The nine-tenet overlay (including tenet 3 and the standing North-Star override) stays live throughout; this skill does not restate it.
+- `playbook:playbook` routes here internally. The engine announces and proceeds; it does not add a staffing gate of its own, and the substrate's own teammate-approval prompt is expected and honoured. The overlay, the nine tenets (held in the engine skill, tenet 3 included) and the standing North-Star override stay live throughout; this skill does not restate them.
 
 **Substrate:**
 - Native Claude Code agent-teams: spawn peers via the `Agent` tool (the team auto-forms), address peers by name via `SendMessage`, coordinate via the shared task list. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Zero extra dependency beyond that flag, so this is part of the common path when the flag is set.

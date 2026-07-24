@@ -224,7 +224,7 @@ digraph offline_mode {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
+- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The overlay, the nine tenets (held in the engine skill) and the standing North-Star override stay live throughout; this skill does not restate them.
 
 **Division of labour:**
 - `/goal` owns the "am I actually done?" loop. This skill owns absence, escalation, and the morning log. Suggest pairing with `/goal` when the task has a clear completion criterion.

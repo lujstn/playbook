@@ -173,7 +173,7 @@ Everything else in `.planning/` is GSD-owned durable state and stays read-only. 
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the routing engine. It makes the gsd routing decision and announces 🏗️ **Playbook** `gsd` before this skill runs. The nine-tenet overlay and the North Star stay live throughout.
+- `playbook:playbook` is the routing engine. It makes the gsd routing decision and announces 🏗️ **Playbook** `gsd` before this skill runs. The overlay, the nine tenets (held in the engine skill) and the North Star stay live throughout.
 
 **External dependency:**
 - GSD (`get-shit-done-cc`). Install with `npx get-shit-done-cc@latest`. This is the one mode in the common path that has a prerequisite; the wrapper prompts at the fork, never hard-fails.

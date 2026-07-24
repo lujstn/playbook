@@ -13,7 +13,7 @@ Playbook is a Claude Code plugin, so setup is two lines inside Claude Code:
 /plugin install playbook
 ```
 
-You'll know it's live when you see `📚 Playbook skills available in this session` in your chat. Say `/playbook:hello` any time to have it introduce itself, check its pulse, and (the first time on a machine) look for plugin conflicts.
+You'll know it's live when you see `📚 Playbook skills available in this session` in your chat, and from then on a small Playbook card rides along with every message you send, keeping the live rules and the current mood in front of Claude at the moment it decides. Say `/playbook:hello` any time to have it introduce itself, check its pulse, and (the first time on a machine) look for plugin conflicts.
 
 You don't need to install anything else, but it's worth having `jq` for goal recovery and smooth compactions. It's on most machines already, and Playbook will tell you if it isn't.
 
@@ -21,7 +21,7 @@ Playbook prioritises native Claude development flows, with the one exception of 
 
 ## How it works
 
-Playbook is a set of Claude Code hooks and skills. There's no runtime, no daemon, and nothing written into your working tree. When a session starts, and again after every compaction, it does four things:
+Playbook is a set of Claude Code hooks and skills. There's no runtime, no daemon, and nothing written into your working tree. When a session starts, after every compaction, and with every message you send, it does four things:
 
 1. **Re-states the goal.** It recovers your original request from the transcript and keeps a one-line North Star in front of Claude at every decision.
 2. **Picks how to run the work,** judged on how separable and durable it is rather than how big it looks.
@@ -52,7 +52,7 @@ The rest are verbs. Each ships as its namespaced `/playbook:*` form, which alway
 
 ## The nine tenets
 
-The doctrine underneath everything. The hooks carry these into the main thread and every subagent, so they survive compaction and reach helpers without any skill text being re-read.
+The doctrine underneath everything. They live in the engine skill, and the per-prompt card points at them from every message, so they survive compaction and stay one tug away at every decision.
 
 1. **Remember what matters.** The North Star is re-anchored after every compaction and passed into every dispatch.
 2. **Front-load the questions.** Ask the batch once, early, so the rest can run unattended.
@@ -151,6 +151,8 @@ Playbook fixes this in one move:
 > 🌡️ **Playbook** `unease: watchful` *three edits in a row failed to apply*
 
 - Playbook holds a quiet sense of how uneasy Claude is, measured against the whole project rather than just the task in front of it.
+- A mood is easy to lose over a long session, so Playbook carries it: the last level Claude declared rides along quietly, and Claude only ever has to answer one question: has this changed?
+- It doesn't just ask how Claude feels; it watches the work. Edits bouncing, tests failing, a long grind with nothing landing: signals like these raise a floor under the mood. Claude can still feel calmer than the dashboard says, but it has to say why.
 - It only speaks when the worry genuinely climbs, so its silence tells you just as much as its voice.
 - A standing rule sits above everything: if a decision could compromise the goal itself, stop and ask you first.
 - With offline mode on, rising unease can go a step further and actually notify you, rather than stalling until you next look.
@@ -162,6 +164,8 @@ For when Claude is working and you aren't watching, whether that's overnight or 
 1. **Pulls you back** with a notification when the work genuinely blocks.
 2. **Falls back to an external manager** if you don't answer inside the window you set.
 3. **Makes the call and logs it** if it must, writing every decision taken without you into a morning-readable HTML log.
+
+Delivery is mechanical. While offline mode is on, a hook watches for the session blocking, idling, or finishing and sends the push itself, so being told never depends on Claude remembering to tell you. Every send and every decision taken without you lands in a durable log file as it happens, and the morning HTML is rendered from that file rather than from memory.
 
 Notifications go through **ntfy or Pushover**, whichever you pick at setup, and you configure it once for the whole machine so every project can use it, with a per-project override when one needs its own. Pushover is the one for a guaranteed wake-up: it punches through iOS Do Not Disturb once you enable Critical Alerts in its app. ntfy is the free, self-hostable, Android-friendly option.
 
