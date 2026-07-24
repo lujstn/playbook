@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Playbook: manage the offline-mode flag and its durable decision log for the
+# current session.
+#
+# Usage:
+#   scripts/offline on [--window N] [--wait a|b]
+#   scripts/offline off
+#   scripts/offline status
+#   scripts/offline log '<json object>'
+#
+# The offline flag lives at <state-dir>/offline as KEY=VALUE lines (window,
+# wait, since). Its presence is what hooks/notification checks before it will
+# forward a platform Notification event to scripts/notify. The decision log is
+# durable JSONL at <state-dir>/offline-log.jsonl: notification sends land
+# there automatically via the hook, and `log` appends model-authored entries
+# (forced-without-you decisions, external-manager consultations, waits).
+#
+# The state directory is resolved from the newest transcript for the current
+# working directory, so this always targets the calling session.
+#
+# Exit codes:
+#   0   success
+#   3   no session transcript found for this directory (state dir cannot be
+#       resolved)
+#   64  usage error
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../hooks/lib/playbook-common.sh
+source "${SCRIPT_DIR}/../hooks/lib/playbook-common.sh"
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: offline on [--window N] [--wait a|b]
+       offline off
+       offline status
+       offline log '<json object>'
+
+  on      turn offline mode on for this session (default: window 10, wait a)
+  off     turn offline mode off for this session
+  status  print whether offline mode is on, and the flag/log state
+  log     append a model-authored decision-log event (a JSON object)
+EOF
+  exit 64
+}
+
+t="$(playbook_latest_transcript "$PWD")"
+[ -n "$t" ] || { echo "offline: no session transcript found for this directory" >&2; exit 3; }
+dir="$(playbook_state_dir "$(jq -cn --arg t "$t" '{transcript_path:$t}')")"
+[ -n "$dir" ] || { echo "offline: could not resolve the session state directory" >&2; exit 3; }
+
+flag="${dir}/offline"
+log_file="${dir}/offline-log.jsonl"
+
+[ $# -ge 1 ] || usage
+cmd="$1"; shift
+
+case "$cmd" in
+  on)
+    window=10
+    wait_opt=a
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --window)   [ $# -gt 1 ] || usage; window="$2"; shift 2 ;;
+        --window=*) window="${1#--window=}"; shift ;;
+        --wait)     [ $# -gt 1 ] || usage; wait_opt="$2"; shift 2 ;;
+        --wait=*)   wait_opt="${1#--wait=}"; shift ;;
+        *)          usage ;;
+      esac
+    done
+    case "$window" in ''|*[!0-9]*) echo "offline: --window must be a positive integer" >&2; usage ;; esac
+    [ "$window" -gt 0 ] || { echo "offline: --window must be a positive integer" >&2; usage; }
+    case "$wait_opt" in
+      a|b) ;;
+      *) echo "offline: --wait must be a or b" >&2; usage ;;
+    esac
+
+    tmp="${flag}.$$.tmp"
+    {
+      printf 'window=%s\n' "$window"
+      printf 'wait=%s\n' "$wait_opt"
+      printf 'since=%s\n' "$(date +%s)"
+    } > "$tmp"
+    mv -f "$tmp" "$flag"
+    echo "offline on: window ${window} min, wait ${wait_opt}, log ${log_file}"
+    ;;
+
+  off)
+    rm -f "$flag"
+    echo "offline off"
+    ;;
+
+  status)
+    if [ -f "$flag" ]; then
+      echo "on"
+      cat "$flag"
+      count=0
+      [ -f "$log_file" ] && count="$(wc -l < "$log_file" | tr -d ' ')"
+      echo "log lines: ${count}"
+    else
+      echo "off"
+    fi
+    ;;
+
+  log)
+    [ $# -eq 1 ] || usage
+    payload="$1"
+    jq -e 'type == "object"' >/dev/null 2>&1 <<<"$payload" \
+      || { echo "offline: log argument must be a JSON object" >&2; usage; }
+    jq -c --argjson ts "$(date +%s)" '.ts = $ts | .event = (.event // "decision")' \
+      <<<"$payload" >> "$log_file"
+    ;;
+
+  *) usage ;;
+esac

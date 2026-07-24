@@ -14,6 +14,9 @@
     "PreToolUse": [
       { "matcher": "Edit|Write", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" comment-guard", "async": false }
+      ] },
+      { "matcher": "Agent|Workflow", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" dispatch-guard", "async": false }
       ] }
     ],
     "PostToolBatch": [
@@ -29,6 +32,11 @@
     "UserPromptSubmit": [
       { "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
+      ] }
+    ],
+    "Notification": [
+      { "matcher": "permission_prompt|idle_prompt|agent_needs_input|agent_completed", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" notification", "async": false }
       ] }
     ]
   }

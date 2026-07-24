@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# PreToolUse veto on Agent/Workflow dispatch that carries no North Star.
+# Verdict convention matches comment-guard: allow is exit 0 and silence,
+# block is exit 2 with a short explanation on stderr.
+set -uo pipefail
+
+stdin="$(cat 2>/dev/null || true)"
+command -v jq >/dev/null 2>&1 || exit 0
+
+tool="$(jq -r '.tool_name // empty' 2>/dev/null <<<"$stdin" || true)"
+case "$tool" in
+  Agent | Workflow) ;;
+  *) exit 0 ;;
+esac
+
+[ "${PLAYBOOK_DISPATCH_GUARD:-}" = "off" ] && exit 0
+
+block() {
+  {
+    echo "Playbook dispatch guard: this ${1} carries no North Star."
+    echo "Add one line to the ${2} and redispatch:"
+    echo "playbook-northstar: <one line stating what success means for the whole project>"
+    echo "Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
+  } >&2
+  exit 2
+}
+
+if [ "$tool" = "Agent" ]; then
+  subagent="$(jq -r '.tool_input.subagent_type // empty' 2>/dev/null <<<"$stdin" || true)"
+  case "$subagent" in
+    gsd-* | Explore | Plan | claude-code-guide | statusline-setup) exit 0 ;;
+  esac
+  prompt="$(jq -r '.tool_input.prompt // empty' 2>/dev/null <<<"$stdin" || true)"
+  # Here-string, not printf|grep: under pipefail a short-circuiting `grep -q`
+  # SIGPIPEs the writer, and the pipeline's 141 would swallow the match on any
+  # prompt large enough to fill the pipe buffer, wrongly blocking it.
+  grep -qE '^[[:space:]]*playbook-northstar:[[:space:]]*[^[:space:]]' <<<"$prompt" && exit 0
+  block "Agent dispatch" "prompt"
+fi
+
+if [ "$tool" = "Workflow" ]; then
+  script="$(jq -r '.tool_input.script // empty' 2>/dev/null <<<"$stdin" || true)"
+  args="$(jq -r 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end' 2>/dev/null <<<"$stdin" || true)"
+  { [ -z "$script" ] && [ -z "$args" ]; } && exit 0
+  grep -qF 'playbook-northstar' <<<"${script}"$'\n'"${args}" && exit 0
+  block "Workflow launch" "script's agent prompts"
+fi
+
+exit 0
