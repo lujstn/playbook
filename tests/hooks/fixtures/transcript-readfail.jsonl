@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"Look at the harness output file."}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":10,"cache_creation_input_tokens":1000,"cache_read_input_tokens":4000,"output_tokens":50},"content":[{"type":"text","text":"Reading the log."},{"type":"tool_use","id":"R1","name":"Read","input":{"file_path":"/tmp/results.txt"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"R1","content":[{"type":"text","text":"--- FAIL: TestSomethingElse\nFAILED tests/test_old.py::test_x\nTests: 9 failed, 0 passed"}]}]}}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-7","usage":{"input_tokens":20,"cache_creation_input_tokens":2000,"cache_read_input_tokens":8000,"output_tokens":60},"content":[{"type":"text","text":"Now a clean build."},{"type":"tool_use","id":"B2","name":"Bash","input":{"command":"make build"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"B2","content":[{"type":"text","text":"Build succeeded in 4.2s"}]}]}}

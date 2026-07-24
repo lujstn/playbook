@@ -144,6 +144,91 @@ playbook_context_used() {
   } 2>/dev/null || printf ''
 }
 
+# The rank of an unease level, low to high, 0..10. Empty for anything outside
+# the register, so a corrupted or fabricated level can never win a comparison.
+playbook_unease_rank() {
+  case "${1:-}" in
+    clear)          printf '0' ;;
+    settled)        printf '1' ;;
+    attentive)      printf '2' ;;
+    watchful)       printf '3' ;;
+    faintly_uneasy) printf '4' ;;
+    uneasy)         printf '5' ;;
+    concerned)      printf '6' ;;
+    strained)       printf '7' ;;
+    troubled)       printf '8' ;;
+    alarmed)        printf '9' ;;
+    near_breaking)  printf '10' ;;
+    *)              printf '' ;;
+  esac
+}
+
+# The first non-empty line of the session's original request, whitespace-
+# trimmed and truncated to 140 characters, for the per-prompt card. Empty on
+# any failure: empty, never a wrong value.
+playbook_northstar_excerpt() {
+  { local orig first
+    orig="$(playbook_original_request "${1:-}")"
+    [ -n "$orig" ] || { printf ''; return 0; }
+    first="$(printf '%s\n' "$orig" | awk 'NF{print; exit}' \
+              | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+    [ -n "$first" ] || { printf ''; return 0; }
+    printf '%s' "$first" | jq -Rr 'if length > 140 then .[0:139] + "…" else . end' 2>/dev/null
+  } 2>/dev/null || printf ''
+}
+
+# One bounded pass over the transcript tail, emitting KEY=VALUE lines:
+#   marker_level=<level>    the model's last stated unease level, if any
+#   marker_reason=<text>    its reason, newline-stripped, possibly empty
+#   bash_fail=0|1           whether a Bash tool result in the window reports
+#                           failing tests
+# Emits nothing at all on any failure. The marker scan reads assistant-authored
+# text blocks only, so hook injections (which live in user and system records)
+# are structurally invisible; the level alternation is concrete, so the
+# overlay's and card's `<level>` placeholder examples can never match. The
+# failing-test scan joins Bash tool_use ids to their tool_results, so a Read
+# of a file that merely contains FAIL-shaped text cannot trip it.
+playbook_scan_tail() {
+  { local f; f="$(playbook_transcript_path "${1:-}")"
+    [ -n "$f" ] && [ -f "$f" ] || return 0
+    local bound="${PLAYBOOK_TAIL_BYTES:-262144}"
+    case "$bound" in ''|*[!0-9]*) bound=262144 ;; esac
+    local levels='clear|settled|attentive|watchful|faintly_uneasy|uneasy|concerned|strained|troubled|alarmed|near_breaking'
+    local flt='
+      def texts: [ .[] | select(.type=="assistant")
+                   | .message.content
+                   | if type=="array" then (map(select(.type=="text")|.text)|join("\n")) else empty end ];
+      def bashids: [ .[] | select(.type=="assistant")
+                     | .message.content
+                     | if type=="array" then .[] else empty end
+                     | select(.type=="tool_use" and .name=="Bash") | .id ];
+      def bashtexts($ids): [ .[] | select(.type=="user")
+                     | .message.content
+                     | if type=="array" then .[] else empty end
+                     | select(.type=="tool_result" and (((.tool_use_id // "") as $i | $ids | index($i)) != null))
+                     | .content
+                     | if type=="string" then .
+                       elif type=="array" then (map(if .type=="text" then (.text // "") else "" end)|join("\n"))
+                       else tostring end ];
+      ( [ texts[] | match("🌡️ \\*\\*Playbook\\*\\* `unease: ('"$levels"')`(?: \\*([^*\\n]{1,120})\\*)?"; "g") ] | last ) as $m
+      | ( bashtexts(bashids)
+          | any(test("(--- FAIL|^FAILED |^FAIL[: ]|\\\\b[0-9]+ (tests?|specs?) failed\\\\b|Tests:.*[0-9]+ failed|[0-9]+ failed, [0-9]+ passed)"; "m")) ) as $bf
+      | ( if $m then ("marker_level=" + $m.captures[0].string),
+                     ("marker_reason=" + (($m.captures[1].string // "") | gsub("[\\n\\r=]"; " ")))
+          else empty end ),
+        ("bash_fail=" + (if $bf then "1" else "0" end))'
+    local size out; size="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
+    case "$size" in ''|*[!0-9]*) size=0 ;; esac
+    if [ "$size" -gt "$bound" ]; then
+      out="$(tail -c "$bound" "$f" 2>/dev/null | tail -n +2 | jq -rs "$flt" 2>/dev/null)"
+    else
+      out="$(jq -rs "$flt" "$f" 2>/dev/null)"
+    fi
+    [ -n "$out" ] && printf '%s\n' "$out"
+  } 2>/dev/null || true
+  return 0
+}
+
 # Integer percent of a used/window pair, clamped to 0..100. Empty unless
 # both are non-negative integers and the window is positive. The single
 # source of the beat formula, so the hook cannot drift from it.
