@@ -50,11 +50,15 @@ for i in 1 2; do
 done
 [ "$(playbook_fail_count "$d")" = "2" ] || fail "failures not counted (expected 2)"
 out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"spike","transcript_path":"%s"}' "$T" | bash "$H")"
-grep -q "Playbook unease spike" <<<"$out" || fail "spike did not fire at the third failure"
-[ "$(playbook_fail_count "$d")" = "0" ] || fail "failures not consumed after the spike"
+grep -q "Playbook unease floor" <<<"$out" || fail "the failure streak did not assert a floor at the third failure"
+grep -q "several tool calls have failed" <<<"$out" || fail "the floor assertion did not carry the tool-failures evidence"
+[ "$(playbook_state_get "$d" floor_level)" = "uneasy" ] || fail "the failure streak did not set the floor to uneasy"
+[ "$(playbook_state_get "$d" floor_reason)" = "tool-failures" ] || fail "the floor did not record the tool-failures detector"
+[ "$(playbook_state_get "$d" floor_clean_streak)" = "0" ] || fail "the floor trip did not zero the clean streak"
+[ "$(playbook_fail_count "$d")" = "0" ] || fail "failures not consumed after the floor trip"
 out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"spike","transcript_path":"%s"}' "$T" | bash "$H")"
-[ -z "$out" ] || fail "fourth failure fired a spike: failures should have been consumed"
-pass "spike at 3 failures: first two silent, failures consumed, fourth silent"
+[ -z "$out" ] || fail "fourth failure asserted a floor: failures should have been consumed"
+pass "a floor at 3 failures: first two silent, failures consumed, fourth silent"
 rm -rf "$PLAYBOOK_STATE_DIR"
 
 # --- 4. Clean-batch reset breaks the streak ---------------------------------
