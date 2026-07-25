@@ -79,13 +79,19 @@ blocks "restating the code below" src/a.ts "// @nonobvious(means) fetch the user
 const userProfile = await fetchUserProfile(id);
 const b = 2;"
 
-echo "-- an edit may not be more comment than code"
+echo "-- an edit may not be more unsanctioned comment than code"
 guard "$(payload Edit src/a.ts '// @nonobvious(must-hold) the counter must never go negative
 // @nonobvious(means) a null basis is undetermined, not unchanged
 // @nonobvious(forced-by) Redis caps a single key at 512MB
 const a = 1;')"
-[ "$GUARD_RC" -eq 2 ] && echo "PASS: three comment lines against one of code is rejected" \
-  || { echo "FAIL: ratio rule did not fire (rc=$GUARD_RC)"; fail=1; }
+[ "$GUARD_RC" -eq 0 ] && echo "PASS: sanctioned comment lines are exempt from the ratio" \
+  || { echo "FAIL: ratio rule fired on sanctioned lines (rc=$GUARD_RC) [$GUARD_OUT]"; fail=1; }
+guard "$(payload Edit src/a.ts '// the counter must never go negative
+// a null basis is undetermined, not unchanged
+// Redis caps a single key at 512MB
+const a = 1;')"
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: three untagged comment lines against one of code are rejected" \
+  || { echo "FAIL: ratio rule did not fire on untagged lines (rc=$GUARD_RC)"; fail=1; }
 guard "$(payload Edit src/a.ts "$TAGGED
 $CODE")"
 [ "$GUARD_RC" -eq 0 ] && echo "PASS: comments outnumbered by code are accepted" \
@@ -195,12 +201,20 @@ int a = 1;"
 allows "must-hold with comparison operators" src/a.c "// @nonobvious(must-hold) a[i] != b[j] && c[k]
 int a = 1;"
 
-echo "-- the ratio rule counts a comment-only edit as all comment, no code"
-guard "$(payload Edit src/a.ts '// @nonobvious(means) alpha
-// @nonobvious(means) beta
-// @nonobvious(means) gamma')"
-[ "$GUARD_RC" -eq 2 ] && echo "PASS: three comments against zero code is rejected" \
-  || { echo "FAIL: comment-only edit slipped through (rc=$GUARD_RC)"; fail=1; }
+echo "-- a comment-only edit lives or dies on sanction alone"
+guard "$(jq -cn '{tool_name:"Edit", tool_input:{file_path:"src/a.ts",
+  old_string:"const a = 1;",
+  new_string:"// @nonobvious(forced-by) the vendor API rejects unpadded ids\nconst a = 1;"}}')"
+[ "$GUARD_RC" -eq 0 ] && echo "PASS: a sanctioned comment can be added to existing code on its own" \
+  || { echo "FAIL: sanctioned comment-only edit blocked (rc=$GUARD_RC) [$GUARD_OUT]"; fail=1; }
+guard "$(payload Edit src/a.ts '// alpha explains nothing
+// beta explains nothing
+// gamma explains nothing')"
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: an untagged comment-only edit is rejected" \
+  || { echo "FAIL: untagged comment-only edit slipped through (rc=$GUARD_RC)"; fail=1; }
+guard "$(payload Edit src/a.ts '// @nonobvious(means) as requested, we decided to keep this')"
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: a tagged but narrating comment-only edit is still rejected" \
+  || { echo "FAIL: narration hid behind the tag exemption (rc=$GUARD_RC)"; fail=1; }
 
 echo "-- every line of a comment run is judged, not only the first"
 PAD=$'const a = 1;\nconst b = 2;\nconst c = 3;'

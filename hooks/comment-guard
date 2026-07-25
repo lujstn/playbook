@@ -285,11 +285,12 @@ END {
       if (restates(b, nextcode)) { problem(j, "restates the code below it"); hit = 1; break }
     }
     if (hit) continue
+    for (j = i; j < i + runlen; j++) sanctioned[j] = 1
   }
 
   for (i = 1; i <= n; i++) {
     if (isold[i]) continue
-    if (kind[i] == "comment") comments++
+    if (kind[i] == "comment" && !sanctioned[i]) comments++
     else if (kind[i] == "code") code++
   }
 
@@ -342,6 +343,9 @@ If a comment truly earns its place, open it with @nonobvious(<category>):
 
 None of these fits "explains what the code does". If that is what yours does,
 it does not earn its place.
+
+A comment that passes every check above stands on its own: it is exempt from
+the comment-to-code ratio, so a sanctioned line can be added to existing code.
 EOF
 } >&2
 
