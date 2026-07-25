@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Unease floors: the detectors that raise one, the adjudication that retires it,
-# the decay that lets it lapse, and the single-emission discipline that carries
-# it. Every case runs against an isolated PLAYBOOK_STATE_DIR.
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/take-a-beat"
@@ -41,8 +38,6 @@ fire() {  # event, session, transcript
   OUT="$(printf '{"hook_event_name":"%s","session_id":"%s","transcript_path":"%s"}' "$1" "$2" "$3" | bash "$H")"
   CTX="$(jq -r '.hookSpecificOutput.additionalContext // empty' <<<"$OUT" 2>/dev/null)"
 }
-# A fresh state dir makes the first batch silent by the bias-to-silence heal, so
-# every case seeds a healthy baseline first.
 seed() { playbook_state_reset "$1" 0; }
 
 # --- 1. Detector 2 trips a failing-tests floor at concerned ------------------
@@ -57,7 +52,6 @@ eq "the floor reason is stored" "failing-tests" "$(st "$d" floor_reason)"
 eq "the trip zeroes the clean streak" "0" "$(st "$d" floor_clean_streak)"
 
 # --- 2. No trip when the tail carries no Bash failure ------------------------
-# The readfail fixture's FAIL text sits in a Read result, which must never trip.
 iso
 d="$(sd rf)"; seed "$d"
 fire PostToolBatch rf "$R"
@@ -65,7 +59,6 @@ eq "a Read result carrying FAIL text emits nothing" "" "$OUT"
 eq "a Read result carrying FAIL text sets no floor" "" "$(st "$d" floor_level)"
 
 # --- 3. Raise-only in both directions ----------------------------------------
-# A tool-failure streak cannot lower a floor that is already higher.
 iso
 d="$(sd ro)"; seed "$d"
 playbook_state_put "$d" "floor_level=concerned" "floor_reason=failing-tests"
@@ -76,9 +69,6 @@ eq "a lower detector level does not re-emit over a higher floor" "" "$OUT"
 eq "a lower detector level does not lower the floor" "concerned" "$(st "$d" floor_level)"
 eq "a lower detector level does not rewrite the floor reason" "failing-tests" "$(st "$d" floor_reason)"
 
-# The reverse direction raises. The stored unease is pre-seeded to match the
-# fixture's marker so the adjudication treats it as unchanged and stays out of
-# the way, leaving the detector as the only thing acting.
 iso
 d="$(sd ro2)"; seed "$d"
 playbook_state_put "$d" "floor_level=uneasy" "floor_reason=tool-failures" \
@@ -145,8 +135,6 @@ eq "/clear wipes the stated unease" "" "$(st "$d" unease_level)"
 rm -rf "$CH"
 
 # --- 8. Two things to say, still one envelope --------------------------------
-# A floor assertion and the token pulse in the same batch must combine into a
-# single context block rather than racing each other to stdout.
 iso
 d="$(sd env)"; seed "$d"
 playbook_state_put "$d" "unease_level=$U_LEVEL" "unease_reason=$U_REASON"
@@ -178,16 +166,12 @@ fire UserPromptSubmit par "$U"
 eq "the parser records the stated level" "$U_LEVEL" "$(st "$d" unease_level)"
 eq "the parser records the stated reason" "$U_REASON" "$(st "$d" unease_reason)"
 eq "no floor means nothing to argue with" "" "$(st "$d" argue_downs)"
-# A zeroed timestamp survives only if the second pass treats the marker as
-# unchanged; a re-record would stamp it with the current time.
 playbook_state_put "$d" "unease_at=0"
 fire UserPromptSubmit par "$U"
 eq "an unchanged marker is not re-recorded" "0" "$(st "$d" unease_at)"
 eq "an unchanged marker adjudicates nothing" "" "$(st "$d" argue_downs)"
 
 # --- 10. An answered detector does not immediately re-assert itself ----------
-# The failing-test signal stays in the transcript tail long after the model has
-# answered it, so without this the floor would clear and re-trip on every batch.
 iso
 d="$(sd loop)"; seed "$d"
 playbook_state_put "$d" "floor_level=concerned" "floor_reason=failing-tests"
@@ -198,7 +182,6 @@ eq "the same batch does not re-assert the answered floor" "" "$OUT"
 fire PostToolBatch loop "$U"
 eq "a later batch on the same evidence stays quiet" "" "$OUT"
 eq "a later batch on the same evidence sets no floor" "" "$(st "$d" floor_level)"
-# A clean batch re-arms the detector, so a genuinely fresh signal still lands.
 fire PostToolBatch loop "$B"
 eq "a clean batch re-arms the settled detector" "" "$(st "$d" floor_settled)"
 fire PostToolBatch loop "$U"
@@ -206,9 +189,6 @@ has "a re-armed detector asserts the floor again" "Playbook unease floor: $TESTS
 eq "the re-armed detector restores the floor" "concerned" "$(st "$d" floor_level)"
 
 # --- 11. A verbatim re-statement still answers the floor it was asked for ----
-# The model's honest acknowledgement can repeat its earlier level and reason
-# word for word; the grown marker count is what distinguishes that from the
-# stale marker already sitting in the tail window.
 iso
 d="$(sd vb)"; seed "$d"
 playbook_state_put "$d" "unease_level=$U_LEVEL" "unease_reason=$U_REASON" \

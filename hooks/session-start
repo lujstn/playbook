@@ -5,8 +5,6 @@ source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"
 event="$(jq -r '.hook_event_name // "SessionStart"' 2>/dev/null <<<"$stdin" || true)"
 [ -n "$event" ] || event="SessionStart"
-# Only the two overlay-carrier events do any work; everything else exits before
-# the transcript parse, keeping the whole-suite silence budget cheap.
 case "$event" in SessionStart|SubagentStart) : ;; *) exit 0 ;; esac
 anchor="$(playbook_anchor_block "$stdin")"
 
@@ -30,9 +28,6 @@ else
   body="$overlay"
 fi
 
-# Faint liveness line on a fresh main-thread start only, so a vanished plugin is
-# noticeable even on a trivial session where no routing marker would fire.
-# Skipped for subagents (event is SubagentStart) and for compaction resumes.
 src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
 if [ "$event" = "SessionStart" ] && { [ "$src" = "startup" ] || [ "$src" = "clear" ]; }; then
   body="${body}
@@ -45,12 +40,6 @@ It is worded to be a harmless no-op when ultracode is already on, so print it wi
 Playbook liveness: include this exact short faint line once this session, as the very last line of your first reply, on its own line directly below the ultracode nudge above: 📚 *Playbook skills available in this session*. Your first reply is the first time you stop and hand back to the user; put the line at the end of it, wherever that lands, whether the reply answers them, greets them, or asks them something and waits. Never place it at the start, do not repeat it on later turns, and do not print it inside subagents."
 fi
 
-# On a dispatched helper, ask for one closing unease line only when elevated, so a
-# calm helper stays quiet and the register still surfaces when something is wrong.
-# The task-authority rule sits here too, because a helper is the only place the
-# question arises: it is the one context where something other than the brief can
-# arrive wearing the shape of an instruction. The project North Star arrives the
-# same way, as a line in the dispatch, so its reading rule belongs here too.
 if [ "$event" = "SubagentStart" ]; then
   body="${body}
 
@@ -63,9 +52,6 @@ Set an explicit model on anything you dispatch: execute on Sonnet, plan and revi
 Playbook helper report: end your final report with exactly one unease line of the form unease: <level>: <reason of at most 50 characters>, and only when your unease is elevated (attentive or above); if you are calm, end the report with no unease line."
 fi
 
-# Loud dependency guard: the overlay text, markers and context-calm offer run
-# without jq, but the North Star anchor and the context meter need it. If jq is
-# missing, say so in-context rather than degrading those silently.
 if ! command -v jq >/dev/null 2>&1; then
   body="${body}
 

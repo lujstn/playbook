@@ -1,28 +1,4 @@
 #!/usr/bin/env bash
-# Playbook: manage the offline-mode flag and its durable decision log for the
-# current session.
-#
-# Usage:
-#   scripts/offline on [--window N] [--wait a|b]
-#   scripts/offline off
-#   scripts/offline status
-#   scripts/offline log '<json object>'
-#
-# The offline flag lives at <state-dir>/offline as KEY=VALUE lines (window,
-# wait, since). Its presence is what hooks/notification checks before it will
-# forward a platform Notification event to scripts/notify. The decision log is
-# durable JSONL at <state-dir>/offline-log.jsonl: notification sends land
-# there automatically via the hook, and `log` appends model-authored entries
-# (forced-without-you decisions, external-manager consultations, waits).
-#
-# The state directory is resolved from the newest transcript for the current
-# working directory, so this always targets the calling session.
-#
-# Exit codes:
-#   0   success
-#   3   no session transcript found for this directory (state dir cannot be
-#       resolved)
-#   64  usage error
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

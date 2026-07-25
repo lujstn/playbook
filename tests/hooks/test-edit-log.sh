@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# The PreToolUse edit recorder and the churn detector it feeds. Every case runs
-# against an isolated PLAYBOOK_STATE_DIR.
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/edit-log"
@@ -30,7 +28,6 @@ iso() {
 sd() { playbook_state_dir "{\"session_id\":\"$1\"}"; }
 st() { playbook_state_get "$1" "$2"; }
 
-# Record one PreToolUse payload; OUT is stdout, ERR is stderr, RC the exit code.
 log_edit() {  # session, tool, path
   OUT="$(jq -cn --arg t "$2" --arg p "$3" --arg s "$1" \
           '{hook_event_name:"PreToolUse", session_id:$s, tool_name:$t, tool_input:{file_path:$p}}' \
@@ -73,8 +70,6 @@ done
 [ "$mf" -eq 0 ] && pass "malformed or empty stdin stays silent and exits 0"
 
 # --- 4. Churn trips a floor and consumes the log -----------------------------
-# A fresh state dir makes the first batch silent by the bias-to-silence heal, so
-# the baseline is seeded first.
 iso
 d="$(sd churn)"; playbook_state_reset "$d" 0
 ef="$d/edits"
@@ -99,7 +94,6 @@ eq "three rewrites in the window emit nothing" "" "$OUT"
 eq "three rewrites in the window set no floor" "" "$(st "$d" floor_level)"
 eq "a quiet window leaves the edit log alone" "10" "$(count_lines "$ef")"
 
-# Four rewrites, but spread outside the ten-edit window.
 iso
 d="$(sd spread)"; playbook_state_reset "$d" 0
 ef="$d/edits"

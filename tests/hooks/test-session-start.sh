@@ -10,8 +10,6 @@ grep -q "PLAYBOOK_OVERLAY" <<<"$ctx" && echo "PASS: sentinel tag" || { echo FAIL
 ! grep -q 'The nine tenets' <<<"$ctx" \
   && echo "PASS: the tenets are not restated in the overlay; the engine skill holds them" \
   || { echo "FAIL: the overlay still restates the nine tenets"; exit 1; }
-# Size ceiling on the always-on block, so the overlay cannot silently regrow past
-# the point where a model reliably reads all of it.
 ob="$(sed -n '/<PLAYBOOK_OVERLAY>/,/<\/PLAYBOOK_OVERLAY>/p' <<<"$ctx")"
 bytes=$(printf '%s' "$ob" | wc -c | tr -d ' ')
 { [ "$bytes" -gt 0 ] && [ "$bytes" -lt 2500 ]; } \
@@ -30,9 +28,6 @@ grep -qF '**Playbook**' <<<"$ctx" \
   || { echo "FAIL: liveness placement wording missing"; exit 1; }
 jq -e . <<<"$out" >/dev/null && echo "PASS: valid JSON" || { echo FAIL json; exit 1; }
 
-# SubagentStart: the same overlay must reach a spawned subagent, and the
-# envelope must carry the actual event name so Claude Code routes it (a
-# hardcoded "SessionStart" would be ignored for a SubagentStart firing).
 export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
 sout="$(printf '{"hook_event_name":"SubagentStart","agent_id":"a1","agent_type":"general-purpose"}' | bash "$H")"
@@ -69,7 +64,6 @@ mctx="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$mout")"
   && echo "PASS: the task-authority block is subagent-only, absent on a main SessionStart" \
   || { echo "FAIL: task-authority block leaked into a main SessionStart"; exit 1; }
 
-# Event guard: an unwired event (Stop) yields empty output and exits 0.
 if gout="$(printf '{"hook_event_name":"Stop"}' | bash "$H" 2>/dev/null)"; then :; else
   echo "FAIL: Stop payload aborted session-start"; exit 1; fi
 [ -z "$gout" ] && echo "PASS: session-start is silent on an unwired event (Stop)" \

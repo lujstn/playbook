@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# The per-prompt card: exactly one card on every UserPromptSubmit, carrying the
-# live rules and the current unease, with the 75k pulse folded in as a suffix.
-# Every case runs against an isolated PLAYBOOK_STATE_DIR.
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/take-a-beat"
@@ -9,8 +6,6 @@ export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
 source "$root/hooks/lib/playbook-common.sh"
 
-# The machine-global dir is isolated and pre-marked as checked, so the SessionStart
-# cases below can never touch the real HOME or fire the first-run doorbell.
 GLOBAL_TMP="$(mktemp -d)"; export PLAYBOOK_GLOBAL_DIR="$GLOBAL_TMP"
 printf 'checked=2026-07-24\nplugins=none\n' > "$GLOBAL_TMP/setup"
 SANDBOX=""
@@ -28,8 +23,6 @@ fail=0
 pass()  { echo "PASS: $1"; }
 flunk() { echo "FAIL: $1"; fail=1; }
 chk()   { if eval "$1" >/dev/null 2>&1; then pass "$2"; else flunk "$2"; fi }
-# Literal substring assertions over the emitted card, argument-passed rather than
-# evalled so the verbatim bullets can carry backticks.
 has()   { if grep -qF -- "$2" <<<"$CTX"; then pass "$1"; else flunk "$1"; fi }
 hasnt() { if grep -qF -- "$2" <<<"$CTX"; then flunk "$1"; else pass "$1"; fi }
 
@@ -39,7 +32,6 @@ iso() {
 }
 sd() { playbook_state_dir "{\"session_id\":\"$1\"}"; }
 
-# Fire one UserPromptSubmit; OUT is the raw envelope, CTX the injected card, RC the exit code.
 run() {
   OUT="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"%s","transcript_path":"%s"}' "$1" "$2" | bash "$H")"
   RC=$?
@@ -85,8 +77,6 @@ has "the floor renders with its level and reason" "floor: uneasy (tool-failures)
 has "the floor carries the acknowledge-or-argue instruction" "acknowledge it or argue it down"
 
 # --- 5. The card never renders a concrete unease marker ----------------------
-# The detector parses assistant text for the concrete-level marker form. A card
-# that printed one would feed its own state back to itself as a fresh statement.
 iso
 d="$(sd marker)"; playbook_state_reset "$d" 0
 playbook_state_put "$d" "unease_level=concerned" "unease_reason=nothing lines up" \
@@ -104,8 +94,6 @@ has "below-threshold prompt still emits a card" "📚 **Playbook** card"
 hasnt "below-threshold prompt carries no pulse suffix" "long stretch"
 chk '[ "$(playbook_state_int "$d" last_anchor_used 9)" = "1000" ]' "a silent pulse does not touch the baseline"
 
-# Usage below the baseline is a compaction the hook never heard about: the state
-# heals, and the card must survive the heal rather than being skipped with it.
 iso
 d="$(sd heal)"; playbook_state_reset "$d" 500000
 run heal "$B"
@@ -131,7 +119,6 @@ chk '[ "$(jq -s "[.. | objects | select(has(\"additionalContext\"))] | length" <
     "the envelope carries exactly one additionalContext"
 
 # --- 9. Byte ceiling on the card body ----------------------------------------
-# Measured at the worst realistic shape: a maximum-length excerpt plus a floor.
 iso
 d="$(sd size)"; playbook_state_reset "$d" 0
 long="$SANDBOX/long.jsonl"
@@ -144,7 +131,6 @@ hasnt "the measured card carries no pulse suffix" "long stretch"
 chk '[ "$bytes" -gt 0 ] && [ "$bytes" -lt 1400 ]' "card body is $bytes bytes, under the 1400-byte ceiling"
 
 # --- 10. /clear wipes the conversation-scoped state --------------------------
-# A /clear keeps the session id, so nothing may survive it into the new conversation.
 iso
 d="$(sd clr)"; playbook_state_reset "$d" 0
 playbook_state_put "$d" "northstar_excerpt=a stale request from the last conversation" \

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests for scripts/offline: manages the per-session offline flag and appends
-# to the durable decision log. The state directory is resolved from the
-# newest transcript for the current working directory, exactly as a running
-# session would resolve it, so these tests fake ~/.claude/projects/<encoded-
-# cwd>/ rather than pointing PLAYBOOK_STATE_DIR at a pre-made session dir.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 OFFLINE="$root/scripts/offline"

@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# PreToolUse veto on Agent/Workflow dispatch that carries no North Star.
-# Verdict convention matches comment-guard: allow is exit 0 and silence,
-# block is exit 2 with a short explanation on stderr.
 set -uo pipefail
 
 stdin="$(cat 2>/dev/null || true)"
@@ -31,9 +28,6 @@ if [ "$tool" = "Agent" ]; then
     gsd-* | Explore | Plan | claude-code-guide | statusline-setup) exit 0 ;;
   esac
   prompt="$(jq -r '.tool_input.prompt // empty' 2>/dev/null <<<"$stdin" || true)"
-  # Here-string, not printf|grep: under pipefail a short-circuiting `grep -q`
-  # SIGPIPEs the writer, and the pipeline's 141 would swallow the match on any
-  # prompt large enough to fill the pipe buffer, wrongly blocking it.
   grep -qE '^[[:space:]]*playbook-northstar:[[:space:]]*[^[:space:]]' <<<"$prompt" && exit 0
   block "Agent dispatch" "prompt"
 fi
@@ -41,8 +35,6 @@ fi
 if [ "$tool" = "Workflow" ]; then
   script="$(jq -r '.tool_input.script // empty' 2>/dev/null <<<"$stdin" || true)"
   args="$(jq -r 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end' 2>/dev/null <<<"$stdin" || true)"
-  # A name or scriptPath invocation carries no visible content, so both fail
-  # open, the same deliberate gap as an empty script.
   { [ -z "$script" ] && [ -z "$args" ]; } && exit 0
   grep -qF 'playbook-northstar' <<<"${script}"$'\n'"${args}" && exit 0
   block "Workflow launch" "script's agent prompts"

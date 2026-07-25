@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Forwards a Notification event to scripts/notify while offline mode is on,
-# and records the send (or its failure) in the durable decision log. Silent
-# and always exit 0 otherwise: this hook must never speak on its own account
-# and never fail the platform's Notification dispatch.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"

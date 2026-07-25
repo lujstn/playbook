@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Tests for hooks/dispatch-guard: a PreToolUse veto that blocks an Agent or
-# Workflow dispatch carrying no `playbook-northstar:` line. Verdict
-# convention matches comment-guard: allow is exit 0 and silence, block is
-# exit 2 with a short explanation on stderr.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/dispatch-guard"
@@ -44,10 +40,6 @@ grep -qF "playbook-northstar" <<<"$GUARD_OUT" \
 allows "prompt with a northstar line is allowed" "$(agent_payload "" "Do the thing.
 playbook-northstar: ship a working login page end to end")"
 
-# A real dispatch prompt is large; the northstar line sits near the top. A
-# `printf|grep -q` check SIGPIPEs the writer once the prompt exceeds the pipe
-# buffer, and under pipefail the 141 wrongly blocks a valid dispatch. This must
-# stay ALLOW no matter how much context follows the line.
 big_filler="$(head -c 200000 /dev/zero | tr '\0' 'a')"
 allows "a large prompt with the northstar line near the top is allowed" \
   "$(agent_payload "" "$(printf 'playbook-northstar: ship the whole feature\n%s\n' "$big_filler")")"

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tests for hooks/notification: forwards a Notification event to scripts/notify
-# only while the offline flag is set, maps the notification kind to a level
-# and headline, and appends one line to the durable JSONL decision log
-# whether the send succeeded or failed. Never speaks on stdout/stderr, and
-# never fails the hook regardless of the stub's own exit code.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/notification"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# PreToolUse edit recorder: one line per edited path, read by the edit-churn
-# detector in take-a-beat. Never blocks, never prints, always exits 0.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
@@ -14,7 +12,6 @@ case "$tool" in
   *) exit 0 ;;
 esac
 
-# Newlines are stripped so one edit is always one record.
 path="$(jq -r '.tool_input.file_path // empty' 2>/dev/null <<<"$stdin" | tr -d '\n\r' || true)"
 [ -n "$path" ] || exit 0
 

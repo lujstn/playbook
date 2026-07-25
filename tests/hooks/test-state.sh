@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Throttle-state lifecycle for take-a-beat. Every case runs against an isolated
-# PLAYBOOK_STATE_DIR so nothing leaks between cases or into the real state root.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 H="$root/hooks/take-a-beat"
 SS="$root/hooks/session-start"
 export CLAUDE_PLUGIN_ROOT="$root"
 unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
-# Isolate the global marker dir so the first-run doorbell never touches real HOME.
 GLOBAL_TMP="$(mktemp -d)"; export PLAYBOOK_GLOBAL_DIR="$GLOBAL_TMP"
 trap 'rm -rf "$GLOBAL_TMP"' EXIT
 source "$root/hooks/lib/playbook-common.sh"

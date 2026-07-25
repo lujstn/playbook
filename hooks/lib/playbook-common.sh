@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for Playbook hooks. Sourced, never executed directly.
 
-# Resolve the project working directory from hook stdin or PWD.
 playbook_project_dir() {
   local cwd
   cwd="$(jq -r '.cwd // empty' 2>/dev/null <<<"${1:-}")"
@@ -9,28 +7,14 @@ playbook_project_dir() {
   printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}"
 }
 
-# Resolve the transcript path from hook stdin JSON. Empty if absent.
 playbook_transcript_path() {
   jq -r '.transcript_path // empty' 2>/dev/null <<<"${1:-}" || printf ''
 }
 
-# The dispatched subagent's id from hook stdin. Empty on the main thread,
-# which is how callers distinguish a helper from the steering thread.
 playbook_agent_id() {
   jq -r '.agent_id // empty' 2>/dev/null <<<"${1:-}" || printf ''
 }
 
-# The verbatim original request: the complete content of the first transcript
-# record that is the human's own user message, with multi-line content
-# preserved. Skips system/hook records (.type!="user"), records whose role is
-# not "user", and tool-result turns (content is an array whose first element
-# type is "tool_result"). Returns the full text, or empty on any failure.
-# Silent degradation is mandatory: empty, never a wrong value.
-#
-# Bounded read: the first user record is structurally at the top of the file, so
-# only the leading PLAYBOOK_TAIL_BYTES are parsed on a large transcript (the last,
-# possibly partial, physical line is dropped since JSONL is one record per line);
-# a full parse is the fallback only if that window carried no matching record.
 playbook_original_request() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
@@ -55,10 +39,6 @@ playbook_original_request() {
   } 2>/dev/null || printf ''
 }
 
-# The value of the most recent `playbook-northstar: <text>` line in a block
-# of recovered text. The whole line, after optional leading space, must be
-# the declaration; the last occurrence wins; trailing space is trimmed.
-# Empty if absent. Empty, never a wrong value.
 playbook_northstar_line() {
   { printf '%s\n' "${1:-}" \
       | grep -E '^[[:space:]]*playbook-northstar:[[:space:]]*.' \
@@ -67,39 +47,12 @@ playbook_northstar_line() {
   } 2>/dev/null || printf ''
 }
 
-# The project North Star a dispatcher passed into this run: the
-# `playbook-northstar: <text>` line carried in the first genuine human or
-# dispatch message. Read off playbook_original_request so it is anchored to
-# the exact same record (one parse, no second slurp, and a later doc read
-# cannot poison it). Empty on the main thread (the engine does not inject
-# the line into the user's own request) and empty if absent.
 playbook_project_northstar() {
   local orig; orig="$(playbook_original_request "${1:-}")"
   [ -n "$orig" ] || { printf ''; return 0; }
   playbook_northstar_line "$orig"
 }
 
-# The labelled anchor block to inject. Subagent-aware, and deliberately says
-# less inside a subagent than on the main thread.
-#
-# On the main thread the recovered first message is the user's own request and
-# is labelled as such.
-#
-# Inside a subagent (agent_id present) the anchor carries the project North Star
-# ONLY, and never the task. At SubagentStart the helper has not produced a
-# transcript yet, so .transcript_path can only resolve to the dispatching
-# session's transcript, whose first user record is the PARENT's opening request
-# rather than this helper's dispatch prompt. Labelling that as "your assigned
-# task" hands the helper a confidently-worded wrong job, which is precisely what
-# this module's contract forbids: empty, never a wrong value. The hook payload
-# carries no dispatch prompt (only agent_id, cwd, hook_event_name, session_id,
-# source, transcript_path), so the task cannot be recovered here and must not be
-# guessed.
-#
-# The North Star is still safe to carry: it is a deliberate human-authored
-# `playbook-northstar:` line stating the project goal, which holds for every
-# helper whatever its individual task. Absent that line there is nothing
-# trustworthy to say, so the block is empty. Never fabricates a North Star.
 playbook_anchor_block() {
   local s="${1:-}" aid orig ns
   aid="$(playbook_agent_id "$s")"
@@ -114,13 +67,6 @@ playbook_anchor_block() {
   fi
 }
 
-# Context tokens in use = the last assistant record's input-side usage, the
-# exact formula Claude Code uses for used_percentage. Empty if unavailable.
-#
-# Bounded read: this runs on every batch and inside the time-budgeted prompt
-# hook, so a large transcript is read only from its last PLAYBOOK_TAIL_BYTES
-# (the first, partial, physical line is dropped); a full parse is the fallback
-# only if no usage record landed in that tail window.
 playbook_context_used() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
@@ -144,8 +90,6 @@ playbook_context_used() {
   } 2>/dev/null || printf ''
 }
 
-# The rank of an unease level, low to high, 0..10. Empty for anything outside
-# the register, so a corrupted or fabricated level can never win a comparison.
 playbook_unease_rank() {
   case "${1:-}" in
     clear)          printf '0' ;;
@@ -163,9 +107,6 @@ playbook_unease_rank() {
   esac
 }
 
-# The first non-empty line of the session's original request, whitespace-
-# trimmed and truncated to 140 characters, for the per-prompt card. Empty on
-# any failure: empty, never a wrong value.
 playbook_northstar_excerpt() {
   { local orig first
     orig="$(playbook_original_request "${1:-}")"
@@ -177,17 +118,6 @@ playbook_northstar_excerpt() {
   } 2>/dev/null || printf ''
 }
 
-# One bounded pass over the transcript tail, emitting KEY=VALUE lines:
-#   marker_level=<level>    the model's last stated unease level, if any
-#   marker_reason=<text>    its reason, newline-stripped, possibly empty
-#   bash_fail=0|1           whether a Bash tool result in the window reports
-#                           failing tests
-# Emits nothing at all on any failure. The marker scan reads assistant-authored
-# text blocks only, so hook injections (which live in user and system records)
-# are structurally invisible; the level alternation is concrete, so the
-# overlay's and card's `<level>` placeholder examples can never match. The
-# failing-test scan joins Bash tool_use ids to their tool_results, so a Read
-# of a file that merely contains FAIL-shaped text cannot trip it.
 playbook_scan_tail() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || return 0
@@ -231,9 +161,6 @@ playbook_scan_tail() {
   return 0
 }
 
-# Integer percent of a used/window pair, clamped to 0..100. Empty unless
-# both are non-negative integers and the window is positive. The single
-# source of the beat formula, so the hook cannot drift from it.
 playbook_percent() {
   { local u="${1:-}" w="${2:-}"
     case "$u" in ''|*[!0-9]*) printf ''; return 0 ;; esac
@@ -245,21 +172,10 @@ playbook_percent() {
   } 2>/dev/null || printf ''
 }
 
-# --- Per-session throttle state --------------------------------------------
-# All state lives outside the working tree, under
-# ${PLAYBOOK_STATE_DIR:-$HOME/.claude/hook-state/playbook}/<sid>/ (main thread)
-# or .../<sid>/agents/<aid>/ (subagents). Two files: `state` (KEY=VALUE lines,
-# integers only, no jq needed) and `failures` (append-only, one line per
-# failure; wc -l is the count). Every helper here returns 0 unconditionally:
-# a state failure must never fail a hook, only degrade it to silence.
-
-# The root directory holding every per-session state dir.
 playbook_state_root() {
   printf '%s' "${PLAYBOOK_STATE_DIR:-${HOME}/.claude/hook-state/playbook}"
 }
 
-# The sanitised session id: session_id from stdin, else the transcript filename
-# stem, else the literal `unknown`. Sanitised to a safe path segment. Never empty.
 playbook_session_id() {
   local s="${1:-}" sid
   sid="$(jq -r '.session_id // empty' 2>/dev/null <<<"$s" || true)"
@@ -275,8 +191,6 @@ playbook_session_id() {
   printf '%s' "$sid"
 }
 
-# The per-session (or per-subagent) state directory, created on demand. Empty
-# only if the root is unusable.
 playbook_state_dir() {
   local s="${1:-}" root sid aid dir
   root="$(playbook_state_root)"
@@ -288,8 +202,6 @@ playbook_state_dir() {
   printf '%s' "$dir"
 }
 
-# Read a single raw state value. Empty if the file or key is absent. Last
-# occurrence wins.
 playbook_state_get() {
   local dir="${1:-}" key="${2:-}" sf
   [ -n "$dir" ] && [ -n "$key" ] || { printf ''; return 0; }
@@ -299,16 +211,12 @@ playbook_state_get() {
     "$sf" 2>/dev/null || printf ''
 }
 
-# Read an integer state value with a default. Non-integer or missing -> default.
 playbook_state_int() {
   local dir="${1:-}" key="${2:-}" def="${3:-0}" v
   v="$(playbook_state_get "$dir" "$key")"
   case "$v" in ''|*[!0-9]*) printf '%s' "$def" ;; *) printf '%s' "$v" ;; esac
 }
 
-# Atomically set KEY=VALUE pairs in <dir>/state, preserving other sane KEY=VALUE
-# lines. Writes a sibling temp file then renames it, so a reader never sees a
-# torn file. Always returns 0.
 playbook_state_put() {
   local dir="${1:-}"; shift 2>/dev/null || true
   [ -n "$dir" ] || return 0
@@ -331,8 +239,6 @@ playbook_state_put() {
   return 0
 }
 
-# Whether <dir>/state exists and every always-present integer key parses. Drives
-# the bias-to-silence self-heal on corruption.
 playbook_state_healthy() {
   local dir="${1:-}" k v
   [ -n "$dir" ] || return 1
@@ -344,10 +250,6 @@ playbook_state_healthy() {
   return 0
 }
 
-# Re-seed state biased to silence: baseline set to current usage, calm and
-# snapshot zeroed, failures truncated. window_proven is deliberately preserved
-# (a compaction does not change the window size) and otherwise re-derived by the
-# ratchet. Always returns 0.
 playbook_state_reset() {
   local dir="${1:-}" used="${2:-0}"
   [ -n "$dir" ] || return 0
@@ -357,8 +259,6 @@ playbook_state_reset() {
   return 0
 }
 
-# Append one atomic failure marker (single-line >> is atomic under PIPE_BUF, so
-# concurrent parallel failures never lose an increment).
 playbook_fail_append() {
   local dir="${1:-}"
   [ -n "$dir" ] || return 0
@@ -367,7 +267,6 @@ playbook_fail_append() {
   return 0
 }
 
-# The current failure count (wc -l of the failures file). Zero if absent.
 playbook_fail_count() {
   local dir="${1:-}" c
   [ -n "$dir" ] || { printf '0'; return 0; }
@@ -376,8 +275,6 @@ playbook_fail_count() {
   case "$c" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$c" ;; esac
 }
 
-# Remove per-session state dirs older than 7 days. Guarded so an empty or root
-# path can never be swept. Best-effort; always returns 0.
 playbook_state_gc() {
   local root; root="$(playbook_state_root)"
   case "$root" in ''|/) return 0 ;; esac
@@ -386,10 +283,6 @@ playbook_state_gc() {
   return 0
 }
 
-# The nominal context window in tokens. PLAYBOOK_WINDOW (a positive integer)
-# is the escape hatch and always wins. Otherwise the ratchet-proven window from
-# the state dir wins once usage has exceeded 200000 this session. Otherwise the
-# assumed standard 200000-token window. Never empty.
 playbook_window() {
   local dir="${1:-}" e="${PLAYBOOK_WINDOW:-}" v
   case "$e" in ''|*[!0-9]*) : ;; *) [ "$e" -gt 0 ] 2>/dev/null && { printf '%s' "$e"; return 0; } ;; esac
@@ -400,9 +293,6 @@ playbook_window() {
   printf '200000'
 }
 
-# Provenance of the window figure: `proven` when it comes from the env override
-# or the usage ratchet, `assumed` when it is the 200000 default. The calm beat
-# may state a percentage only when the window is proven.
 playbook_window_provenance() {
   local dir="${1:-}" e="${PLAYBOOK_WINDOW:-}" v
   case "$e" in ''|*[!0-9]*) : ;; *) [ "$e" -gt 0 ] 2>/dev/null && { printf 'proven'; return 0; } ;; esac
@@ -413,8 +303,6 @@ playbook_window_provenance() {
   printf 'assumed'
 }
 
-# JSON-string escape via bash parameter substitution (single C-level passes;
-# identical technique to the Superpowers session-start hook).
 playbook_json_escape() {
   local s="${1:-}"
   s="${s//\\/\\\\}"; s="${s//\"/\\\"}"
@@ -422,11 +310,6 @@ playbook_json_escape() {
   printf '%s' "$s"
 }
 
-# Read a single-line scalar from .claude/playbook/<file> under the project
-# dir. Trims surrounding whitespace; returns the first non-empty line only.
-# Empty if the file is missing or blank. Silent degradation: empty, never a
-# wrong value. Used by scripts/notify to read the gitignored ntfy topic and
-# the optional server override.
 playbook_claude_file() {
   local proj="${1:-}" name="${2:-}" path
   [ -n "$proj" ] && [ -n "$name" ] || { printf ''; return 0; }
@@ -438,10 +321,6 @@ playbook_claude_file() {
   } 2>/dev/null || printf ''
 }
 
-# Read a single-line scalar from the machine-global config directory,
-# ${PLAYBOOK_GLOBAL_DIR:-~/.claude/playbook}/<name>. Same trimming and
-# silent-degradation contract as playbook_claude_file. This is where a user
-# sets ntfy/Pushover once so it applies to every project.
 playbook_global_file() {
   local name="${1:-}" dir path
   [ -n "$name" ] || { printf ''; return 0; }
@@ -454,10 +333,6 @@ playbook_global_file() {
   } 2>/dev/null || printf ''
 }
 
-# Resolve a notification config scalar with project override: a project
-# .claude/playbook/<name> wins when present, otherwise the machine-global
-# config. This makes ntfy/Pushover a set-once-globally setup that any single
-# project can override by dropping its own file in place.
 playbook_config_scalar() {
   local proj="${1:-}" name="${2:-}" v
   v="$(playbook_claude_file "$proj" "$name")"
@@ -465,22 +340,14 @@ playbook_config_scalar() {
   playbook_global_file "$name"
 }
 
-# The ntfy topic and optional server override: project .claude/playbook/ first,
-# then the machine-global ~/.claude/playbook/.
 playbook_ntfy_topic()  { playbook_config_scalar "${1:-$PWD}" "ntfy-topic"; }
 playbook_ntfy_server() { playbook_config_scalar "${1:-$PWD}" "ntfy-server"; }
 
-# The chosen notification provider (pushover|ntfy), project then global. Empty
-# if not configured; scripts/notify falls back to ntfy when an ntfy-topic is present.
 playbook_notify_provider() { playbook_config_scalar "${1:-$PWD}" "notify-provider"; }
 
-# Pushover app token and user/group key, project then global. Silent
-# degradation: empty, never a wrong value.
 playbook_pushover_token() { playbook_config_scalar "${1:-$PWD}" "pushover-token"; }
 playbook_pushover_user()  { playbook_config_scalar "${1:-$PWD}" "pushover-user"; }
 
-# Candidate settings files that may register hooks: the user's global config and
-# the project-local configs. Echoed one per line, only those that exist.
 playbook_settings_files() {
   local proj="${1:-$PWD}" f
   for f in "${HOME}/.claude/settings.json" \
@@ -490,12 +357,6 @@ playbook_settings_files() {
   done
 }
 
-# Detect a competing context-warning hook: one that injects low-context anxiety
-# into the model's context (e.g. GSD's gsd-context-monitor, which tells agents to
-# wrap up and stop near the context limit). Echoes a short identifier for the
-# first match, else empty. Detection is by the command path a settings file
-# registers, since that path is all the settings file carries. Silent
-# degradation: empty, never a wrong value.
 playbook_competing_context_hook() {
   local proj="${1:-$PWD}" f
   while IFS= read -r f; do
@@ -508,11 +369,6 @@ playbook_competing_context_hook() {
   printf ''
 }
 
-# Whether the context-calm channel has been resolved: the user has either let
-# Playbook own it or explicitly declined. Persisted as a marker so the one-time
-# offer is not repeated every session. Checks the project marker first, then a
-# global fallback. Echoes the marker contents (e.g. owned or declined), else
-# empty.
 playbook_context_calm_resolved() {
   local proj="${1:-$PWD}" v g
   v="$(playbook_claude_file "$proj" "context-calm")"
@@ -523,11 +379,6 @@ playbook_context_calm_resolved() {
       | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; } 2>/dev/null || printf ''
 }
 
-# Discover the most recently modified transcript jsonl for the current
-# working directory. Claude Code stores per-project transcripts under
-# ~/.claude/projects/<encoded-cwd>/, where the encoding replaces '/' with
-# '-' in the absolute project path. Empty if the directory does not exist
-# or carries no transcripts.
 playbook_latest_transcript() {
   local proj="${1:-$PWD}" enc dir latest
   enc="$(printf '%s' "$proj" | tr '/' '-')"
@@ -537,14 +388,6 @@ playbook_latest_transcript() {
   [ -n "$latest" ] && [ -f "$latest" ] && printf '%s' "$latest" || printf ''
 }
 
-# The remote-control session URL the live transcript carries when
-# /remote-control is active. Recovered the same role/type-anchored way as
-# playbook_original_request: filter records
-# whose type=="system" and subtype=="bridge_status" and whose content
-# literally contains "is active", take the .url of the latest such record.
-# A user paste of the URL string is type=="user", so it cannot match. A
-# later deactivation or an absent record yields empty: silent degradation
-# by construction, never a wrong value.
 playbook_remote_url() {
   { local f; f="${1:-}"
     [ -n "$f" ] || f="$(playbook_latest_transcript "${2:-$PWD}")"
@@ -556,10 +399,6 @@ playbook_remote_url() {
   } 2>/dev/null || printf ''
 }
 
-# Emit the context-injection envelope. Replicates the Superpowers session-start
-# three-platform branch: Claude Code reads BOTH additional_context and the nested
-# form without dedup, so exactly one field is emitted per platform. Without this
-# branch the overlay and anchor silently never inject on Cursor or Copilot.
 playbook_emit_context() {
   local event="${1:-}" body="${2:-}" escaped
   escaped="$(playbook_json_escape "$body")"
