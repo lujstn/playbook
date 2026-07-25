@@ -38,6 +38,7 @@ fire() {  # event, session, transcript
   OUT="$(printf '{"hook_event_name":"%s","session_id":"%s","transcript_path":"%s"}' "$1" "$2" "$3" | bash "$H")"
   CTX="$(jq -r '.hookSpecificOutput.additionalContext // empty' <<<"$OUT" 2>/dev/null)"
 }
+# @nonobvious(forced-by) heal_or_baseline silently resets a fresh state dir, so every case seeds a baseline first
 seed() { playbook_state_reset "$1" 0; }
 
 # --- 1. Detector 2 trips a failing-tests floor at concerned ------------------

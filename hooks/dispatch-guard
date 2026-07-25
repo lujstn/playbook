@@ -28,6 +28,7 @@ if [ "$tool" = "Agent" ]; then
     gsd-* | Explore | Plan | claude-code-guide | statusline-setup) exit 0 ;;
   esac
   prompt="$(jq -r '.tool_input.prompt // empty' 2>/dev/null <<<"$stdin" || true)"
+  # @nonobvious(forced-by) a printf pipe into grep -q SIGPIPEs past the pipe buffer and pipefail turns allow into block; the here-string has no writer process
   grep -qE '^[[:space:]]*playbook-northstar:[[:space:]]*[^[:space:]]' <<<"$prompt" && exit 0
   block "Agent dispatch" "prompt"
 fi
@@ -35,6 +36,7 @@ fi
 if [ "$tool" = "Workflow" ]; then
   script="$(jq -r '.tool_input.script // empty' 2>/dev/null <<<"$stdin" || true)"
   args="$(jq -r 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end' 2>/dev/null <<<"$stdin" || true)"
+  # @nonobvious(deliberately-missing) name and scriptPath invocations carry no visible content to check, so they fail open
   { [ -z "$script" ] && [ -z "$args" ]; } && exit 0
   grep -qF 'playbook-northstar' <<<"${script}"$'\n'"${args}" && exit 0
   block "Workflow launch" "script's agent prompts"

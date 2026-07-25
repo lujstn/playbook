@@ -12,6 +12,7 @@ case "$tool" in
   *) exit 0 ;;
 esac
 
+# @nonobvious(must-hold) newlines stripped so one edit is exactly one record in the churn window
 path="$(jq -r '.tool_input.file_path // empty' 2>/dev/null <<<"$stdin" | tr -d '\n\r' || true)"
 [ -n "$path" ] || exit 0
 

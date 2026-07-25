@@ -20,6 +20,7 @@ EOF
   exit 64
 }
 
+# @nonobvious(means) the state dir from the newest transcript scopes offline to the current session, never the machine
 t="$(playbook_latest_transcript "$PWD")"
 [ -n "$t" ] || { echo "offline: no session transcript found for this directory" >&2; exit 3; }
 dir="$(playbook_state_dir "$(jq -cn --arg t "$t" '{transcript_path:$t}')")"

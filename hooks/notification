@@ -3,6 +3,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/playbook-common.sh"
 
+# @nonobvious(must-hold) never speaks and always exits 0, so a notify failure cannot break the platform dispatch
 stdin="$(cat 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0
 

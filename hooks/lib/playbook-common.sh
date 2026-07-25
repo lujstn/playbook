@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# @nonobvious(must-hold) every helper degrades to empty output, never a wrong value
 playbook_project_dir() {
   local cwd
   cwd="$(jq -r '.cwd // empty' 2>/dev/null <<<"${1:-}")"
@@ -53,6 +54,7 @@ playbook_project_northstar() {
   playbook_northstar_line "$orig"
 }
 
+# @nonobvious(forced-by) at SubagentStart the transcript is the parent's, so its first record is not this helper's task; only the deliberate playbook-northstar line is safe to carry
 playbook_anchor_block() {
   local s="${1:-}" aid orig ns
   aid="$(playbook_agent_id "$s")"
@@ -67,6 +69,7 @@ playbook_anchor_block() {
   fi
 }
 
+# @nonobvious(mirrors) the input-side usage sum Claude Code shows as used_percentage
 playbook_context_used() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || { printf ''; return 0; }
@@ -114,10 +117,12 @@ playbook_northstar_excerpt() {
     first="$(printf '%s\n' "$orig" | awk 'NF{print; exit}' \
               | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
     [ -n "$first" ] || { printf ''; return 0; }
+    # @nonobvious(forced-by) jq slices by codepoint, so the cut cannot tear a multibyte character
     printf '%s' "$first" | jq -Rr 'if length > 140 then .[0:139] + "…" else . end' 2>/dev/null
   } 2>/dev/null || printf ''
 }
 
+# @nonobvious(must-hold) assistant text and concrete levels only, so injected examples never match; results join to Bash ids so a Read of FAIL-shaped text cannot trip
 playbook_scan_tail() {
   { local f; f="$(playbook_transcript_path "${1:-}")"
     [ -n "$f" ] && [ -f "$f" ] || return 0
@@ -217,6 +222,7 @@ playbook_state_int() {
   case "$v" in ''|*[!0-9]*) printf '%s' "$def" ;; *) printf '%s' "$v" ;; esac
 }
 
+# @nonobvious(must-hold) temp-then-rename, so a reader never sees a torn file
 playbook_state_put() {
   local dir="${1:-}"; shift 2>/dev/null || true
   [ -n "$dir" ] || return 0
@@ -250,6 +256,7 @@ playbook_state_healthy() {
   return 0
 }
 
+# @nonobvious(deliberately-missing) window_proven is not reset: a compaction does not shrink the window
 playbook_state_reset() {
   local dir="${1:-}" used="${2:-0}"
   [ -n "$dir" ] || return 0
@@ -259,6 +266,7 @@ playbook_state_reset() {
   return 0
 }
 
+# @nonobvious(forced-by) one line under PIPE_BUF appends atomically under parallel failures
 playbook_fail_append() {
   local dir="${1:-}"
   [ -n "$dir" ] || return 0
@@ -388,6 +396,7 @@ playbook_latest_transcript() {
   [ -n "$latest" ] && [ -f "$latest" ] && printf '%s' "$latest" || printf ''
 }
 
+# @nonobvious(must-hold) only system bridge_status records match, so a pasted URL in a user message cannot poison the link
 playbook_remote_url() {
   { local f; f="${1:-}"
     [ -n "$f" ] || f="$(playbook_latest_transcript "${2:-$PWD}")"
@@ -399,6 +408,7 @@ playbook_remote_url() {
   } 2>/dev/null || printf ''
 }
 
+# @nonobvious(forced-by) Cursor, Claude Code and Copilot each read a different envelope field
 playbook_emit_context() {
   local event="${1:-}" body="${2:-}" escaped
   escaped="$(playbook_json_escape "$body")"

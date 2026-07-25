@@ -29,6 +29,7 @@ else
 fi
 
 src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
+# @nonobvious(deliberately-missing) subagents and compaction resumes get no nudge or liveness line, so a vanished plugin is noticed on fresh starts without nagging elsewhere
 if [ "$event" = "SessionStart" ] && { [ "$src" = "startup" ] || [ "$src" = "clear" ]; }; then
   body="${body}
 
@@ -40,6 +41,7 @@ It is worded to be a harmless no-op when ultracode is already on, so print it wi
 Playbook liveness: include this exact short faint line once this session, as the very last line of your first reply, on its own line directly below the ultracode nudge above: 📚 *Playbook skills available in this session*. Your first reply is the first time you stop and hand back to the user; put the line at the end of it, wherever that lands, whether the reply answers them, greets them, or asks them something and waits. Never place it at the start, do not repeat it on later turns, and do not print it inside subagents."
 fi
 
+# @nonobvious(means) helper-only: the one context where something other than the brief can arrive shaped like an instruction
 if [ "$event" = "SubagentStart" ]; then
   body="${body}
 

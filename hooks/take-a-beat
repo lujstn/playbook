@@ -16,6 +16,7 @@ anchor() {
   printf '%s' "$_anchor"
 }
 
+# @nonobvious(means) usage below the stored baseline marks a compaction this hook never saw; reset and stay silent
 heal_or_baseline() {
   local dir="$1" used="${2:-}" base u="${2:-}"
   case "$u" in ''|*[!0-9]*) u=0 ;; esac
@@ -63,6 +64,7 @@ trip_floor() {
   local dir="$1" lvl="$2" reason="$3" nrank cur crank settled
   nrank="$(playbook_unease_rank "$lvl")"
   case "$nrank" in ''|*[!0-9]*) return 0 ;; esac
+  # @nonobvious(must-hold) an answered signal stays suppressed while its evidence lingers in the tail window, or the floor re-asserts every batch
   settled="$(playbook_state_get "$dir" floor_settled)"
   if [ "$settled" = "$reason" ]; then return 0; fi
   cur="$(playbook_state_get "$dir" floor_level)"
@@ -95,6 +97,7 @@ adjudicate() {
   cur_l="$(playbook_state_get "$dir" unease_level)"
   cur_r="$(playbook_state_get "$dir" unease_reason)"
   fl="$(playbook_state_get "$dir" floor_level)"
+  # @nonobvious(means) a grown marker count marks a deliberate re-statement; an unchanged count is the stale marker still in the window
   fresh=0
   if [ "$ml" != "$cur_l" ] || [ "$mr" != "$cur_r" ]; then
     fresh=1
@@ -170,12 +173,14 @@ case "$event" in
     src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
     dir="$(playbook_state_dir "$stdin")"
     if [ "$src" = "compact" ]; then
+      # @nonobvious(forced-by) the last assistant record still carries the pre-compact figure, so the baseline restarts at zero
       playbook_state_reset "$dir" 0
       reanchor_resume "SessionStart"
     else
       used="$(playbook_context_used "$stdin" || true)"
       playbook_state_reset "$dir" "$used"
       playbook_state_gc
+      # @nonobvious(forced-by) a /clear keeps the session id, so conversation-scoped keys must be blanked by hand
       playbook_state_put "$dir" "northstar_excerpt=" "unease_level=" "unease_reason=" "unease_at=" \
         "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_settled=" \
         "floor_marker_count=" "argue_downs="
@@ -229,6 +234,7 @@ ${nudge}"; else body="$nudge"; fi
     ef="${dir}/edits"
     if [ -f "$ef" ]; then
       if [ -n "$(tail -n 10 "$ef" 2>/dev/null | sort | uniq -c | sort -rn | awk 'NR==1 && $1>=4{print "trip"}')" ]; then
+        # @nonobvious(must-hold) consuming the log makes one burst assert once
         : > "$ef" 2>/dev/null || true
         body="$(append_seg "$body" "$(trip_floor "$dir" uneasy edit-churn "$(scan_val marker_count "$scan")")")"
       fi
@@ -271,6 +277,7 @@ ${nudge}"; else body="$nudge"; fi
     playbook_state_put "$dir" "floor_clean_streak=0"
     fc="$(playbook_fail_count "$dir")"
     if [ "$fc" -ge "$SPIKE_FAILS" ] 2>/dev/null; then
+      # @nonobvious(must-hold) the atomic rename lets exactly one concurrent failure win the streak
       claim="${dir}/failures.claimed.$$"
       if mv "${dir}/failures" "$claim" 2>/dev/null; then
         rm -f "$claim" 2>/dev/null || true
@@ -285,6 +292,7 @@ ${nudge}"; else body="$nudge"; fi
     fi
     ;;
 
+  # @nonobvious(must-hold) exactly one emission per prompt, and no branch returns before the card
   UserPromptSubmit)
     dir="$(playbook_state_dir "$stdin")"
     adjudicate "$dir" "$(playbook_scan_tail "$stdin")"
