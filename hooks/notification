@@ -36,6 +36,10 @@ case "$kind" in
     level="info"
     headline="Session finished while you were away"
     ;;
+  idle_prompt)
+    level="action"
+    headline="Claude has gone quiet and may need you"
+    ;;
   *)
     level="action"
     headline="Claude is blocked and needs you"

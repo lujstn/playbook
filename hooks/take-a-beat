@@ -61,7 +61,7 @@ now() {
 scan_val() { printf '%s\n' "${2:-}" | sed -n "s/^${1}=//p" | tail -n1; }
 
 clear_floor() {
-  playbook_state_put "${1:-}" "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak="
+  playbook_state_put "${1:-}" "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_marker_count="
 }
 
 floor_assertion() {
@@ -92,7 +92,7 @@ trip_floor() {
     if [ "$nrank" -le "$crank" ] 2>/dev/null; then return 0; fi
   fi
   playbook_state_put "$dir" "floor_level=${lvl}" "floor_reason=${reason}" \
-    "floor_at=$(now)" "floor_clean_streak=0"
+    "floor_at=$(now)" "floor_clean_streak=0" "floor_marker_count=${4:-}"
   floor_assertion "$lvl" "$reason"
 }
 
@@ -112,17 +112,32 @@ decay_floor() {
 # Record the model's latest stated unease, and let a new statement answer an
 # active floor: at or above the floor acknowledges it, below it argues it down.
 # The model's statement wins either way, so both outcomes retire the floor and
-# neither emits. An unchanged marker is not a new statement and answers nothing.
+# neither emits. An unchanged marker is not a new statement and answers nothing,
+# with one exception: when the marker count has grown since the floor was set,
+# the model printed the same line again deliberately, and an honest answer that
+# happens to repeat the earlier level and reason verbatim still counts.
 adjudicate() {
-  local dir="$1" scan="$2" ml mr cur_l cur_r fl fr mrank frank n
+  local dir="$1" scan="$2" ml mr mc cur_l cur_r fl fr fmc mrank frank n fresh
   ml="$(scan_val marker_level "$scan")"
   [ -n "$ml" ] || return 0
   mr="$(scan_val marker_reason "$scan")"
+  mc="$(scan_val marker_count "$scan")"
   cur_l="$(playbook_state_get "$dir" unease_level)"
   cur_r="$(playbook_state_get "$dir" unease_reason)"
-  if [ "$ml" = "$cur_l" ] && [ "$mr" = "$cur_r" ]; then return 0; fi
-  playbook_state_put "$dir" "unease_level=${ml}" "unease_reason=${mr}" "unease_at=$(now)"
   fl="$(playbook_state_get "$dir" floor_level)"
+  fresh=0
+  if [ "$ml" != "$cur_l" ] || [ "$mr" != "$cur_r" ]; then
+    fresh=1
+  elif [ -n "$fl" ]; then
+    fmc="$(playbook_state_get "$dir" floor_marker_count)"
+    case "$fmc" in ''|*[!0-9]*) : ;; *)
+      case "$mc" in ''|*[!0-9]*) : ;; *)
+        if [ "$mc" -gt "$fmc" ] 2>/dev/null; then fresh=1; fi ;;
+      esac ;;
+    esac
+  fi
+  [ "$fresh" -eq 1 ] || return 0
+  playbook_state_put "$dir" "unease_level=${ml}" "unease_reason=${mr}" "unease_at=$(now)"
   [ -n "$fl" ] || return 0
   mrank="$(playbook_unease_rank "$ml")"
   case "$mrank" in ''|*[!0-9]*) return 0 ;; esac
@@ -199,7 +214,8 @@ case "$event" in
       # A /clear keeps the session id, so every conversation-scoped key must be
       # blanked here or the previous conversation's state leaks into the new one.
       playbook_state_put "$dir" "northstar_excerpt=" "unease_level=" "unease_reason=" "unease_at=" \
-        "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_settled=" "argue_downs="
+        "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_settled=" \
+        "floor_marker_count=" "argue_downs="
       exc="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
       if [ -n "$exc" ]; then playbook_state_put "$dir" "northstar_excerpt=${exc}"; fi
       # Fresh start: if a competing context-warning hook is registered and the
@@ -253,7 +269,7 @@ ${nudge}"; else body="$nudge"; fi
     # floor, whether or not the detector had anything new to say.
     body=""
     if [ "$bf" = "1" ]; then
-      body="$(trip_floor "$dir" concerned failing-tests)"
+      body="$(trip_floor "$dir" concerned failing-tests "$(scan_val marker_count "$scan")")"
     elif [ "$clean" -eq 1 ]; then
       decay_floor "$dir"
     fi
@@ -265,7 +281,7 @@ ${nudge}"; else body="$nudge"; fi
     if [ -f "$ef" ]; then
       if [ -n "$(tail -n 10 "$ef" 2>/dev/null | sort | uniq -c | sort -rn | awk 'NR==1 && $1>=4{print "trip"}')" ]; then
         : > "$ef" 2>/dev/null || true
-        body="$(append_seg "$body" "$(trip_floor "$dir" uneasy edit-churn)")"
+        body="$(append_seg "$body" "$(trip_floor "$dir" uneasy edit-churn "$(scan_val marker_count "$scan")")")"
       fi
       lines="$(wc -l < "$ef" 2>/dev/null | tr -d ' ')"
       case "$lines" in ''|*[!0-9]*) lines=0 ;; esac

@@ -41,6 +41,8 @@ fi
 if [ "$tool" = "Workflow" ]; then
   script="$(jq -r '.tool_input.script // empty' 2>/dev/null <<<"$stdin" || true)"
   args="$(jq -r 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end' 2>/dev/null <<<"$stdin" || true)"
+  # A name or scriptPath invocation carries no visible content, so both fail
+  # open, the same deliberate gap as an empty script.
   { [ -z "$script" ] && [ -z "$args" ]; } && exit 0
   grep -qF 'playbook-northstar' <<<"${script}"$'\n'"${args}" && exit 0
   block "Workflow launch" "script's agent prompts"

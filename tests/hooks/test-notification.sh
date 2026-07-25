@@ -83,6 +83,15 @@ jq -e '.event == "notify" and .kind == "permission_prompt" and .level == "action
   && echo "PASS: decision-log line carries the expected fields" \
   || { echo "FAIL: decision-log line malformed [$line]"; fail=1; }
 
+echo "-- idle_prompt keeps the action level with its own headline"
+run_hook "$(payload idle_prompt '')"
+grep -qx '  --level' "$stub_log" && grep -qx '  action' "$stub_log" \
+  && echo "PASS: idle_prompt maps to --level action" \
+  || { echo "FAIL: idle_prompt did not map to action [$(cat "$stub_log")]"; fail=1; }
+grep -qx '  Claude has gone quiet and may need you' "$stub_log" \
+  && echo "PASS: idle_prompt uses the gone-quiet headline" \
+  || { echo "FAIL: idle_prompt headline wrong [$(cat "$stub_log")]"; fail=1; }
+
 echo "-- agent_completed maps to info"
 run_hook "$(payload agent_completed '')"
 grep -qx '  --level' "$stub_log" && grep -qx '  info' "$stub_log" \

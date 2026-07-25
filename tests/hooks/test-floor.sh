@@ -205,4 +205,28 @@ fire PostToolBatch loop "$U"
 has "a re-armed detector asserts the floor again" "Playbook unease floor: $TESTS_SENTENCE."
 eq "the re-armed detector restores the floor" "concerned" "$(st "$d" floor_level)"
 
+# --- 11. A verbatim re-statement still answers the floor it was asked for ----
+# The model's honest acknowledgement can repeat its earlier level and reason
+# word for word; the grown marker count is what distinguishes that from the
+# stale marker already sitting in the tail window.
+iso
+d="$(sd vb)"; seed "$d"
+playbook_state_put "$d" "unease_level=$U_LEVEL" "unease_reason=$U_REASON" \
+  "floor_level=uneasy" "floor_reason=tool-failures" "floor_at=1" \
+  "floor_clean_streak=0" "floor_marker_count=1"
+fire UserPromptSubmit vb "$U"
+eq "a repeated identical marker retires the floor when the count grew" "" "$(st "$d" floor_level)"
+eq "the answered detector is settled" "tool-failures" "$(st "$d" floor_settled)"
+eq "an acknowledgement at the floor level is not an argue-down" "" "$(st "$d" argue_downs)"
+
+# --- 12. A stale marker alone answers nothing --------------------------------
+iso
+d="$(sd stale)"; seed "$d"
+playbook_state_put "$d" "unease_level=$U_LEVEL" "unease_reason=$U_REASON" \
+  "floor_level=uneasy" "floor_reason=tool-failures" "floor_at=1" \
+  "floor_clean_streak=0" "floor_marker_count=2"
+fire UserPromptSubmit stale "$U"
+eq "a stale marker leaves the floor standing" "uneasy" "$(st "$d" floor_level)"
+eq "a stale marker is not an argue-down" "" "$(st "$d" argue_downs)"
+
 exit $fail

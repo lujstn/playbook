@@ -77,6 +77,8 @@ blocks "Workflow script lacking it is blocked" \
   - run: echo hi')"
 allows "a Workflow with only a name field fails open (content not visible)" \
   "$(jq -cn '{tool_name:"Workflow", tool_input:{name:"x"}}')"
+allows "a Workflow with only a scriptPath fails open (content not visible)" \
+  "$(jq -cn '{tool_name:"Workflow", tool_input:{scriptPath:"/tmp/w.js"}}')"
 allows "playbook-northstar found only in args is allowed" \
   "$(jq -cn '{tool_name:"Workflow", tool_input:{script:"echo hi", args:{note:"playbook-northstar: ship it"}}}')"
 

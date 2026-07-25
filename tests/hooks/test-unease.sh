@@ -24,9 +24,11 @@ chk 'grep -qx "marker_reason=auth tests still failing" <<<"$scan"' "scan: reason
 chk '! grep -q "alarmed" <<<"$scan"' "scan: marker inside a user record never parses"
 chk '! grep -q "marker_level=<level>" <<<"$scan"' "scan: placeholder level never parses"
 chk 'grep -qx "bash_fail=1" <<<"$scan"' "scan: failing Bash test output detected"
+chk 'grep -qx "marker_count=2" <<<"$scan"' "scan: marker count tallies every concrete marker"
 
 readscan="$(playbook_scan_tail "$(stdin_for "$FIX/transcript-readfail.jsonl")")"
 chk '! grep -q "^marker_level=" <<<"$readscan"' "scan: no marker line when none stated"
+chk 'grep -qx "marker_count=0" <<<"$readscan"' "scan: marker count is zero when none stated"
 chk 'grep -qx "bash_fail=0" <<<"$readscan"' "scan: FAIL text in a Read result does not trip"
 
 basescan="$(playbook_scan_tail "$(stdin_for "$FIX/transcript-basic.jsonl")")"
