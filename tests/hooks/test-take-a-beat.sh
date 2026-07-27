@@ -88,9 +88,24 @@ grep -q "context-calm offer" <<<"$out" \
 printf 'owned\n' > "$csl_proj/.claude/playbook/context-calm"
 out2="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"off","cwd":"%s"}' "$csl_proj" \
   | HOME="$csl_home" bash "$H")"
-[ -z "$out2" ] \
-  && echo "PASS: offer silent when context-calm marker exists" \
-  || { echo "FAIL: offer repeated despite marker [$out2]"; rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"; exit 1; }
+grep -q "has come back" <<<"$out2" \
+  && echo "PASS: an owned channel re-surfaces the offer when the hook returns" \
+  || { echo "FAIL: returned hook not re-surfaced despite owned marker [$out2]"; rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"; exit 1; }
+
+printf 'declined\n' > "$csl_proj/.claude/playbook/context-calm"
+out3="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"off","cwd":"%s"}' "$csl_proj" \
+  | HOME="$csl_home" bash "$H")"
+[ -z "$out3" ] \
+  && echo "PASS: a declined channel stays silent whatever the hook does" \
+  || { echo "FAIL: offer repeated despite declined marker [$out3]"; rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"; exit 1; }
+
+printf 'owned\n' > "$csl_proj/.claude/playbook/context-calm"
+printf '{"hooks":{}}' > "$csl_home/.claude/settings.json"
+out4="$(HOME="$csl_home" printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"off","cwd":"%s"}' "$csl_proj" \
+  | HOME="$csl_home" bash "$H")"
+[ -z "$out4" ] \
+  && echo "PASS: an owned channel with the hook genuinely gone stays silent" \
+  || { echo "FAIL: re-offer fired with no competing hook [$out4]"; rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"; exit 1; }
 rm -rf "$csl_home" "$csl_proj" "$PLAYBOOK_STATE_DIR"
 
 iso
