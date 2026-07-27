@@ -125,6 +125,16 @@ adjudicate() {
   clear_floor "$dir"
 }
 
+restate_northstar() {
+  local dir="$1" scan="$2" nsn cur
+  nsn="$(scan_val northstar "$scan")"
+  [ -n "$nsn" ] || return 0
+  case "$nsn" in none*|None*) return 0 ;; esac
+  cur="$(playbook_state_get "$dir" northstar_excerpt)"
+  [ "$nsn" = "$cur" ] && return 0
+  playbook_state_put "$dir" "northstar_excerpt=${nsn}" "northstar_restated=1"
+}
+
 append_seg() {
   local a="${1:-}" b="${2:-}"
   if [ -z "$b" ]; then printf '%s' "$a"; return 0; fi
@@ -181,7 +191,7 @@ case "$event" in
       playbook_state_reset "$dir" "$used"
       playbook_state_gc
       # @nonobvious(forced-by) a /clear keeps the session id, so conversation-scoped keys must be blanked by hand
-      playbook_state_put "$dir" "northstar_excerpt=" "unease_level=" "unease_reason=" "unease_at=" \
+      playbook_state_put "$dir" "northstar_excerpt=" "northstar_restated=" "unease_level=" "unease_reason=" "unease_at=" \
         "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_settled=" \
         "floor_marker_count=" "argue_downs="
       exc="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
@@ -212,6 +222,7 @@ ${nudge}"; else body="$nudge"; fi
 
     scan="$(playbook_scan_tail "$stdin")"
     adjudicate "$dir" "$scan"
+    restate_northstar "$dir" "$scan"
     bf="$(scan_val bash_fail "$scan")"
 
     fc="$(playbook_fail_count "$dir")"
@@ -295,7 +306,9 @@ ${nudge}"; else body="$nudge"; fi
   # @nonobvious(must-hold) exactly one emission per prompt, and no branch returns before the card
   UserPromptSubmit)
     dir="$(playbook_state_dir "$stdin")"
-    adjudicate "$dir" "$(playbook_scan_tail "$stdin")"
+    scan="$(playbook_scan_tail "$stdin")"
+    adjudicate "$dir" "$scan"
+    restate_northstar "$dir" "$scan"
 
     ns="$(playbook_state_get "$dir" northstar_excerpt)"
     if [ -z "$ns" ]; then
@@ -303,6 +316,8 @@ ${nudge}"; else body="$nudge"; fi
       if [ -n "$ns" ]; then playbook_state_put "$dir" "northstar_excerpt=${ns}"; fi
     fi
     [ -n "$ns" ] || ns="(not yet captured)"
+    nslabel="North Star"
+    if [ "$(playbook_state_get "$dir" northstar_restated)" = "1" ]; then nslabel="North Star (restated)"; fi
 
     lvl="$(playbook_state_get "$dir" unease_level)"
     lreason="$(playbook_state_get "$dir" unease_reason)"
@@ -317,7 +332,7 @@ ${nudge}"; else body="$nudge"; fi
     fi
 
     card="📚 **Playbook** card
-North Star: ${ns}
+${nslabel}: ${ns}
 ${uline}
 
 - Route non-trivial work before starting it: 🐺 lone-wolf, 🐜 interns, 🤝 hackathon, ⚙️ workflows, 🏗️ gsd. Announce as <emoji> **Playbook** \`<mode>\` *<reason>*; depth in the /playbook:* skills.

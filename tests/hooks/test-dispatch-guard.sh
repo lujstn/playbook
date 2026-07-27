@@ -37,6 +37,11 @@ guard "$(agent_payload "" "Please build the login page.")"
 grep -qF "playbook-northstar" <<<"$GUARD_OUT" \
   && echo "PASS: the block message mentions playbook-northstar" \
   || { echo "FAIL: block message missing playbook-northstar [$GUARD_OUT]"; fail=1; }
+grep -qF "none (task-only)" <<<"$GUARD_OUT" \
+  && echo "PASS: the block message teaches the task-only opt-out" \
+  || { echo "FAIL: block message missing the none opt-out [$GUARD_OUT]"; fail=1; }
+allows "a deliberate task-only dispatch passes" "$(agent_payload "" "Do the tiny chore.
+playbook-northstar: none (task-only)")"
 allows "prompt with a northstar line is allowed" "$(agent_payload "" "Do the thing.
 playbook-northstar: ship a working login page end to end")"
 

@@ -25,6 +25,10 @@ chk '! grep -q "alarmed" <<<"$scan"' "scan: marker inside a user record never pa
 chk '! grep -q "marker_level=<level>" <<<"$scan"' "scan: placeholder level never parses"
 chk 'grep -qx "bash_fail=1" <<<"$scan"' "scan: failing Bash test output detected"
 chk 'grep -qx "marker_count=2" <<<"$scan"' "scan: marker count tallies every concrete marker"
+chk 'grep -qx "northstar=evidence-backed addresses for every org" <<<"$scan"' "scan: the last visible northstar restatement is captured"
+chk '! grep -q "the old goal line" <<<"$scan"' "scan: an earlier northstar statement is superseded"
+chk '! grep -q "injected goal" <<<"$scan"' "scan: a northstar line in a user record never parses"
+chk '! grep -q "northstar=<" <<<"$scan"' "scan: the placeholder northstar form never parses"
 
 readscan="$(playbook_scan_tail "$(stdin_for "$FIX/transcript-readfail.jsonl")")"
 chk '! grep -q "^marker_level=" <<<"$readscan"' "scan: no marker line when none stated"
@@ -33,6 +37,7 @@ chk 'grep -qx "bash_fail=0" <<<"$readscan"' "scan: FAIL text in a Read result do
 
 basescan="$(playbook_scan_tail "$(stdin_for "$FIX/transcript-basic.jsonl")")"
 chk 'grep -qx "bash_fail=0" <<<"$basescan"' "scan: quiet transcript reports bash_fail=0"
+chk '! grep -q "^northstar=" <<<"$basescan"' "scan: no northstar line when none stated"
 chk '[ -z "$(playbook_scan_tail "$(stdin_for /nonexistent/t.jsonl)")" ]' "scan: missing transcript emits nothing"
 chk '[ -z "$(playbook_scan_tail "not json")" ]' "scan: malformed stdin emits nothing"
 
