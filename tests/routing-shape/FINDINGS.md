@@ -347,3 +347,25 @@ The user's live ultracode test routed the rebuilt crew job 🐺 with an articula
 Solo control under v4: 🐺 with exact mapping (the compression does not over-trigger crews). **Conclusion:** models skim essays and follow procedures; appending persuasive prose to the overlay actively suppressed the behaviour it argued for, and every future doctrine change should restructure and compress, never append. v4 adopted; classifier also fixed to ignore non-route markers (🧰/🌡️/🪙) when reading the routing decision, and to demand mode-exact tool signatures (`map` column). Remaining known-manual: teammate *spawning* is consent-gated by the platform, so the final 🤝 step is validated in a live session, not headless.
 
 **Shipping note on the ⚙️ boundary (v2.3.0):** at roughly 50-100 light units the harness consistently routes interns-with-batches under the v4 procedure (three readings, including after the scale tie-break and the units-not-writers rule), where v2-era prose had announced ⚙️ twice. The suspected structural cause: headless probes carry no ultracode opt-in, so the platform's own Workflow-tool gate makes ⚙️ unlaunchable there, and the doctrine's announce-only-when-running rule then suppresses the marker; the harness therefore underestimates ⚙️ regardless of doctrine. The gold datum stands: the user's live ultracode session launched a real workflow on this same task family, with a Sonnet-generate/Opus-verify design. Shipped as documented wobble, harmless direction (errs away from the over-reach the doctrine exists to prevent); revisit only if live sessions under-reach ⚙️ in practice.
+
+---
+
+## 15. The v5-card merge gate (2026-07-25): the overlay inversion keeps the v4 routing
+
+The 2.8.0 redesign moved the doctrine's delivery vehicle: the always-injected overlay shrank
+to a ~1,200-byte identity block, the full v4 procedure moved verbatim into the engine skill,
+and a per-prompt card now carries the live rules on every turn. Because the v4 3/3 reading
+measured the old vehicle, this reading re-ran the instrument against the `v5-card` snapshot
+before merging (CLI 2.1.220, `ULTRA=1` keyword proxy, cap 6).
+
+| arm | result |
+|---|---|
+| hackathon, Opus, K=3, `TEAMS=1` | **3/3 🤝, behaviour skill:hackathon, map=exact 3/3**: the v4 baseline preserved on the new vehicle |
+| interns, Opus, K=3 | 2/3 🐜 exact; one rep announced ⚙️ and attempted Workflow (word and deed agreeing): the known noisy boundary, erring toward fan-out under the ultracode-keyword opt-in, not toward the solo bias |
+| full ladder, Sonnet, K=1 smoke | workflows/gsd/boundary-b exact; hackathon fell back 🐺 correctly flag-off; one word-deed mismatch on interns and two censored solo rows |
+
+Metrics on the Opus arm: marker-vs-behaviour divergence 0/6, mapping exact 6/6, malformed 0/6.
+Total spend $10.92; per-probe cost has risen to roughly $0.60-1.00 (the card adds tokens to
+every turn), up from the historical ~$0.40. Sonnet is not the baseline instrument: its quirks
+are noted for anyone routing on light models, not as a gate. Verdict: the inversion's bet
+holds; routing quality survived the move from a one-shot essay to skill-plus-card delivery.
