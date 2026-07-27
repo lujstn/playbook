@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/playbook-common.sh"
+
+stdin="$(cat 2>/dev/null || true)"
+command -v jq >/dev/null 2>&1 || exit 0
+
+tool="$(jq -r '.tool_name // empty' 2>/dev/null <<<"$stdin" || true)"
+case "$tool" in
+  Edit | Write) ;;
+  *) exit 0 ;;
+esac
+
+# @nonobvious(must-hold) newlines stripped so one edit is exactly one record in the churn window
+path="$(jq -r '.tool_input.file_path // empty' 2>/dev/null <<<"$stdin" | tr -d '\n\r' || true)"
+[ -n "$path" ] || exit 0
+
+dir="$(playbook_state_dir "$stdin")"
+[ -n "$dir" ] || exit 0
+printf '%s\n' "$path" >> "${dir}/edits" 2>/dev/null || true
+exit 0

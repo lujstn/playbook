@@ -24,9 +24,6 @@ used="$(playbook_context_used "$stdin_b")"
 [ "$used" = "10020" ] && echo "PASS: usage sum = last assistant input+cache" \
   || { echo "FAIL: used was [$used], expected 10020"; exit 1; }
 
-# Window inference: env override wins; the ratcheted state window is sticky; the
-# assumed 200000 is the default; an invalid env value falls through; provenance
-# is proven for env/ratchet and assumed for the default.
 ws="$(mktemp -d)"
 [ "$(PLAYBOOK_WINDOW=1000000 playbook_window "$ws")" = "1000000" ] \
   && echo "PASS: playbook_window env override wins" || { echo "FAIL: env window"; exit 1; }
@@ -45,7 +42,6 @@ printf 'v=1\nwindow_proven=1000000\n' > "$ws/state"
   && echo "PASS: ratcheted state window provenance is proven" || { echo "FAIL: sticky provenance"; exit 1; }
 rm -rf "$ws"
 
-# The single beat formula: round(100 * used / window).
 pct="$(playbook_percent 700020 1000000)"
 [ "$pct" = "70" ] && echo "PASS: playbook_percent = round(100*used/window)" \
   || { echo "FAIL: percent was [$pct], expected 70"; exit 1; }
@@ -54,9 +50,6 @@ missing="$(playbook_context_used '{"transcript_path":"/no/such/file"}')"
 [ -z "$missing" ] && echo "PASS: silent empty usage on missing transcript" \
   || { echo "FAIL: expected empty, got [$missing]"; exit 1; }
 
-# Bounded reads: a filler record over 300KB must not stop the tail read from
-# finding the final usage record, nor the head read from finding the first user
-# record.
 big="$(mktemp).jsonl"
 printf '{"type":"user","message":{"role":"user","content":"the bounded-read first ask"}}\n' > "$big"
 filler="$(head -c 350000 /dev/zero | tr '\0' 'z')"
@@ -71,7 +64,6 @@ bo="$(playbook_original_request "$bstdin")"
   || { echo "FAIL bounded orig: [$bo]"; rm -f "$big"; exit 1; }
 rm -f "$big"
 
-# Project North Star recovery and the subagent-aware anchor block.
 SB="$root/tests/hooks/fixtures/transcript-subagent-beat.jsonl"
 ns="$(playbook_project_northstar "$(printf '{"transcript_path":"%s"}' "$SB")")"
 [ "$ns" = "Ship a zero-dependency context anchor that survives compaction without writing to the user tree." ] \
@@ -86,10 +78,6 @@ case "$main_ab" in
   "Original request, verbatim:"*"Build me a widget that does X."*) echo "PASS: main-thread anchor labelled original request" ;;
   *) echo "FAIL: main anchor was [$main_ab]"; exit 1 ;;
 esac
-# A subagent anchor carries the North Star and nothing else. At SubagentStart the
-# transcript can only be the dispatching session's, so its first user record is the
-# PARENT's request, not this helper's dispatch prompt: quoting it as the helper's
-# task hands over a confidently-worded wrong job.
 sub_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"a1"}' "$SB")")"
 { grep -q "Overall goal (what success means for the whole project):" <<<"$sub_ab" \
   && grep -q "It does NOT state your task" <<<"$sub_ab" \

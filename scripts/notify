@@ -1,41 +1,4 @@
 #!/usr/bin/env bash
-# Playbook: push a notification to the user's phone via Pushover or ntfy.
-#
-# Usage:
-#   scripts/notify [--level info|action|critical] [--link <url>]
-#                  "<headline>" ["<detail>"]
-#
-#   Back-compat: --category=action and --category=info are accepted as aliases
-#   (action -> action level, info -> info level). --level takes precedence.
-#
-# Title format: "📚 <Level>: <headline>" (the text shown on the lock screen).
-# Detail defaults to the headline when omitted.
-#
-# Config is read from the project's .claude/playbook/ first, then the machine-
-# global ~/.claude/playbook/ (set once, applies everywhere; a project file
-# overrides). Provider comes from notify-provider (values: pushover|ntfy); if
-# that is absent but an ntfy-topic exists, ntfy is used.
-#
-# Level mapping:
-#   info     -> ntfy Priority 3 / Pushover priority 0
-#   action   -> ntfy Priority 4 / Pushover priority 1
-#   critical -> ntfy Priority 5 / Pushover priority 2 (retry=60 expire=1800 sound=siren)
-#
-# Keys (in project .claude/playbook/ or global ~/.claude/playbook/):
-#   Pushover creds: pushover-token and pushover-user
-#   ntfy topic:     ntfy-topic
-#   ntfy server:    ntfy-server (default https://ntfy.sh)
-#
-# When /remote-control is active in the current session, a tappable deep-link
-# is attached (ntfy: Click header; Pushover: url field). --link overrides it
-# when both are present. Silent degradation when neither is available.
-#
-# Exit codes:
-#   0   success
-#   3   publish failed (curl error or non-2xx HTTP)
-#   4   no topic/credentials configured
-#   5   curl not installed
-#   64  usage error
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -110,7 +73,6 @@ if [ -z "$PROVIDER" ]; then
 fi
 
 REMOTE_URL="$(playbook_remote_url "" "$PWD")"
-# --link overrides the remote-control URL when both are present.
 CLICK_URL="${LINK:-$REMOTE_URL}"
 
 case "$PROVIDER" in

@@ -2,13 +2,13 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")" && pwd)"
 fail=0
-echo "== bash -n lint ==";   for f in "$root"/../hooks/session-start "$root"/../hooks/take-a-beat "$root"/../hooks/comment-guard "$root"/../hooks/lib/playbook-common.sh; do bash -n "$f" && echo "ok $f" || fail=1; done
+echo "== bash -n lint ==";   for f in "$root"/../hooks/session-start "$root"/../hooks/take-a-beat "$root"/../hooks/comment-guard "$root"/../hooks/notification "$root"/../hooks/dispatch-guard "$root"/../hooks/edit-log "$root"/../hooks/lib/playbook-common.sh "$root"/../scripts/offline; do bash -n "$f" && echo "ok $f" || fail=1; done
 echo "== manifests ==";      bash "$root/manifests.sh" || fail=1
 echo "== hook silence budget =="
 budget_fail=0
 budget_dir="$(mktemp -d)"
 for ev in Stop SubagentStop PostToolUse PreCompact Notification; do
-  for hk in session-start take-a-beat comment-guard; do
+  for hk in session-start take-a-beat comment-guard notification dispatch-guard edit-log; do
     o="$(printf '{"hook_event_name":"%s","session_id":"budget","transcript_path":"/no/such.jsonl"}' "$ev" \
         | PLAYBOOK_STATE_DIR="$budget_dir" CLAUDE_PLUGIN_ROOT="$root/.." bash "$root/../hooks/$hk" 2>/dev/null || true)"
     if [ -n "$o" ]; then echo "FAIL: $hk emitted on unwired $ev: [$o]"; budget_fail=1; fi

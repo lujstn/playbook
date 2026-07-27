@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Tests for scripts/install-aliases.sh, the bare-command-alias installer.
-# Claude Code only ever exposes a plugin command as /playbook:<name>; this
-# script writes the standalone ~/.claude/commands/<name>.md files that give the
-# plain /<name>. The contract these tests pin: every managed file carries the
-# ownership marker, a name already owned by someone else is never clobbered,
-# re-running is a safe refresh, and --remove touches only Playbook's own files.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 script="$root/scripts/install-aliases.sh"
@@ -32,14 +26,12 @@ for name in brainstorming debug fix offline-mode worktrees hello workflow review
 done
 pass "fresh install writes all eight bare aliases, each marked"
 
-# Delegates point at the right skill (short name maps to the *-mode skill).
 grep -q 'Invoke the `playbook:fix-mode` skill' "$PLAYBOOK_COMMANDS_DIR/fix.md" \
   && grep -q 'Invoke the `playbook:debug-mode` skill' "$PLAYBOOK_COMMANDS_DIR/debug.md" \
   && grep -q 'Invoke the `playbook:brainstorming` skill' "$PLAYBOOK_COMMANDS_DIR/brainstorming.md" \
   && pass "delegates target the correct skills" \
   || die "a delegate targets the wrong skill"
 
-# Copies mirror the plugin command body (workflow keeps its user-only guard).
 grep -q 'disable-model-invocation: true' "$PLAYBOOK_COMMANDS_DIR/workflow.md" \
   || die "workflow copy lost disable-model-invocation"
 grep -q '\$ARGUMENTS' "$PLAYBOOK_COMMANDS_DIR/workflow.md" \
@@ -48,7 +40,6 @@ grep -q '\$ARGUMENTS' "$PLAYBOOK_COMMANDS_DIR/review-panel.md" \
   || die "review-panel copy lost its \$ARGUMENTS body"
 pass "command-backed names are mirrored verbatim, guard intact"
 
-# Manifest records version and the full installed set.
 grep -q "version=$version" "$PLAYBOOK_GLOBAL_DIR/aliases" \
   || die "manifest missing version=$version"
 grep -q 'installed=brainstorming,debug,fix,offline-mode,worktrees,hello,workflow,review-panel' \
@@ -56,7 +47,6 @@ grep -q 'installed=brainstorming,debug,fix,offline-mode,worktrees,hello,workflow
   || die "manifest installed list wrong"
 pass "manifest records version and installed set"
 
-# Generated files must stay free of the long dashes the shipped surface bans.
 if LC_ALL=C grep -rlq $'\xe2\x80\x94' "$PLAYBOOK_COMMANDS_DIR" 2>/dev/null \
    || LC_ALL=C grep -rlq $'\xe2\x80\x93' "$PLAYBOOK_COMMANDS_DIR" 2>/dev/null; then
   die "a generated alias file contains a long dash"

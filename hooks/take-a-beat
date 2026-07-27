@@ -6,24 +6,17 @@ source "${SCRIPT_DIR}/lib/playbook-common.sh"
 stdin="$(cat 2>/dev/null || true)"
 event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
 
-# Tunables, all integer-validated with fallbacks.
 CALM_PCT="${PLAYBOOK_CALM_PCT:-80}";            case "$CALM_PCT" in ''|*[!0-9]*) CALM_PCT=80 ;; esac
 PULSE_TOKENS="${PLAYBOOK_PULSE_TOKENS:-75000}"; case "$PULSE_TOKENS" in ''|*[!0-9]*) PULSE_TOKENS=75000 ;; esac
 SPIKE_FAILS="${PLAYBOOK_SPIKE_FAILS:-3}";       case "$SPIKE_FAILS" in ''|*[!0-9]*) SPIKE_FAILS=3 ;; esac
 
-# The anchor block costs a bounded transcript parse, so it is computed lazily and
-# memoised: only the emissions that actually fire ever pay for it.
 _anchor=""; _anchor_ready=""
 anchor() {
   [ -n "$_anchor_ready" ] || { _anchor="$(playbook_anchor_block "$stdin")"; _anchor_ready=1; }
   printf '%s' "$_anchor"
 }
 
-# Heal-or-baseline: return 0 when state is healthy and the caller should proceed;
-# perform a bias-to-silence reset and return 1 (caller stays silent this event)
-# when state is missing or corrupt, or when usage dropped below the baseline (a
-# compaction the hook never heard about). The reset re-baselines to current usage
-# so a lost or rewound baseline can never fire a giant spurious delta.
+# @nonobvious(means) usage below the stored baseline marks a compaction this hook never saw; reset and stay silent
 heal_or_baseline() {
   local dir="$1" used="${2:-}" base u="${2:-}"
   case "$u" in ''|*[!0-9]*) u=0 ;; esac
@@ -37,13 +30,106 @@ heal_or_baseline() {
   return 0
 }
 
-# The usage ratchet: the first time usage exceeds 200000 this session, prove the
-# window is the one-million product tier. Sticky: at most one write per session.
 ratchet_window() {
   local dir="$1" used="$2" wp
   [ "$used" -gt 200000 ] 2>/dev/null || return 0
   wp="$(playbook_state_get "$dir" window_proven)"
   if [ -z "$wp" ]; then playbook_state_put "$dir" "window_proven=1000000"; fi
+}
+
+now() {
+  local t; t="$(date +%s 2>/dev/null)"
+  case "$t" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$t" ;; esac
+}
+
+scan_val() { printf '%s\n' "${2:-}" | sed -n "s/^${1}=//p" | tail -n1; }
+
+clear_floor() {
+  playbook_state_put "${1:-}" "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_marker_count="
+}
+
+floor_assertion() {
+  local lvl="$1" reason="$2" sentence
+  case "$reason" in
+    tool-failures) sentence="several tool calls have failed in a row without a clean batch between them" ;;
+    failing-tests) sentence="a test run in this session reported failures" ;;
+    edit-churn)    sentence="the same file has been rewritten several times in quick succession" ;;
+    *)             return 0 ;;
+  esac
+  printf 'Playbook unease floor: %s. Your unease floor is now %s. In your next reply, either print 🌡️ **Playbook** `unease: <level or higher>` *<reason>* to acknowledge it, or argue it down by printing a lower level with a reason that answers the evidence. The card will carry this floor until you respond.' \
+    "$sentence" "$lvl"
+}
+
+trip_floor() {
+  local dir="$1" lvl="$2" reason="$3" nrank cur crank settled
+  nrank="$(playbook_unease_rank "$lvl")"
+  case "$nrank" in ''|*[!0-9]*) return 0 ;; esac
+  # @nonobvious(must-hold) an answered signal stays suppressed while its evidence lingers in the tail window, or the floor re-asserts every batch
+  settled="$(playbook_state_get "$dir" floor_settled)"
+  if [ "$settled" = "$reason" ]; then return 0; fi
+  cur="$(playbook_state_get "$dir" floor_level)"
+  if [ -n "$cur" ]; then
+    crank="$(playbook_unease_rank "$cur")"
+    case "$crank" in ''|*[!0-9]*) crank="-1" ;; esac
+    if [ "$nrank" -le "$crank" ] 2>/dev/null; then return 0; fi
+  fi
+  playbook_state_put "$dir" "floor_level=${lvl}" "floor_reason=${reason}" \
+    "floor_at=$(now)" "floor_clean_streak=0" "floor_marker_count=${4:-}"
+  floor_assertion "$lvl" "$reason"
+}
+
+decay_floor() {
+  local dir="$1" fl n
+  playbook_state_put "$dir" "floor_settled="
+  fl="$(playbook_state_get "$dir" floor_level)"
+  [ -n "$fl" ] || return 0
+  n="$(playbook_state_int "$dir" floor_clean_streak 0)"
+  n=$(( n + 1 ))
+  if [ "$n" -ge 3 ]; then clear_floor "$dir"; else playbook_state_put "$dir" "floor_clean_streak=${n}"; fi
+}
+
+adjudicate() {
+  local dir="$1" scan="$2" ml mr mc cur_l cur_r fl fr fmc mrank frank n fresh
+  ml="$(scan_val marker_level "$scan")"
+  [ -n "$ml" ] || return 0
+  mr="$(scan_val marker_reason "$scan")"
+  mc="$(scan_val marker_count "$scan")"
+  cur_l="$(playbook_state_get "$dir" unease_level)"
+  cur_r="$(playbook_state_get "$dir" unease_reason)"
+  fl="$(playbook_state_get "$dir" floor_level)"
+  # @nonobvious(means) a grown marker count marks a deliberate re-statement; an unchanged count is the stale marker still in the window
+  fresh=0
+  if [ "$ml" != "$cur_l" ] || [ "$mr" != "$cur_r" ]; then
+    fresh=1
+  elif [ -n "$fl" ]; then
+    fmc="$(playbook_state_get "$dir" floor_marker_count)"
+    case "$fmc" in ''|*[!0-9]*) : ;; *)
+      case "$mc" in ''|*[!0-9]*) : ;; *)
+        if [ "$mc" -gt "$fmc" ] 2>/dev/null; then fresh=1; fi ;;
+      esac ;;
+    esac
+  fi
+  [ "$fresh" -eq 1 ] || return 0
+  playbook_state_put "$dir" "unease_level=${ml}" "unease_reason=${mr}" "unease_at=$(now)"
+  [ -n "$fl" ] || return 0
+  mrank="$(playbook_unease_rank "$ml")"
+  case "$mrank" in ''|*[!0-9]*) return 0 ;; esac
+  frank="$(playbook_unease_rank "$fl")"
+  case "$frank" in ''|*[!0-9]*) frank="-1" ;; esac
+  if [ "$mrank" -lt "$frank" ] 2>/dev/null; then
+    n="$(playbook_state_int "$dir" argue_downs 0)"
+    playbook_state_put "$dir" "argue_downs=$(( n + 1 ))"
+  fi
+  fr="$(playbook_state_get "$dir" floor_reason)"
+  playbook_state_put "$dir" "floor_settled=${fr}"
+  clear_floor "$dir"
+}
+
+append_seg() {
+  local a="${1:-}" b="${2:-}"
+  if [ -z "$b" ]; then printf '%s' "$a"; return 0; fi
+  if [ -z "$a" ]; then printf '%s' "$b"; return 0; fi
+  printf '%s\n\n%s' "$a" "$b"
 }
 
 reanchor_resume() {
@@ -56,8 +142,8 @@ ${a}
 Re-establish the one-line North Star and your current unease from the anchor above and the live work, then resume the in-flight work where you left off. Do not stop to ask whether to continue, and do not treat the compaction as a reason to wrap up."
 }
 
-emit_calm() {
-  local ev="$1" used="$2" win="$3" prov="$4" pct="$5" a body
+calm_body() {
+  local used="$1" win="$2" prov="$3" pct="$4" a body
   a="$(anchor)"
   if [ "$prov" = "proven" ]; then
     body="Playbook context calm: context is at about ${pct} percent of your ${win}-token window. Auto-compact is seamless and the session keeps going; the platform will not stop you. Do not wrap up early, do less, halt, or break an offline run because context is tight. You keep what matters: the original request and the North Star are re-anchored for you after compaction. Keep working at the same completeness bar."
@@ -67,44 +153,39 @@ emit_calm() {
   if [ -n "$a" ]; then body="${body}
 
 ${a}"; fi
-  playbook_emit_context "$ev" "$body"
+  printf '%s' "$body"
 }
 
-emit_pulse() {
-  local ev="$1" a body
+pulse_body() {
+  local a body
   a="$(anchor)"
   body="Playbook pulse: a long stretch of work has passed since the last anchor. Silently re-check the anchor below. If the work still serves the North Star and your unease has not increased, say nothing about this pulse and carry on. If your unease has increased or the work has drifted, say so in one branded line: 🌡️ **Playbook** \`unease: <level>\` *<reason of at most 50 characters>*. The escalation ladder is available on an increase and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager."
   if [ -n "$a" ]; then body="${body}
 
 ${a}"; fi
-  playbook_emit_context "$ev" "$body"
+  printf '%s' "$body"
 }
 
-emit_spike() {
-  playbook_emit_context "$1" "Playbook unease spike: several tool calls have failed in a row without a clean batch between them. Take a beat before the next attempt: re-read the North Star and check whether the approach itself is what is failing. If you agree unease has risen, print one branded line before continuing: 🌡️ **Playbook** \`unease: <level>\` *<reason of at most 50 characters>*; if it has not, print nothing about this. The escalation ladder is open and usually declined: re-read the North Star and take a beat, research, a fresh subagent for a second pair of eyes, notify the user via the configured notification channel (see scripts/notify) and wait, then an external manager. Standing override, above all of this: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the unease level or the mode."
-}
-
-emit_micro_anchor() {
-  playbook_emit_context "$1" "Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
-}
+MICRO_ANCHOR="Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
 
 case "$event" in
   SessionStart)
     src="$(jq -r '.source // empty' 2>/dev/null <<<"$stdin" || true)"
     dir="$(playbook_state_dir "$stdin")"
     if [ "$src" = "compact" ]; then
-      # The transcript's last assistant record still carries the pre-compact
-      # figure, so reset to 0; the first post-compact batch re-baselines to the
-      # real small figure.
+      # @nonobvious(forced-by) the last assistant record still carries the pre-compact figure, so the baseline restarts at zero
       playbook_state_reset "$dir" 0
       reanchor_resume "SessionStart"
     else
       used="$(playbook_context_used "$stdin" || true)"
       playbook_state_reset "$dir" "$used"
       playbook_state_gc
-      # Fresh start: if a competing context-warning hook is registered and the
-      # context-calm channel has not been resolved, offer once to let Playbook
-      # own it, so agents are not scared into stopping near the context limit.
+      # @nonobvious(forced-by) a /clear keeps the session id, so conversation-scoped keys must be blanked by hand
+      playbook_state_put "$dir" "northstar_excerpt=" "unease_level=" "unease_reason=" "unease_at=" \
+        "floor_level=" "floor_reason=" "floor_at=" "floor_clean_streak=" "floor_settled=" \
+        "floor_marker_count=" "argue_downs="
+      exc="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
+      if [ -n "$exc" ]; then playbook_state_put "$dir" "northstar_excerpt=${exc}"; fi
       body=""
       proj="$(playbook_project_dir "$stdin")"
       comp="$(playbook_competing_context_hook "$proj")"
@@ -112,7 +193,6 @@ case "$event" in
       if [ -n "$comp" ] && [ -z "$resolved" ]; then
         body="Playbook context-calm offer: a competing context-warning hook (${comp}) is registered on this machine. Near the context limit it injects wrap-up-and-stop messages into the agent, which makes work halt early and breaks offline runs. Offer the user, once, to let Playbook own the context channel instead and keep working calmly through auto-compact. If they accept: in a GSD project set hooks.context_warnings to false in .planning/config.json; otherwise back up the settings file and remove the ${comp} PostToolUse registration from it. Then write the word owned to .claude/playbook/context-calm. If they decline, write the word declined to .claude/playbook/context-calm. Either marker stops this offer repeating. Never edit settings without the user's explicit consent, and always back up first."
       fi
-      # First-run doorbell: suggest the setup check once ever per machine.
       gdir="${PLAYBOOK_GLOBAL_DIR:-${HOME}/.claude/playbook}"
       if [ ! -f "${gdir}/setup" ] && [ ! -f "${gdir}/setup-nudged" ]; then
         nudge="Playbook setup has not run on this machine. At a natural pause in your first reply, add one short line suggesting the user type /playbook:hello so Playbook can introduce itself and, with their permission, check once for plugin conflicts (hooks that re-prompt on Stop or inject context-limit warnings), confirm jq, and optionally set up offline notifications. Do not run the check unasked, and do not repeat the suggestion on later turns."
@@ -130,11 +210,13 @@ ${nudge}"; else body="$nudge"; fi
     used="$(playbook_context_used "$stdin" || true)"
     if ! heal_or_baseline "$dir" "$used"; then exit 0; fi
 
-    # Clean-batch failure reset: an unchanged non-zero failure count means a whole
-    # batch passed without a new failure, so the streak is broken; otherwise
-    # record the current count as the snapshot for the next batch.
+    scan="$(playbook_scan_tail "$stdin")"
+    adjudicate "$dir" "$scan"
+    bf="$(scan_val bash_fail "$scan")"
+
     fc="$(playbook_fail_count "$dir")"
     snap="$(playbook_state_int "$dir" fail_snapshot 0)"
+    clean=0; if [ "$fc" -eq "$snap" ] 2>/dev/null; then clean=1; fi
     if [ "$fc" -ne 0 ] && [ "$fc" -eq "$snap" ]; then
       : > "${dir}/failures" 2>/dev/null || true
       playbook_state_put "$dir" "fail_snapshot=0"
@@ -142,34 +224,60 @@ ${nudge}"; else body="$nudge"; fi
       playbook_state_put "$dir" "fail_snapshot=${fc}"
     fi
 
-    # No usable usage figure: the failure bookkeeping above still ran; stop here.
-    case "$used" in ''|*[!0-9]*) exit 0 ;; esac
-
-    ratchet_window "$dir" "$used"
-
-    win="$(playbook_window "$dir")"
-    prov="$(playbook_window_provenance "$dir")"
-    pct="$(playbook_percent "$used" "$win")"
-    calm_fired="$(playbook_state_int "$dir" calm_fired 0)"
-    base="$(playbook_state_int "$dir" last_anchor_used 0)"
-    delta=$(( used - base ))
-
-    if [ -n "$pct" ] && [ "$pct" -ge "$CALM_PCT" ] 2>/dev/null && [ "$calm_fired" -eq 0 ]; then
-      emit_calm "PostToolBatch" "$used" "$win" "$prov" "$pct"
-      playbook_state_put "$dir" "calm_fired=1" "last_anchor_used=${used}"
-    elif [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
-      emit_pulse "PostToolBatch"
-      playbook_state_put "$dir" "last_anchor_used=${used}"
+    body=""
+    if [ "$bf" = "1" ]; then
+      body="$(trip_floor "$dir" concerned failing-tests "$(scan_val marker_count "$scan")")"
+    elif [ "$clean" -eq 1 ]; then
+      decay_floor "$dir"
     fi
+
+    ef="${dir}/edits"
+    if [ -f "$ef" ]; then
+      if [ -n "$(tail -n 10 "$ef" 2>/dev/null | sort | uniq -c | sort -rn | awk 'NR==1 && $1>=4{print "trip"}')" ]; then
+        # @nonobvious(must-hold) consuming the log makes one burst assert once
+        : > "$ef" 2>/dev/null || true
+        body="$(append_seg "$body" "$(trip_floor "$dir" uneasy edit-churn "$(scan_val marker_count "$scan")")")"
+      fi
+      lines="$(wc -l < "$ef" 2>/dev/null | tr -d ' ')"
+      case "$lines" in ''|*[!0-9]*) lines=0 ;; esac
+      if [ "$lines" -gt 200 ]; then
+        { tail -n 100 "$ef" > "${ef}.trim.$$" && mv -f "${ef}.trim.$$" "$ef"; } 2>/dev/null \
+          || rm -f "${ef}.trim.$$" 2>/dev/null || true
+      fi
+    fi
+
+    case "$used" in
+      ''|*[!0-9]*) : ;;
+      *)
+        ratchet_window "$dir" "$used"
+
+        win="$(playbook_window "$dir")"
+        prov="$(playbook_window_provenance "$dir")"
+        pct="$(playbook_percent "$used" "$win")"
+        calm_fired="$(playbook_state_int "$dir" calm_fired 0)"
+        base="$(playbook_state_int "$dir" last_anchor_used 0)"
+        delta=$(( used - base ))
+
+        if [ -n "$pct" ] && [ "$pct" -ge "$CALM_PCT" ] 2>/dev/null && [ "$calm_fired" -eq 0 ]; then
+          body="$(append_seg "$body" "$(calm_body "$used" "$win" "$prov" "$pct")")"
+          playbook_state_put "$dir" "calm_fired=1" "last_anchor_used=${used}"
+        elif [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
+          body="$(append_seg "$body" "$(pulse_body)")"
+          playbook_state_put "$dir" "last_anchor_used=${used}"
+        fi
+        ;;
+    esac
+
+    if [ -n "$body" ]; then playbook_emit_context "PostToolBatch" "$body"; fi
     ;;
 
   PostToolUseFailure)
     dir="$(playbook_state_dir "$stdin")"
     playbook_fail_append "$dir"
+    playbook_state_put "$dir" "floor_clean_streak=0"
     fc="$(playbook_fail_count "$dir")"
     if [ "$fc" -ge "$SPIKE_FAILS" ] 2>/dev/null; then
-      # Claim the failures file with an atomic rename so exactly one concurrent
-      # failure wins the spike; losers exit silently.
+      # @nonobvious(must-hold) the atomic rename lets exactly one concurrent failure win the streak
       claim="${dir}/failures.claimed.$$"
       if mv "${dir}/failures" "$claim" 2>/dev/null; then
         rm -f "$claim" 2>/dev/null || true
@@ -178,24 +286,63 @@ ${nudge}"; else body="$nudge"; fi
           ''|*[!0-9]*) playbook_state_put "$dir" "fail_snapshot=0" ;;
           *)           playbook_state_put "$dir" "fail_snapshot=0" "last_anchor_used=${used}" ;;
         esac
-        emit_spike "PostToolUseFailure"
+        body="$(trip_floor "$dir" uneasy tool-failures)"
+        if [ -n "$body" ]; then playbook_emit_context "PostToolUseFailure" "$body"; fi
       fi
     fi
     ;;
 
+  # @nonobvious(must-hold) exactly one emission per prompt, and no branch returns before the card
   UserPromptSubmit)
     dir="$(playbook_state_dir "$stdin")"
-    used="$(playbook_context_used "$stdin" || true)"
-    if ! heal_or_baseline "$dir" "$used"; then exit 0; fi
-    # No assistant record yet this session: nothing to anchor against, stay silent.
-    case "$used" in ''|*[!0-9]*) exit 0 ;; esac
-    ratchet_window "$dir" "$used"
-    base="$(playbook_state_int "$dir" last_anchor_used 0)"
-    delta=$(( used - base ))
-    if [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
-      emit_micro_anchor "UserPromptSubmit"
-      playbook_state_put "$dir" "last_anchor_used=${used}"
+    adjudicate "$dir" "$(playbook_scan_tail "$stdin")"
+
+    ns="$(playbook_state_get "$dir" northstar_excerpt)"
+    if [ -z "$ns" ]; then
+      ns="$(playbook_northstar_excerpt "$stdin" | tr -d '\n\r')"
+      if [ -n "$ns" ]; then playbook_state_put "$dir" "northstar_excerpt=${ns}"; fi
     fi
+    [ -n "$ns" ] || ns="(not yet captured)"
+
+    lvl="$(playbook_state_get "$dir" unease_level)"
+    lreason="$(playbook_state_get "$dir" unease_reason)"
+    flvl="$(playbook_state_get "$dir" floor_level)"
+    freason="$(playbook_state_get "$dir" floor_reason)"
+    shown="$lvl"; [ -n "$shown" ] || shown="none stated yet"
+    said=""; if [ -n "$lvl" ] && [ -n "$lreason" ]; then said=" *${lreason}*"; fi
+    if [ -n "$flvl" ]; then
+      uline="Unease: ${shown}; floor: ${flvl} (${freason}): acknowledge it or argue it down with a 🌡️ line."
+    else
+      uline="Unease: ${shown}${said}; no floor."
+    fi
+
+    card="📚 **Playbook** card
+North Star: ${ns}
+${uline}
+
+- Route non-trivial work before starting it: 🐺 lone-wolf, 🐜 interns, 🤝 hackathon, ⚙️ workflows, 🏗️ gsd. Announce as <emoji> **Playbook** \`<mode>\` *<reason>*; depth in the /playbook:* skills.
+- Every dispatch carries \`playbook-northstar: <line>\` and an explicit model: Sonnet executes, Opus plans and reviews.
+- Divide your felt time estimate by ten; never divide external waits or observed durations.
+- Compaction is safe: never wrap up early. If your unease has changed, print the 🌡️ **Playbook** \`unease: <level>\` *<reason>* line."
+
+    used="$(playbook_context_used "$stdin" || true)"
+    if heal_or_baseline "$dir" "$used"; then
+      case "$used" in
+        ''|*[!0-9]*) : ;;
+        *)
+          ratchet_window "$dir" "$used"
+          base="$(playbook_state_int "$dir" last_anchor_used 0)"
+          delta=$(( used - base ))
+          if [ "$delta" -ge "$PULSE_TOKENS" ] 2>/dev/null; then
+            card="${card}
+
+${MICRO_ANCHOR}"
+            playbook_state_put "$dir" "last_anchor_used=${used}"
+          fi
+          ;;
+      esac
+    fi
+    playbook_emit_context "UserPromptSubmit" "$card"
     ;;
 
   *) : ;;

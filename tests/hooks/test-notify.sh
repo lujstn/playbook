@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Tests for the ntfy notify seam: the new helpers in playbook-common.sh
-# (playbook_ntfy_topic, playbook_ntfy_server, playbook_remote_url,
-# playbook_latest_transcript) and the integration of scripts/notify against
-# a curl stub. Every test pins one specific behaviour the production path
-# relies on: the remote-control URL must be recoverable, must be immune to
-# user-channel paste poisoning, must be gated on the bridge being active,
-# and the script must degrade visibly (documented exit codes) when the
-# topic, the server or curl is absent.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$root/hooks/lib/playbook-common.sh"
@@ -14,9 +6,6 @@ source "$root/hooks/lib/playbook-common.sh"
 sandbox="$(mktemp -d)"
 trap 'rm -rf "$sandbox"' EXIT
 
-# Isolate the machine-global notification config so these tests never read the
-# tester's real ~/.claude/playbook (which the new global fallback would otherwise
-# reach). Global-config tests below point PLAYBOOK_GLOBAL_DIR at a populated dir.
 export PLAYBOOK_GLOBAL_DIR="$sandbox/global-empty"
 mkdir -p "$PLAYBOOK_GLOBAL_DIR"
 
@@ -25,7 +14,6 @@ mkdir -p "$PLAYBOOK_GLOBAL_DIR"
 proj="$sandbox/proj"
 mkdir -p "$proj/.claude/playbook"
 
-# Topic + server read with whitespace trimming.
 printf '  topic-abc  \n' > "$proj/.claude/playbook/ntfy-topic"
 printf 'https://ntfy.example.com\n'  > "$proj/.claude/playbook/ntfy-server"
 [ "$(playbook_ntfy_topic "$proj")" = "topic-abc" ] \
@@ -35,7 +23,6 @@ printf 'https://ntfy.example.com\n'  > "$proj/.claude/playbook/ntfy-server"
   && echo "PASS: ntfy-server override read" \
   || { echo "FAIL: server was [$(playbook_ntfy_server "$proj")]"; exit 1; }
 
-# Missing topic/server files: empty, never a wrong value.
 empty_proj="$sandbox/empty"
 mkdir -p "$empty_proj"
 [ -z "$(playbook_ntfy_topic  "$empty_proj")" ] \
@@ -45,21 +32,18 @@ mkdir -p "$empty_proj"
   && echo "PASS: missing server file yields empty" \
   || { echo "FAIL: missing server file did not yield empty"; exit 1; }
 
-# Remote URL recovery from the active fixture, ignoring the user paste.
 ACTIVE_FIX="$root/tests/hooks/fixtures/transcript-bridge.jsonl"
 url_active="$(playbook_remote_url "$ACTIVE_FIX")"
 [ "$url_active" = "https://claude.ai/code/session_TEST_ACTIVE" ] \
   && echo "PASS: active bridge_status url recovered, user paste ignored" \
   || { echo "FAIL: url_active was [$url_active]"; exit 1; }
 
-# Inactive bridge_status: gating keeps the URL empty.
 INACTIVE_FIX="$root/tests/hooks/fixtures/transcript-bridge-inactive.jsonl"
 url_inactive="$(playbook_remote_url "$INACTIVE_FIX")"
 [ -z "$url_inactive" ] \
   && echo "PASS: inactive bridge_status yields no url" \
   || { echo "FAIL: url_inactive was [$url_inactive]"; exit 1; }
 
-# Paste-only transcript (no bridge_status record at all): empty.
 PASTE_ONLY="$sandbox/paste-only.jsonl"
 printf '%s\n' '{"type":"user","message":{"role":"user","content":"see https://claude.ai/code/session_PASTE_ONLY here"}}' > "$PASTE_ONLY"
 url_paste="$(playbook_remote_url "$PASTE_ONLY")"
@@ -67,8 +51,6 @@ url_paste="$(playbook_remote_url "$PASTE_ONLY")"
   && echo "PASS: user paste alone cannot match the bridge_status filter" \
   || { echo "FAIL: url_paste was [$url_paste]"; exit 1; }
 
-# latest_transcript: encodes the project dir under HOME and picks the most
-# recent jsonl. Sandbox HOME so the test cannot stomp on the real one.
 fake_home="$sandbox/home"
 enc="$(printf '%s' "$proj" | tr '/' '-')"
 mkdir -p "$fake_home/.claude/projects/$enc"
@@ -84,8 +66,6 @@ nothing="$(HOME="$sandbox/empty-home" playbook_latest_transcript "$proj")"
 
 # --- integration: scripts/notify with a curl stub -------------------------
 
-# Stub curl: captures args to log file; outputs {"status":1} for Pushover
-# response parsing; exits 0. Sandboxed by PATH override.
 stub_bin="$sandbox/bin"
 mkdir -p "$stub_bin"
 cat >"$stub_bin/curl" <<'STUB'
@@ -100,8 +80,6 @@ exit 0
 STUB
 chmod +x "$stub_bin/curl"
 
-# Real PATH plus the stub-bin prefix so curl resolves to the stub, jq/awk/etc
-# stay reachable. CURL_LOG captures one request per invocation.
 NOTIFY="$root/scripts/notify"
 LOG="$sandbox/curl.log"
 run_notify() {
@@ -109,11 +87,9 @@ run_notify() {
     bash -c "cd '$proj' && '$NOTIFY' \"\$@\"" -- "$@"
 }
 
-# Restore ntfy config: provider file, topic, and server override.
 printf 'ntfy\n' > "$proj/.claude/playbook/notify-provider"
 cp "$ACTIVE_FIX" "$fake_home/.claude/projects/$enc/session.jsonl"
 
-# Usage errors degrade with documented exits.
 set +e
 run_notify >/dev/null 2>&1; ec=$?; set -e
 [ "$ec" -eq 64 ] && echo "PASS: no-args yields exit 64 (usage)" \
@@ -123,7 +99,6 @@ run_notify --category=weird "hello" >/dev/null 2>&1; ec=$?; set -e
 [ "$ec" -eq 64 ] && echo "PASS: unknown category yields exit 64" \
   || { echo "FAIL: bad category exit was $ec"; exit 1; }
 
-# Missing topic: documented exit 4.
 mv "$proj/.claude/playbook/ntfy-topic" "$sandbox/topic.bak"
 set +e
 run_notify "hello" >/dev/null 2>&1; ec=$?; set -e
@@ -131,7 +106,6 @@ run_notify "hello" >/dev/null 2>&1; ec=$?; set -e
   || { echo "FAIL: no-topic exit was $ec"; exit 1; }
 mv "$sandbox/topic.bak" "$proj/.claude/playbook/ntfy-topic"
 
-# Missing curl: documented exit 5.
 nocurl_bin="$sandbox/nocurl_bin"
 mkdir -p "$nocurl_bin"
 for tool in bash dirname basename env tr awk sed jq ls grep cat tail head printf mktemp; do
@@ -146,7 +120,6 @@ set -e
 [ "$ec" -eq 5 ] && echo "PASS: missing curl yields exit 5" \
   || { echo "FAIL: no-curl exit was $ec"; exit 1; }
 
-# Default level is info: no --level flag -> Priority 3, "Info:" title prefix.
 rm -f "$LOG"
 run_notify "Schema decision" "NOT NULL backfill needs your call"
 grep -qx '  Title: 📚 Info: Schema decision' "$LOG" \
@@ -165,7 +138,6 @@ grep -qx '  https://ntfy.example.com/topic-abc' "$LOG" \
   && echo "PASS: URL = server override / topic" \
   || { echo "FAIL: target URL wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --level action: Priority 4, "Action:" title prefix.
 rm -f "$LOG"
 run_notify --level action "Deploy failed" "ci/cd pipeline exited non-zero"
 grep -qx '  Title: 📚 Action: Deploy failed' "$LOG" \
@@ -175,7 +147,6 @@ grep -qx '  Priority: 4' "$LOG" \
   && echo "PASS: --level action maps to ntfy Priority 4" \
   || { echo "FAIL: action priority wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --level critical: Priority 5, "Critical:" title prefix.
 rm -f "$LOG"
 run_notify --level critical "System down"
 grep -qx '  Title: 📚 Critical: System down' "$LOG" \
@@ -185,7 +156,6 @@ grep -qx '  Priority: 5' "$LOG" \
   && echo "PASS: --level critical maps to ntfy Priority 5" \
   || { echo "FAIL: critical priority wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --category=action back-compat: same as --level action.
 rm -f "$LOG"
 run_notify --category=action "Wave merged"
 grep -qx '  Title: 📚 Action: Wave merged' "$LOG" \
@@ -195,8 +165,6 @@ grep -qx '  Priority: 4' "$LOG" \
   && echo "PASS: --category=action back-compat maps to Priority 4" \
   || { echo "FAIL: category=action back-compat priority wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --category=info back-compat: default priority, info title prefix, body =
-# headline when no detail arg.
 rm -f "$LOG"
 run_notify --category=info "Wave 2 merged"
 grep -qx '  Title: 📚 Info: Wave 2 merged' "$LOG" \
@@ -209,14 +177,12 @@ grep -qx '  Wave 2 merged' "$LOG" \
   && echo "PASS: body = headline when detail omitted" \
   || { echo "FAIL: body fallback wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --link overrides the remote-control URL.
 rm -f "$LOG"
 run_notify --link https://example.com/pr/42 "PR review needed"
 grep -qx '  Click: https://example.com/pr/42' "$LOG" \
   && echo "PASS: --link overrides the session URL in Click header" \
   || { echo "FAIL: --link override wrong in [$(cat "$LOG")]"; exit 1; }
 
-# Inactive bridge_status: no Click header when not overridden by --link.
 cp "$INACTIVE_FIX" "$fake_home/.claude/projects/$enc/session.jsonl"
 rm -f "$LOG"
 run_notify "Heads up"
@@ -224,7 +190,6 @@ grep -q 'Click:' "$LOG" \
   && { echo "FAIL: Click header should be absent when bridge is inactive"; cat "$LOG"; exit 1; } \
   || echo "PASS: no Click header when bridge_status is inactive"
 
-# Default server when no override is configured.
 rm -f "$proj/.claude/playbook/ntfy-server"
 rm -f "$LOG"
 run_notify "ping"
@@ -234,13 +199,11 @@ grep -qx '  https://ntfy.sh/topic-abc' "$LOG" \
 
 # --- Pushover provider tests -----------------------------------------------
 
-# Switch to Pushover: set provider + credentials.
 printf 'pushover\n' > "$proj/.claude/playbook/notify-provider"
 printf 'token_abc\n' > "$proj/.claude/playbook/pushover-token"
 printf 'user_xyz\n' > "$proj/.claude/playbook/pushover-user"
 cp "$ACTIVE_FIX" "$fake_home/.claude/projects/$enc/session.jsonl"
 
-# --level info: Pushover priority 0, "Info:" title.
 rm -f "$LOG"
 run_notify --level info "Heads up"
 grep -qx '  --form-string' "$LOG" \
@@ -253,7 +216,6 @@ grep -q 'priority=0' "$LOG" \
   && echo "PASS: Pushover info maps to priority 0" \
   || { echo "FAIL: Pushover info priority wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --level action: Pushover priority 1.
 rm -f "$LOG"
 run_notify --level action "Need your call"
 grep -q 'priority=1' "$LOG" \
@@ -263,7 +225,6 @@ grep -q 'title=📚 Action: Need your call' "$LOG" \
   && echo "PASS: Pushover action title rendered" \
   || { echo "FAIL: Pushover action title wrong in [$(cat "$LOG")]"; exit 1; }
 
-# --level critical: Pushover priority 2 with retry, expire, and sound=siren.
 rm -f "$LOG"
 run_notify --level critical "Emergency"
 grep -q 'priority=2' "$LOG" \
@@ -279,21 +240,18 @@ grep -q 'sound=siren' "$LOG" \
   && echo "PASS: Pushover critical adds sound=siren" \
   || { echo "FAIL: Pushover critical missing sound in [$(cat "$LOG")]"; exit 1; }
 
-# --link attaches url field on Pushover.
 rm -f "$LOG"
 run_notify --link https://example.com/pr/42 --level action "Review needed"
 grep -q 'url=https://example.com/pr/42' "$LOG" \
   && echo "PASS: Pushover --link attaches url field" \
   || { echo "FAIL: Pushover --link url missing in [$(cat "$LOG")]"; exit 1; }
 
-# Missing Pushover credentials -> exit 4.
 rm "$proj/.claude/playbook/pushover-token"
 set +e
 run_notify "test" >/dev/null 2>&1; ec=$?; set -e
 [ "$ec" -eq 4 ] && echo "PASS: missing Pushover token yields exit 4" \
   || { echo "FAIL: missing token exit was $ec"; exit 1; }
 
-# No provider configured and no ntfy-topic fallback -> exit 4.
 rm "$proj/.claude/playbook/notify-provider"
 rm -f "$proj/.claude/playbook/ntfy-topic"
 set +e
@@ -303,7 +261,6 @@ run_notify "test" >/dev/null 2>&1; ec=$?; set -e
 
 # --- curl failure: both providers must return exit 3 ----------------------
 
-# Stub that always fails; stderr is visible so the script can surface it.
 fail_bin="$sandbox/fail_bin"
 mkdir -p "$fail_bin"
 cat >"$fail_bin/curl" <<'STUB'
@@ -318,7 +275,6 @@ run_notify_fail() {
     bash -c "cd '$proj' && '$NOTIFY' \"\$@\"" -- "$@"
 }
 
-# Pushover: curl failure -> exit 3.
 printf 'pushover\n' > "$proj/.claude/playbook/notify-provider"
 printf 'token_abc\n' > "$proj/.claude/playbook/pushover-token"
 printf 'user_xyz\n' > "$proj/.claude/playbook/pushover-user"
@@ -327,7 +283,6 @@ run_notify_fail "test" >/dev/null 2>&1; ec=$?; set -e
 [ "$ec" -eq 3 ] && echo "PASS: Pushover curl failure yields exit 3" \
   || { echo "FAIL: Pushover curl failure exit was $ec (expected 3)"; exit 1; }
 
-# ntfy: curl failure -> exit 3.
 printf 'ntfy\n' > "$proj/.claude/playbook/notify-provider"
 printf 'topic-abc\n' > "$proj/.claude/playbook/ntfy-topic"
 set +e
@@ -341,7 +296,6 @@ printf 'pushover\n' > "$proj/.claude/playbook/notify-provider"
 printf 'token_abc\n' > "$proj/.claude/playbook/pushover-token"
 printf 'user_xyz\n' > "$proj/.claude/playbook/pushover-user"
 
-# Stub that returns a receipt in the response JSON.
 cat >"$stub_bin/curl" <<'STUB'
 #!/usr/bin/env bash
 log="${CURL_LOG:-/dev/null}"
@@ -364,7 +318,6 @@ receipt_val="$(cat "$proj/.claude/playbook/last-receipt")"
   && echo "PASS: last-receipt contains the parsed receipt token" \
   || { echo "FAIL: last-receipt contains [$receipt_val] (expected receipt_test_abc123)"; exit 1; }
 
-# Non-critical send must not write last-receipt even when stub always emits receipt.
 rm -f "$proj/.claude/playbook/last-receipt"
 run_notify --level info "Just an update" >/dev/null
 [ ! -f "$proj/.claude/playbook/last-receipt" ] \
@@ -372,8 +325,6 @@ run_notify --level info "Just an update" >/dev/null
   || { echo "FAIL: last-receipt unexpectedly created on non-critical send"; exit 1; }
 
 # --- global notification config: set once, override per project -----------
-# Every config key falls back to the machine-global dir when the project has no
-# file of its own, and a project file overrides the global value for that key.
 gdir="$sandbox/global-populated"
 mkdir -p "$gdir"
 printf 'global-topic\n' > "$gdir/ntfy-topic"
@@ -408,7 +359,6 @@ printf 'project-topic\n' > "$ovr/.claude/playbook/ntfy-topic"
   && echo "PASS: no project config and an empty global dir yields empty" \
   || { echo "FAIL: absent config did not yield empty"; exit 1; }
 
-# End-to-end: scripts/notify sends using global config alone, no project files.
 gproj="$sandbox/gproj"; mkdir -p "$gproj"
 rm -f "$LOG"
 CURL_LOG="$LOG" HOME="$fake_home" PLAYBOOK_GLOBAL_DIR="$gdir" PATH="$stub_bin:$PATH" \

@@ -38,6 +38,8 @@ On every invocation, present an interactive picker (via `AskUserQuestion`) for t
 - **Option A, custom wait window.** A wait window during which the user is notified and the work waits for a response before proceeding. The picker's default is pre-filled at 10 minutes; the user can accept 10 minutes or set a different duration.
 - **Option B, disable waiting.** No waiting; the work proceeds without holding for a response.
 
+Once the choice is made, record it mechanically: run `scripts/offline on --window <minutes> --wait a` for option A, or `scripts/offline on --window <minutes> --wait b` for option B. When offline behaviour ends, run `scripts/offline off`. Once the flag is set, blocked, idle, and finished notifications are sent by the hooks, mechanically, straight off the platform's own Notification event, so delivery does not depend on remembering to notify.
+
 The choice is not persisted and is not inferred from any previous run. The user must declare it fresh every single invocation. There is no remembered default beyond the pre-filled 10 minutes shown in option A, and even that pre-fill is a starting value for the picker, not a persisted setting.
 
 ---
@@ -91,13 +93,15 @@ While offline mode is active, accumulate a running log of events that occur spec
 - Waits.
 - Notification sends (all levels).
 
+The log is durable JSONL at the path `scripts/offline` reports when offline mode is turned on (`<state-dir>/offline-log.jsonl`, also printed by `scripts/offline status`). Notification sends land there automatically via the hooks; log every other event yourself with a `scripts/offline log '{"event":"decision","summary":"...","reason":"..."}'`-style call, one JSON object per event.
+
 Online runs produce no log. The log accumulates only while offline mode is active; outside an offline-mode session there is no decision log at all.
 
 ---
 
 ## HTML export
 
-At the end of the session, render the accumulated log to a clean, simple-to-read HTML document using `decision-log.html.tmpl` in this skill directory. Save it to a folder the user chooses at runtime: either the project root, or a dedicated logs folder outside the root. The destination folder is chosen at runtime, not fixed in advance and not persisted between runs. The intent is a document the user can read calmly in the morning, so keep it legible at a glance.
+At the end of the session, read the durable JSONL log (`<state-dir>/offline-log.jsonl`, the path `scripts/offline status` reports) and render it, not conversation memory, to a clean, simple-to-read HTML document using `decision-log.html.tmpl` in this skill directory. Save it to a folder the user chooses at runtime: either the project root, or a dedicated logs folder outside the root. The destination folder is chosen at runtime, not fixed in advance and not persisted between runs. The intent is a document the user can read calmly in the morning, so keep it legible at a glance.
 
 ---
 
@@ -122,7 +126,7 @@ The ladder steps that govern the proceed-and-log path under either option:
 
 ## The notify seam
 
-The skill specifies a single integration point: the `scripts/notify` contract shipped with the plugin.
+The skill specifies a single integration point: the `scripts/notify` contract shipped with the plugin. While offline mode is on, the hooks fire `scripts/notify` mechanically for blocked, idle, and finished events straight off the platform's Notification event; the skill's own direct sends are reserved for richer mid-work updates that carry more context than the hook alone can.
 
 **Contract.** `scripts/notify [--level info|action|critical] [--link <url>] "<headline>" ["<detail>"]`. The headline is the lock-screen key action seen first (the title renders as `📚 Action: <headline>`, `📚 Info: <headline>`, or `📚 Critical: <headline>`); the optional detail is the notification body and defaults to the headline. Back-compat: `--category=action` and `--category=info` are accepted as aliases.
 
@@ -220,7 +224,7 @@ digraph offline_mode {
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The nine-tenet overlay and the standing North-Star override stay live throughout; this skill does not restate the overlay.
+- `playbook:playbook` is the routing engine. It restates the North Star, batches questions, and routes. It routes here only when the user explicitly enables offline behaviour for tenet 5; offline mode is never implicit. The overlay, the nine tenets (held in the engine skill) and the standing North-Star override stay live throughout; this skill does not restate them.
 
 **Division of labour:**
 - `/goal` owns the "am I actually done?" loop. This skill owns absence, escalation, and the morning log. Suggest pairing with `/goal` when the task has a clear completion criterion.

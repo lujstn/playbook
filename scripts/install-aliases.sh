@@ -1,26 +1,4 @@
 #!/usr/bin/env bash
-# Playbook: install (or remove) bare command aliases.
-#
-# Claude Code always namespaces a plugin's commands and skills, so the plugin
-# can only ever offer the /playbook:<name> form. A bare /<name> exists only as a
-# standalone file under ~/.claude/commands/. This script writes those standalone
-# files so the plain /brainstorming, /debug, /fix, /offline-mode, /worktrees,
-# /hello and /workflow all work, each pointing back at the plugin. The
-# /playbook:<name> form keeps working regardless; the bare alias is the extra.
-#
-# Every file this writes carries a "playbook-managed" marker in its body. That
-# marker is the ownership record: the script refreshes or removes only files it
-# wrote, and never clobbers a same-named command the user or another tool
-# already owns. Where a name is taken, that bare alias is skipped and reported;
-# the /playbook:<name> form covers it.
-#
-# Usage:
-#   scripts/install-aliases.sh            install or refresh the aliases
-#   scripts/install-aliases.sh --remove   remove only Playbook-managed aliases
-#
-# Overrides (for tests):
-#   PLAYBOOK_COMMANDS_DIR   where the bare files go   (default ~/.claude/commands)
-#   PLAYBOOK_GLOBAL_DIR     where the record is kept  (default ~/.claude/playbook)
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,8 +13,6 @@ version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
   "$plugin_root/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
 [ -n "$version" ] || version="unknown"
 
-# Bare names backed by a skill: a thin delegator is enough. Fields are
-# name|skill|description, delimited by | so the description may contain spaces.
 delegates=(
   "brainstorming|brainstorming|Playbook brainstorming mode: explore deeply, surface sharp questions, then converge."
   "debug|debug-mode|Playbook debug mode: systematic investigation of an unknown failure."
@@ -44,9 +20,6 @@ delegates=(
   "offline-mode|offline-mode|Playbook offline mode: enable push notifications for long-running sessions."
   "worktrees|worktrees|Playbook worktrees mode: isolate separate Claude Code sessions in .worktrees/, each on its own branch with an instance number for collision-free resources."
 )
-# Bare names backed by a plugin command with its own body (arguments,
-# model-invocation control): mirror the plugin file verbatim so behaviour stays
-# identical and there is a single source of truth.
 copies=(hello workflow review-panel)
 
 owned_by_playbook() { [ -e "$1" ] && grep -q "$marker" "$1"; }

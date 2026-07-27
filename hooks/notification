@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/playbook-common.sh"
+
+# @nonobvious(must-hold) never speaks and always exits 0, so a notify failure cannot break the platform dispatch
+stdin="$(cat 2>/dev/null || true)"
+command -v jq >/dev/null 2>&1 || exit 0
+
+event="$(jq -r '.hook_event_name // empty' 2>/dev/null <<<"$stdin" || true)"
+[ "$event" = "Notification" ] || exit 0
+
+dir="$(playbook_state_dir "$stdin")"
+[ -n "$dir" ] || exit 0
+flag="${dir}/offline"
+[ -f "$flag" ] || exit 0
+
+kind=""
+for field in notification_type matcher type_name; do
+  v="$(jq -r --arg f "$field" '.[$f] // empty' 2>/dev/null <<<"$stdin" || true)"
+  if [ -n "$v" ]; then kind="$v"; break; fi
+done
+[ -n "$kind" ] || kind="unknown"
+
+message=""
+for field in message title; do
+  v="$(jq -r --arg f "$field" '.[$f] // empty' 2>/dev/null <<<"$stdin" || true)"
+  if [ -n "$v" ]; then message="$v"; break; fi
+done
+
+case "$kind" in
+  agent_completed)
+    level="info"
+    headline="Session finished while you were away"
+    ;;
+  idle_prompt)
+    level="action"
+    headline="Claude has gone quiet and may need you"
+    ;;
+  *)
+    level="action"
+    headline="Claude is blocked and needs you"
+    ;;
+esac
+
+detail="$message"
+[ -n "$detail" ] || detail="$headline"
+
+default_bin="${SCRIPT_DIR}/../scripts/notify"
+notify_bin="${PLAYBOOK_NOTIFY_BIN:-}"
+if [ -z "$notify_bin" ] || [ ! -x "$notify_bin" ] || [ ! -f "$notify_bin" ]; then
+  notify_bin="$default_bin"
+fi
+
+"$notify_bin" --level "$level" "$headline" "$detail" >/dev/null 2>&1
+notify_exit=$?
+
+logline="$(jq -cn \
+  --argjson ts "$(date +%s)" \
+  --arg kind "$kind" --arg level "$level" --arg headline "$headline" --arg detail "$detail" \
+  --argjson exit "$notify_exit" \
+  '{ts:$ts, event:"notify", kind:$kind, level:$level, headline:$headline, detail:$detail, exit:$exit}' 2>/dev/null)"
+[ -n "$logline" ] && printf '%s\n' "$logline" >> "${dir}/offline-log.jsonl" 2>/dev/null
+
+exit 0

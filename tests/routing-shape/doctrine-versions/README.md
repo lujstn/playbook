@@ -9,6 +9,7 @@ for like. All probes: pixel-art exemplar, `EFFORT=xhigh`, `TEAMS=1`, Opus, turn 
 | `v1-redefinition` | the user's five canonical mode definitions, mechanical flag check, price list, both biases named | markers 🐺🤝🤝 (2/3), behaviour hackathon-skill 3/3, one word-vs-deed mismatch; plus 1/1 🤝 on its earlier single probe |
 | `v3-spine-essay` | v1 plus the interns-logic rebuttal, spine-density argument and marker discipline, all appended as prose (routing paragraph grew to 1,003 words) | 0/3 🤝, all solo; the spine text was delivered into every probe and engaged by none |
 | `v4-compressed` | the same concepts restructured as a decision procedure: route-by-shape plus three numbered tie-breaks; 522 words | **3/3 🤝, all map=exact, and every marker reason cites the spine tie-break** ("thin protocol spine, three deep pieces"); solo control stays 🐺 |
+| `v5-card` | the 2.8.0 inversion: the overlay shrunk to a ~1,200-byte identity block, the full v4 procedure moved verbatim into the engine `SKILL.md`, and the live rules delivered by a per-prompt card from `take-a-beat` (not captured in this two-file snapshot; probe against a checkout of the 2.8.0 plugin to include it) | unmeasured; the pre-merge reading for the 2.8.0 release compares this against `v4-compressed` |
 
 **Verdict (2026-07-06):** the essay was actively harmful, not merely ignored: the same
 concepts scored 0/3 as accumulated prose and 3/3 as a numbered procedure, with v1 in
