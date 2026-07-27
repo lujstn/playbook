@@ -20,6 +20,8 @@ The overlay is the persistence mechanism, carried by the hooks across compaction
 
 One line, derived verbatim from the user's request, kept load-bearing at every decision. For trivial work this is one line and there are zero questions; lone-wolf and proceed.
 
+When the work has outgrown the North Star, confirm the new one-liner with the user, then state it on its own line as `playbook-northstar: <line>` so the hooks carry it into the per-prompt card. Never restate a changed goal silently.
+
 ### 2. Assess separability and durability
 
 - **Separability** decides the coordination topology: can the work be partitioned by file ownership and run without peer communication (interns), is it a living build whose specialist pieces must talk to converge (hackathon), or is it a frozen plan a script can execute wide while keeping results out of main context (workflows)?
@@ -63,7 +65,7 @@ The **Playbook** brand is mandatory so the marker is unmistakably Playbook on to
 
 ### 4. Route
 
-Pass the North Star into every dispatch as a single labelled line: `playbook-northstar: <one-line North Star>`. The overlay reaches helpers through `SubagentStart`; this data line is the one piece of carried state the hook cannot recover on its behalf.
+Pass the North Star into every dispatch as a single labelled line: `playbook-northstar: <one-line North Star>`. The overlay reaches helpers through `SubagentStart`; this data line is the one piece of carried state the hook cannot recover on its behalf. Use `playbook-northstar: none (task-only)` for a helper whose brief is genuinely the whole goal, a tiny mechanical chore needing no project context; every other dispatch carries the real line.
 
 #### lone-wolf
 

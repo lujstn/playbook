@@ -17,6 +17,7 @@ block() {
     echo "Playbook dispatch guard: this ${1} carries no North Star."
     echo "Add one line to the ${2} and redispatch:"
     echo "playbook-northstar: <one line stating what success means for the whole project>"
+    echo "or declare a deliberately narrow dispatch with: playbook-northstar: none (task-only)"
     echo "Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
   } >&2
   exit 2

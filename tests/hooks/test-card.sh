@@ -155,4 +155,40 @@ run cmp "$MISSING"
 has "compaction preserves the stated unease" "Unease: concerned *slow tests*; no floor."
 has "compaction preserves the cached excerpt" "North Star: Ship the reliability redesign"
 
+echo "-- a visible restatement updates the card with the restated label"
+U="$FIX/transcript-unease.jsonl"
+iso
+d="$(sd rst)"; playbook_state_reset "$d" 0
+playbook_state_put "$d" "northstar_excerpt=condense this chat log into one message"
+run rst "$U"
+has "a restatement replaces the stale excerpt" "North Star (restated): evidence-backed addresses for every org"
+chk '[ "$(playbook_state_get "$d" northstar_restated)" = "1" ]' "the restated flag is set in state"
+run rst "$U"
+has "an unchanged restatement keeps the restated label" "North Star (restated): evidence-backed addresses for every org"
+
+echo "-- a task-only line never overwrites the excerpt"
+iso
+d="$(sd tno)"; playbook_state_reset "$d" 0
+playbook_state_put "$d" "northstar_excerpt=the real project goal"
+NONE_T="$SANDBOX/none.jsonl"
+jq -cn '{type:"user", message:{role:"user", content:"start"}}' > "$NONE_T"
+jq -cn '{type:"assistant", message:{role:"assistant", model:"m",
+  usage:{input_tokens:10, cache_creation_input_tokens:100, cache_read_input_tokens:400},
+  content:[{type:"text", text:"Dispatching the chore.\nplaybook-northstar: none (task-only)"}]}}' >> "$NONE_T"
+run tno "$NONE_T"
+has "a task-only line leaves the excerpt alone" "North Star: the real project goal"
+chk '[ -z "$(playbook_state_get "$d" northstar_restated)" ]' "a task-only line sets no restated flag"
+
+echo "-- /clear wipes the restated flag"
+iso
+d="$(sd rcl)"; playbook_state_reset "$d" 0
+playbook_state_put "$d" "northstar_excerpt=old goal" "northstar_restated=1"
+CH="$(mktemp -d)"
+printf '{"hook_event_name":"SessionStart","source":"clear","session_id":"rcl","cwd":"%s","transcript_path":"%s"}' "$CH" "$MISSING" \
+  | HOME="$CH" bash "$H" >/dev/null 2>&1
+run rcl "$MISSING"
+has "/clear returns the plain North Star label" "North Star: (not yet captured)"
+chk '[ -z "$(playbook_state_get "$d" northstar_restated)" ]' "/clear wipes the restated flag"
+rm -rf "$CH"
+
 exit $fail

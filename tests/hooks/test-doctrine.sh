@@ -35,6 +35,8 @@ chk "grep -q 'will the plan survive contact unchanged' '$S'" "engine carries the
 chk "grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' '$S'" "engine detects team availability mechanically, not by guessing"
 
 chk "grep -q 'Assume ultracode is the baseline' '$S'" "engine states the ultracode baseline verbatim from the overlay"
+chk "grep -q 'Never restate a changed goal silently' '$S'" "engine requires user confirmation before restating the North Star"
+chk "grep -q 'none (task-only)' '$S'" "engine documents the task-only dispatch opt-out"
 chk "grep -q 'Route by shape' '$S'" "engine carries the route-by-shape procedure verbatim from the overlay"
 chk "grep -q 'Four tie-breaks' '$S'" "engine corrects the tie-break count to four"
 chk "! grep -q 'Three tie-breaks' '$S'" "engine no longer carries the miscounted three-tie-break phrasing"

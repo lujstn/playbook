@@ -43,6 +43,12 @@ grep -q "PLAYBOOK_OVERLAY" <<<"$sctx" && echo "PASS: overlay reaches subagent" \
 grep -q "Set an explicit model on anything you dispatch" <<<"$sctx" \
   && echo "PASS: SubagentStart pushes an explicit model onto every onward dispatch" \
   || { echo "FAIL: model rule missing from SubagentStart"; exit 1; }
+grep -q "never a licence to widen it" <<<"$sctx" \
+  && echo "PASS: the North Star is bounded to the brief as a compass" \
+  || { echo "FAIL: compass-not-licence sentence missing from SubagentStart"; exit 1; }
+grep -q "deliberately task-only" <<<"$sctx" \
+  && echo "PASS: the none value is interpreted as task-only scope" \
+  || { echo "FAIL: task-only interpretation missing from SubagentStart"; exit 1; }
 { grep -q "Playbook helper report:" <<<"$sctx" && grep -q "attentive or above" <<<"$sctx"; } \
   && echo "PASS: SubagentStart asks for the elevated-only closing unease line" \
   || { echo "FAIL: helper-report block missing from SubagentStart"; exit 1; }

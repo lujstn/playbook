@@ -147,10 +147,17 @@ playbook_scan_tail() {
                        else tostring end ];
       ( [ texts[] | match("🌡️ \\*\\*Playbook\\*\\* `unease: ('"$levels"')`(?: \\*([^*\\n]{1,120})\\*)?"; "g") ] ) as $ms
       | ($ms | last) as $m
+      | ( [ texts[] | match("(?:^|\\n)[[:space:]]*playbook-northstar:[[:space:]]*([^\\n]+)"; "g") ] | last ) as $ns
       | ( bashtexts(bashids)
           | any(test("(--- FAIL|^FAILED |^FAIL[: ]|\\\\b[0-9]+ (tests?|specs?) failed\\\\b|Tests:.*[0-9]+ failed|[0-9]+ failed, [0-9]+ passed)"; "m")) ) as $bf
       | ( if $m then ("marker_level=" + $m.captures[0].string),
                      ("marker_reason=" + (($m.captures[1].string // "") | gsub("[\\n\\r=]"; " ")))
+          else empty end ),
+        ( if $ns then ($ns.captures[0].string
+                       | gsub("^[[:space:]]+|[[:space:]]+$"; "")
+                       | if (length > 0) and (startswith("<") | not)
+                         then "northstar=" + (gsub("[=\\n\\r]"; " ") | .[0:140])
+                         else empty end)
           else empty end ),
         ("marker_count=" + ($ms | length | tostring)),
         ("bash_fail=" + (if $bf then "1" else "0" end))'
