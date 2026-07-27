@@ -1,4 +1,4 @@
-# Playbook
+# 📚 Playbook
 
 `@lujstn/playbook` is a small, opinionated steering layer for Claude Code that forces Claude to keep the original goal in sight, **keeps track of its own unease** as it works, **asks for help** (with a **notification**) when that unease builds, decides when to reach for **workflows, teams or subagents** on its own, and adds proper new commands for **brainstorming** and a dedicated **offline mode** for when it's running without you. In other words, all the stuff I think Claude Code should have.
 
