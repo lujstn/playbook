@@ -28,17 +28,38 @@ for field in message title; do
   if [ -n "$v" ]; then message="$v"; break; fi
 done
 
+send=1
+level="action"
 case "$kind" in
   agent_completed)
+    send=0
     level="info"
-    headline="Session finished while you were away"
+    headline="A background session finished"
     ;;
   idle_prompt)
-    level="action"
-    headline="Claude has gone quiet and may need you"
+    ask="$(playbook_final_ask "$stdin")"
+    case $? in
+      0) headline="Claude asked you something"; message="$ask" ;;
+      1) send=0; level="info"; headline="Claude finished its reply without needing you" ;;
+      *) headline="Claude has gone quiet and may need you" ;;
+    esac
+    ;;
+  permission_prompt)
+    headline="Claude needs your permission"
+    ;;
+  elicitation_dialog|elicitation_url_dialog)
+    headline="A tool is asking you for input"
+    ;;
+  agent_needs_input)
+    headline="A background session needs your input"
+    ;;
+  quota_auto_resume_stale)
+    headline="Usage limit reset: press Enter to resume"
+    ;;
+  quota_auto_resume_disabled)
+    headline="A usage limit stopped the run"
     ;;
   *)
-    level="action"
     headline="Claude is blocked and needs you"
     ;;
 esac
@@ -46,20 +67,26 @@ esac
 detail="$message"
 [ -n "$detail" ] || detail="$headline"
 
-default_bin="${SCRIPT_DIR}/../scripts/notify"
-notify_bin="${PLAYBOOK_NOTIFY_BIN:-}"
-if [ -z "$notify_bin" ] || [ ! -x "$notify_bin" ] || [ ! -f "$notify_bin" ]; then
-  notify_bin="$default_bin"
+if [ "$send" = "1" ]; then
+  default_bin="${SCRIPT_DIR}/../scripts/notify"
+  notify_bin="${PLAYBOOK_NOTIFY_BIN:-}"
+  if [ -z "$notify_bin" ] || [ ! -x "$notify_bin" ] || [ ! -f "$notify_bin" ]; then
+    notify_bin="$default_bin"
+  fi
+  "$notify_bin" --level "$level" "$headline" "$detail" >/dev/null 2>&1
+  notify_exit=$?
+  event_name="notify"
+else
+  notify_exit=0
+  event_name="notify_held"
 fi
-
-"$notify_bin" --level "$level" "$headline" "$detail" >/dev/null 2>&1
-notify_exit=$?
 
 logline="$(jq -cn \
   --argjson ts "$(date +%s)" \
+  --arg event "$event_name" \
   --arg kind "$kind" --arg level "$level" --arg headline "$headline" --arg detail "$detail" \
   --argjson exit "$notify_exit" \
-  '{ts:$ts, event:"notify", kind:$kind, level:$level, headline:$headline, detail:$detail, exit:$exit}' 2>/dev/null)"
+  '{ts:$ts, event:$event, kind:$kind, level:$level, headline:$headline, detail:$detail, exit:$exit}' 2>/dev/null)"
 [ -n "$logline" ] && printf '%s\n' "$logline" >> "${dir}/offline-log.jsonl" 2>/dev/null
 
 exit 0

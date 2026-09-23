@@ -166,7 +166,7 @@ For when Claude is working and you aren't watching, whether that's overnight or 
 2. **Falls back to an external manager** if you don't answer inside the window you set.
 3. **Makes the call and logs it** if it must, writing every decision taken without you into a morning-readable HTML log.
 
-Delivery is mechanical. While offline mode is on, a hook watches for the session blocking, idling, or finishing and sends the push itself, so being told never depends on Claude remembering to tell you. Every send and every decision taken without you lands in a durable log file as it happens, and the morning HTML is rendered from that file rather than from memory.
+Delivery is mechanical. While offline mode is on, a hook sends the push itself whenever Claude actually needs you: a permission prompt, a tool asking for input, a usage limit that stops the run, or a reply that asks you something, with that question as the notification. A reply that simply finishes is logged rather than pushed, so a ping always means you're needed. Every send and every decision taken without you lands in a durable log file as it happens, and the morning HTML is rendered from that file rather than from memory.
 
 Notifications go through **ntfy or Pushover**, whichever you pick at setup, and you configure it once for the whole machine so every project can use it, with a per-project override when one needs its own. Pushover is the one for a guaranteed wake-up: it punches through iOS Do Not Disturb once you enable Critical Alerts in its app. ntfy is the free, self-hostable, Android-friendly option.
 

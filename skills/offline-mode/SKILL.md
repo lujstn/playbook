@@ -38,7 +38,7 @@ On every invocation, present an interactive picker (via `AskUserQuestion`) for t
 - **Option A, custom wait window.** A wait window during which the user is notified and the work waits for a response before proceeding. The picker's default is pre-filled at 10 minutes; the user can accept 10 minutes or set a different duration.
 - **Option B, disable waiting.** No waiting; the work proceeds without holding for a response.
 
-Once the choice is made, record it mechanically: run `scripts/offline on --window <minutes> --wait a` for option A, or `scripts/offline on --window <minutes> --wait b` for option B. When offline behaviour ends, run `scripts/offline off`. Once the flag is set, blocked, idle, and finished notifications are sent by the hooks, mechanically, straight off the platform's own Notification event, so delivery does not depend on remembering to notify.
+Once the choice is made, record it mechanically: run `scripts/offline on --window <minutes> --wait a` for option A, or `scripts/offline on --window <minutes> --wait b` for option B. When offline behaviour ends, run `scripts/offline off`. Once the flag is set, the hooks push mechanically, straight off the platform's own Notification event, whenever the session genuinely needs the user: a permission prompt, an MCP input request, a usage limit that halts the run, or an idle after a final reply that asks the user something (that question becomes the notification body). An idle after a reply that asks nothing, and a finished background session, are logged as `notify_held` rather than pushed. Held idles and completions still land in the log (`notify_held`), so the morning HTML shows them.
 
 The choice is not persisted and is not inferred from any previous run. The user must declare it fresh every single invocation. There is no remembered default beyond the pre-filled 10 minutes shown in option A, and even that pre-fill is a starting value for the picker, not a persisted setting.
 
@@ -93,7 +93,7 @@ While offline mode is active, accumulate a running log of events that occur spec
 - Waits.
 - Notification sends (all levels).
 
-The log is durable JSONL at the path `scripts/offline` reports when offline mode is turned on (`<state-dir>/offline-log.jsonl`, also printed by `scripts/offline status`). Notification sends land there automatically via the hooks; log every other event yourself with a `scripts/offline log '{"event":"decision","summary":"...","reason":"..."}'`-style call, one JSON object per event.
+The log is durable JSONL at the path `scripts/offline` reports when offline mode is turned on (`<state-dir>/offline-log.jsonl`, also printed by `scripts/offline status`). Notification sends (`notify`) and the idles and completions held back from the phone (`notify_held`) land there automatically via the hooks; log every other event yourself with a `scripts/offline log '{"event":"decision","summary":"...","reason":"..."}'`-style call, one JSON object per event.
 
 Online runs produce no log. The log accumulates only while offline mode is active; outside an offline-mode session there is no decision log at all.
 
@@ -126,7 +126,7 @@ The ladder steps that govern the proceed-and-log path under either option:
 
 ## The notify seam
 
-The skill specifies a single integration point: the `scripts/notify` contract shipped with the plugin. While offline mode is on, the hooks fire `scripts/notify` mechanically for blocked, idle, and finished events straight off the platform's Notification event; the skill's own direct sends are reserved for richer mid-work updates that carry more context than the hook alone can.
+The skill specifies a single integration point: the `scripts/notify` contract shipped with the plugin. While offline mode is on, the hooks fire `scripts/notify` mechanically for blocking events and for idles whose final reply asks the user something, straight off the platform's Notification event; the skill's own direct sends are reserved for richer mid-work updates that carry more context than the hook alone can.
 
 **Contract.** `scripts/notify [--level info|action|critical] [--link <url>] "<headline>" ["<detail>"]`. The headline is the lock-screen key action seen first (the title renders as `📚 Action: <headline>`, `📚 Info: <headline>`, or `📚 Critical: <headline>`); the optional detail is the notification body and defaults to the headline. Back-compat: `--category=action` and `--category=info` are accepted as aliases.
 

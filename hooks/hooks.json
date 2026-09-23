@@ -36,7 +36,7 @@
       ] }
     ],
     "Notification": [
-      { "matcher": "permission_prompt|idle_prompt|agent_needs_input|agent_completed", "hooks": [
+      { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input|agent_completed|quota_auto_resume_stale|quota_auto_resume_disabled", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" notification", "async": false }
       ] }
     ]
