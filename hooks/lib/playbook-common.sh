@@ -173,6 +173,48 @@ playbook_scan_tail() {
   return 0
 }
 
+# @nonobvious(means) exit 0 prints the question Claude's final reply asks the user, 1 means it asks nothing, 2 means the transcript is unreadable
+playbook_final_ask() {
+  local f; f="$(playbook_transcript_path "${1:-}")"
+  [ -n "$f" ] && [ -f "$f" ] || return 2
+  local bound="${PLAYBOOK_TAIL_BYTES:-262144}"
+  case "$bound" in ''|*[!0-9]*) bound=262144 ;; esac
+  local flt='
+    def txt: if type=="array" then (map(select(.type=="text")|.text)|join("\n")) else "" end;
+    def tidy: gsub("\\*\\*|__"; "") | gsub("\\s+"; " ") | gsub("^ | $"; "") | .[0:220];
+    ( [ .[] | select(.type=="assistant") ] ) as $as
+    | ($as | last) as $a
+    | if $a == null then "state=none" else
+        [ $as[] | select(.message.id == $a.message.id) ] as $turn
+        | ( [ $turn[] | .message.content | if type=="array" then .[] else empty end
+              | select(.type=="tool_use" and .name=="AskUserQuestion")
+              | (.input.questions[0].question // "Claude has a question for you") ] | last ) as $q
+        | if $q then "state=ask", ("text=" + ($q | tidy)) else
+            ( [ $turn[] | .message.content | txt ] | join("\n")
+              | [ splits("\n") | select(test("^\\s*(📚|🌡️|Playbook runs best on|Run `/effort)") | not) ] | join("\n")
+              | gsub("```[\\s\\S]*?```"; "") | gsub("`[^`\\n]*`"; "") | gsub("https?://\\S+"; "")
+              | [ splits("\n[ \t]*\n")
+                  | select(test("\\?(?! (Yes|No|Zero|None|Nothing|Never)\\b)([\\s)\"'"'"'*_]|$)")
+                           or test("\\b(I|I'"'"'ll|we) need (\\w+ ){0,4}(from you|before|to proceed|to continue|to start)|\\bto (proceed|continue|start|go further),? I need\\b|\\bbefore I (start|begin|proceed|continue)\\b|\\bwaiting (on|for) (you|your)\\b|\\b(your|you to) (call|decide|decision|confirm|choose|pick|approve|go-ahead)\\b|\\blet me know (which|whether|if|what)\\b|\\btell me (which|what|where|whether|how)\\b|\\b(I|we) need\\b[^.\\n]*:\\**\\s*(\\n|$)|\\bwhat I need\\b|\\b(decision|question)s? for you\\b|\\bonce you (answer|reply|confirm|choose|decide|tell|pick|send)\\b"; "i")) ]
+              | last ) as $p
+            | if $p then "state=ask", ("text=" + ($p | tidy)) else "state=done" end
+          end
+      end'
+  local size out
+  size="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
+  case "$size" in ''|*[!0-9]*) size=0 ;; esac
+  if [ "$size" -gt "$bound" ]; then
+    out="$(tail -c "$bound" "$f" 2>/dev/null | tail -n +2 | jq -rs "$flt" 2>/dev/null)"
+  else
+    out="$(jq -rs "$flt" "$f" 2>/dev/null)"
+  fi
+  case "$out" in
+    state=ask*) printf '%s' "$(sed -n 's/^text=//p' <<<"$out")"; return 0 ;;
+    state=done*) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 playbook_percent() {
   { local u="${1:-}" w="${2:-}"
     case "$u" in ''|*[!0-9]*) printf ''; return 0 ;; esac

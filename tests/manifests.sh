@@ -32,7 +32,7 @@ assert "! jq -e '.hooks.PreCompact or .hooks.PostCompact' '$root/hooks/hooks.jso
 assert "jq -e '.hooks.SessionStart[0].matcher | test(\"compact\")' '$root/hooks/hooks.json'" "SessionStart matcher includes compact (real re-anchor seam)"
 assert "! grep -q 'uncertainty' '$root/hooks/hooks.json'" "no uncertainty reference in hooks.json"
 
-assert "jq -e '.hooks.Notification[0].matcher == \"permission_prompt|idle_prompt|agent_needs_input|agent_completed\"' '$root/hooks/hooks.json'" "Notification matcher covers permission_prompt, idle_prompt, agent_needs_input, agent_completed"
+assert "jq -e '.hooks.Notification[0].matcher == \"permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input|agent_completed|quota_auto_resume_stale|quota_auto_resume_disabled\"' '$root/hooks/hooks.json'" "Notification matcher covers every state that blocks on the user, plus idle and completed for the log"
 assert "jq -e '.hooks.Notification[0].hooks | map(.command) | any(test(\"notification\"))' '$root/hooks/hooks.json'" "Notification wired to notification"
 assert "jq -e '[.hooks.PreToolUse[] | select(.matcher == \"Agent|Workflow\")] | length == 1' '$root/hooks/hooks.json'" "PreToolUse has exactly one Agent|Workflow entry"
 assert "jq -e '[.hooks.PreToolUse[] | select(.matcher == \"Agent|Workflow\")][0].hooks | map(.command) | any(test(\"dispatch-guard\"))' '$root/hooks/hooks.json'" "PreToolUse Agent|Workflow entry wired to dispatch-guard"
