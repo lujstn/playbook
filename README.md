@@ -129,6 +129,7 @@ Playbook fixes this in one move:
 - It spots competing context warnings and offers, once, to take the context channel over. Only with your consent, and it backs up your settings first. And ownership is re-verified rather than trusted: if a plugin update ever re-registers the warning hook, Playbook notices at the next session start and offers to quiet it again.
 - From then on it's the single calm voice in the room: auto-compact is safe, nothing important is lost, keep going.
 - After a compaction it re-anchors on your original request and the North Star, and picks the in-flight work straight back up.
+- If a long-lived terminal hits the stale subagent cap, Claude tells you to `/rename` and reopen with `claude -r`; offline, it carries on via Workflows.
 
 ### 🪙 The right model for the job
 

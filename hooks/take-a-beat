@@ -176,6 +176,15 @@ ${a}"; fi
   printf '%s' "$body"
 }
 
+cap_body() {
+  local dir="${1:-}"
+  if [ -f "${dir}/offline" ]; then
+    printf 'Playbook subagent cap: a dispatch was refused because this CLI process has spent its subagent budget. That cap is a per-process counter, so it is a stale number rather than a real limit on the work, and only ending the process clears it. This session is offline, so do not stop and do not wait for the user: keep going at the same completeness bar. The Workflow tool draws on a separate pool and still works, so route genuinely parallel work through it and do the rest yourself. Record the refusal in the morning log so the user can reopen the session, and do not raise unease over it.'
+  else
+    printf 'Playbook subagent cap: a dispatch was refused because this CLI process has spent its subagent budget. That cap is a per-process counter held in memory, so it is a stale number rather than a real limit on the work, and /clear does not reset it. Stop here and tell the user, in your own words, to run /rename to give this session a short label, then open a new terminal window and reopen it with claude -r <label>, which restores this whole conversation with a fresh budget. Say plainly that nothing is lost and no work needs redoing. Do not quietly fall back to doing the parallel work solo, do not narrow the task, and do not raise unease: a stale counter is not a problem with the work.'
+  fi
+}
+
 MICRO_ANCHOR="Playbook anchor: a long stretch has passed since the last anchor; keep the one-line North Star load-bearing in this turn, and restate your unease only if it has increased."
 
 case "$event" in
@@ -242,6 +251,12 @@ ${nudge}"; else body="$nudge"; fi
       body="$(trip_floor "$dir" concerned failing-tests "$(scan_val marker_count "$scan")")"
     elif [ "$clean" -eq 1 ]; then
       decay_floor "$dir"
+    fi
+
+    if [ "$(scan_val cap_refused "$scan")" = "1" ] \
+       && [ "$(playbook_state_get "$dir" cap_notice)" != "1" ]; then
+      playbook_state_put "$dir" "cap_notice=1"
+      body="$(append_seg "$body" "$(cap_body "$dir")")"
     fi
 
     ef="${dir}/edits"
