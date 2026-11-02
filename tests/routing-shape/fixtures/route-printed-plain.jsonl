@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"s","note":"PLAYBOOK_OVERLAY"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"playbook route lone-wolf Mechanical single-name rename; one viable mode.\nThe rename is done."}]}}
+{"type":"result","subtype":"success","total_cost_usd":0.07}

@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","session_id":"s","note":"PLAYBOOK_OVERLAY"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":": playbook route build \"six small utilities\"; mkdir -p lib/utils"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b1","is_error":true,"content":"PreToolUse:Bash hook error: the command may not contain quotes"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"b2","name":"Bash","input":{"command":": playbook route lone-wolf six small utilities written directly"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b2","content":"ok"}]}}
+{"type":"result","subtype":"success","total_cost_usd":0.1}

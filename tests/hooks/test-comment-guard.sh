@@ -348,4 +348,29 @@ blocks "sludge sitting beside a breakpoint is still caught" src/db/migrations/00
 -- this creates the b table
 CREATE TABLE b (id int);'
 
+echo "-- scratch and temp locations are exempt, everything else stays guarded"
+SLUDGE='// helper for the thing
+const a = 1;'
+blocks "a project file is guarded" src/a.ts "$SLUDGE"
+allows "/private/tmp/claude-501 scratch is exempt" /private/tmp/claude-501/x/scratchpad/a.ts "$SLUDGE"
+allows "/tmp/claude-501 scratch is exempt" /tmp/claude-501/x/a.ts "$SLUDGE"
+allows "a file directly in /tmp is exempt" /tmp/a.ts "$SLUDGE"
+allows "a file directly in /private/tmp is exempt" /private/tmp/a.ts "$SLUDGE"
+allows "a nested /tmp path is exempt" /tmp/deep/er/a.sh "$SLUDGE"
+TD="$(mktemp -d)"
+allows "a file under the resolved TMPDIR is exempt" "$TD/a.ts" "$SLUDGE"
+GUARD_OUT="$(payload Write "$TD/a.ts" "$SLUDGE" | TMPDIR="$TD" bash "$H" 2>&1)" && GUARD_RC=0 || GUARD_RC=$?
+[ "$GUARD_RC" -eq 0 ] && echo "PASS: a file under an explicit TMPDIR is exempt" || { echo "FAIL: explicit TMPDIR (rc=$GUARD_RC)"; fail=1; }
+mkdir -p "$TD/real" && ln -s "$TD/real" "$TD/link"
+GUARD_OUT="$(payload Write "$TD/link/a.ts" "$SLUDGE" | TMPDIR="$TD/link" bash "$H" 2>&1)" && GUARD_RC=0 || GUARD_RC=$?
+[ "$GUARD_RC" -eq 0 ] && echo "PASS: a TMPDIR reached through a symlink is resolved" || { echo "FAIL: symlinked TMPDIR (rc=$GUARD_RC)"; fail=1; }
+GUARD_OUT="$(payload Write "$HOME/.zshrc" "$SLUDGE" | TMPDIR="$TD" bash "$H" 2>&1)" && GUARD_RC=0 || GUARD_RC=$?
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: ~/.zshrc stays guarded" || { echo "FAIL: ~/.zshrc was not guarded (rc=$GUARD_RC)"; fail=1; }
+GUARD_OUT="$(payload Write "$HOME/proj/a.ts" "$SLUDGE" | TMPDIR="$TD" bash "$H" 2>&1)" && GUARD_RC=0 || GUARD_RC=$?
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: a home project file stays guarded with TMPDIR set" || { echo "FAIL: home file (rc=$GUARD_RC)"; fail=1; }
+GUARD_OUT="$(payload Write "$HOME/proj/a.ts" "$SLUDGE" | TMPDIR="/" bash "$H" 2>&1)" && GUARD_RC=0 || GUARD_RC=$?
+[ "$GUARD_RC" -eq 2 ] && echo "PASS: a TMPDIR of / exempts nothing" || { echo "FAIL: TMPDIR=/ (rc=$GUARD_RC)"; fail=1; }
+blocks "a path that merely starts with /tmp is guarded" /tmpfoo/a.ts "$SLUDGE"
+blocks "a path that merely starts with /private/tmpx is guarded" /private/tmpx/a.ts "$SLUDGE"
+
 exit $fail

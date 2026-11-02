@@ -1,0 +1,4 @@
+{"type": "system", "subtype": "init", "additional": "PLAYBOOK_OVERLAY present"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "AskUserQuestion", "input": {"questions": [{"question": "Which file first?", "header": "File", "multiSelect": false, "options": [{"label": "a", "description": "x"}, {"label": "b", "description": "y"}]}]}}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "🐜 **Playbook** `interns` *four independent briefs*"}]}}
+{"type": "result", "subtype": "success", "total_cost_usd": 0.05}

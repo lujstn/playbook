@@ -110,7 +110,7 @@ If no isolatable resources were detected, say so plainly: "no isolatable resourc
 
 ## Integration
 
-The instance number and resource config in `.worktree-instance` are read by the session that opens in that directory. The routing engine in that session operates normally; it routes on separability and durability as usual, with the North Star of whatever task the session is working on.
+The instance number and resource config in `.worktree-instance` are read by the session that opens in that directory. The routing engine in that session operates normally; it ranks the modes as usual, with the North Star of whatever task the session is working on.
 
 When a worktree is finished and its branch has been merged, remove it cleanly:
 

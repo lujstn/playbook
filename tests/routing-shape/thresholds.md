@@ -49,3 +49,14 @@ shape. Expectations under the new definition:
 - flag OFF: fall-back to lone-wolf or interns with the reason naming the absent flag.
 - the workflows bar moved, deliberately, at the user's direction: a medium-or-larger
   frozen plan qualifies; the floor (never for small or trivial work) is unchanged.
+
+## Amendment (2026-10-27): the 3.0.0 mode definitions
+The user redefined the modes by kind of work: lone-wolf for single-thread work, interns for
+repetitive work and exploration over defined changes up to about ten units, hackathon for small
+to medium cross-specialism features or a fast kickoff, workflows for most medium to large
+feature development and for more than about ten repetitive units, and gsd for big project
+development where reliability outranks speed. Expectations move with them:
+- boundary-b (sixteen validators) is past ten units, so it expects workflows alone.
+- workflows-feature (a plannable plugin system) is new and expects workflows.
+- The picker ranks every available mode, so with teams on and GSD installed a well-formed
+  picker offers exactly four modes; the tally reports how many do.

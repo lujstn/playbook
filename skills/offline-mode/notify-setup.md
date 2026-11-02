@@ -2,7 +2,7 @@
 
 Walk the user through connecting their phone, assuming they have never heard of ntfy or Pushover. Keep it warm and one step at a time; never paste both providers' full instructions at once. This same guide is used from the first-run `/playbook:setup` and the first time offline mode needs a channel.
 
-Notifications are configured once for the whole machine: write the files under `~/.claude/playbook/` so every project can use them (a single project can override later with its own `.claude/playbook/` files). Always finish by sending a real test ping and confirming it landed.
+Notifications are configured once for the whole machine: write the files under `~/.local/state/playbook/` so every project can use them (a single project can override later with its own `.claude/playbook/` files). Always finish by sending a real test ping and confirming it landed.
 
 ## Step 1: which phone?
 
@@ -34,9 +34,9 @@ Ask which they want, or whether to skip for now.
    Confirm it printed a full 32 characters before saving. If both methods somehow come up short, say so and stop rather than saving a weak channel.
 3. **Save it** globally and set the provider:
    ```bash
-   mkdir -p ~/.claude/playbook
-   printf '%s\n' "$topic" > ~/.claude/playbook/ntfy-topic
-   printf 'ntfy\n'        > ~/.claude/playbook/notify-provider
+   mkdir -p ~/.local/state/playbook
+   printf '%s\n' "$topic" > ~/.local/state/playbook/ntfy-topic
+   printf 'ntfy\n'        > ~/.local/state/playbook/notify-provider
    ```
 4. **Tell them it is the only lock.** ntfy channels are not password protected, so this random name is the sole thing keeping the notifications private. Treat it like a password: do not paste it into a repo, an issue, or a public chat.
 5. **Subscribe the phone.** Copy-paste is the reliable path on both phones and is never skipped; the QR is only an optional Android shortcut and must never be the sole method. Show the channel name in a code block so it is easy to copy.
@@ -53,13 +53,13 @@ Ask which they want, or whether to skip for now.
 1. **Install the app** and mention it costs a one-off ~$5 after a 30-day free trial. iPhone: App Store. Android: Google Play. Tell them to search "Pushover".
 2. **Create an account** in the app. Its main screen shows a **User Key**, a 30-character code. Ask them to paste it here, then save it:
    ```bash
-   mkdir -p ~/.claude/playbook
-   printf '%s\n' "<user-key>" > ~/.claude/playbook/pushover-user
+   mkdir -p ~/.local/state/playbook
+   printf '%s\n' "<user-key>" > ~/.local/state/playbook/pushover-user
    ```
 3. **Register an application** so Playbook can send: visit `https://pushover.net/apps/build`, name it something like "Claude Code", create it, and copy the **API Token/Key**. Ask them to paste it, then save it and set the provider:
    ```bash
-   printf '%s\n' "<api-token>" > ~/.claude/playbook/pushover-token
-   printf 'pushover\n'        > ~/.claude/playbook/notify-provider
+   printf '%s\n' "<api-token>" > ~/.local/state/playbook/pushover-token
+   printf 'pushover\n'        > ~/.local/state/playbook/notify-provider
    ```
 4. **Enable Critical Alerts** so it can wake them through Do Not Disturb: in the Pushover app settings turn on Critical Alerts and accept the iOS prompt. Without this, even the loudest alerts will not bypass Do Not Disturb.
 5. Send the test in Step 4.
@@ -79,7 +79,7 @@ For Pushover you may send this test at `--level critical` instead, so they can c
 Read the outcome and self-correct rather than moving on:
 
 - **Exit 0 but nothing arrived:** the send succeeded, so the subscription did not take. For ntfy, re-check the channel was pasted exactly and the app lists it under the `ntfy.sh` server, then re-send; this is the usual outcome when an Android QR did not subscribe, so fall back to copy-paste and re-test. For Pushover, confirm the app is signed in.
-- **Exit 4 (no config):** a topic or credential did not save. Re-write the file under `~/.claude/playbook/`, confirm it reads back the expected value, then re-send.
+- **Exit 4 (no config):** a topic or credential did not save. Re-write the file under `~/.local/state/playbook/`, confirm it reads back the expected value, then re-send.
 - **Exit 3 (publish failed):** a network or provider error. Retry once, and check the token or topic for stray spaces or newlines.
 - **Exit 5 (curl missing):** install `curl`, then re-send.
 

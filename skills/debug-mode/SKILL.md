@@ -9,7 +9,7 @@ On `/debug` or the courtesy alias `[debug]`:
 2. Ask the user to describe the bug and identify the file(s) involved.
 3. Follow the cycle below for every file until the bug is resolved.
 
-Context is managed by Playbook's hooks: auto-compact is seamless and the session continues; the re-anchor after compaction restores the current bug, diagnosis, and progress automatically. Debug mode does not manage context itself and does not issue `/compact`.
+Context is managed by Playbook's hooks: auto-compact is seamless and the session continues; after compaction the hooks restore the confirmed goal, the user's own words behind it and their decisions, and the compaction summary carries the bug, the diagnosis and the progress. Debug mode does not manage context itself and does not issue `/compact`.
 
 ### Cycle: for every file you need to touch
 

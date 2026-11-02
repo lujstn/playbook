@@ -15,6 +15,20 @@ The Workflow tool is required rather than the Agent tool because per-agent `mode
 
 ---
 
+## The review rules
+
+The panel is the user asking for more than one reviewer. Every other review runs with one. The same five rules bind the panel, its reviewers and any reviser:
+
+1. Review against the user's spec and decisions, with one reviewer unless the user asks for more.
+2. A finding blocks only if it is a bug whatever the user's appetite for risk. List the rest, and weigh every fix against its cost.
+3. Reviewers and revisers never change scope or a decision; a conflict is a question for the user.
+4. Only a bug earns another round. If two rounds still find bugs, stop reviewing and take a beat: simplify, accept a contained risk, or ask. Anything bigger than a fix needs a serious assessment and sign-off from a judge or the user; on money or security code, ask.
+5. Growth past what the user agreed is bad news: say it in numbers, with the smaller option.
+
+The dispatch guard holds the third round of the same review until the user or a judge has answered, and when the panel's reports come back Playbook pauses the main thread to weigh them (see `playbook:playbook`, the pause after a review). Put the user's decisions, verbatim, into the shared scope block below, so every reviewer knows they outrank it.
+
+---
+
 ## Scope questions
 
 Use `AskUserQuestion`. Ask these before anything else, in one batch. Do not guess a default and proceed.
@@ -58,6 +72,9 @@ HARD SCOPE CONSTRAINTS (non-negotiable, stated explicitly by the user):
 - READ-ONLY. Do not edit, write, or create any file.
 - Do NOT review <OUT OF SCOPE>.
 
+THE USER'S DECISIONS (verbatim; they outrank you, and a conflict is a question, never a change):
+<the recorded decisions, or none>
+
 CONTEXT YOU NEED:
 <2 to 6 lines. What the system is, what the change proposes, what the reader already knows.
 Written for someone with no session history. This is the highest-leverage part of the prompt.>
@@ -70,7 +87,7 @@ One line. Approve as-is, approve with changes, or reject?
 The three strongest things. Specific, cite section numbers.
 
 ## What is wrong or risky
-Ranked, most serious first. For each: the flaw, why it matters, what you would do instead.
+Ranked, most serious first. For each: the flaw, what a user would actually hit, roughly how big the fix is, and what you would do instead.
 Cite section numbers. If something is factually wrong about the platform or codebase, say so
 and give evidence.
 
@@ -92,7 +109,7 @@ The five fixed headings are what make four reviews comparable. Do not let review
 
 **Symptom:** a reviewer returns a competent answer to a question nobody asked, usually the dispatching session's opening request.
 
-**Cause:** a stale anchor reaching the helper as though it were its assigned task. Playbook's own `playbook_anchor_block` did this before it was fixed to carry the North Star only.
+**Cause:** a stale anchor reaching the helper as though it were its assigned task. Playbook's own compaction anchor once did this, by replaying the session's first message as though it were the task.
 
 **Do NOT fix this with a loud in-prompt override.** This was tried and it backfired instructively. A block of the form:
 

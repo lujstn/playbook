@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+stdin="$(cat 2>/dev/null || true)"
+command -v jq >/dev/null 2>&1 || exit 0
+
+lib="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/hooks/lib/playbook-common.sh"
+[ -f "$lib" ] || exit 0
+# shellcheck source=lib/playbook-common.sh
+. "$lib" 2>/dev/null || exit 0
+
+name="$(jq -r '.teammate_name // empty' 2>/dev/null <<<"$stdin" || true)"
+team="$(jq -r '.team_name // empty' 2>/dev/null <<<"$stdin" || true)"
+[ -n "$name" ] || exit 0
+
+# @nonobvious(forced-by) the documented payload carries no idle reason; if one ever appears, only an available idle is acted on
+reason="$(jq -r '.idleReason // .idle_reason // empty' 2>/dev/null <<<"$stdin" || true)"
+case "$reason" in "" | available) ;; *) exit 0 ;; esac
+
+dir="$(playbook_team_dir "$stdin" "$name")"
+[ -n "$dir" ] || exit 0
+playbook_lock "$dir"
+
+case "$(playbook_state_get "$dir" declared)" in
+  part-done)
+    playbook_state_put "$dir" "idle=1"
+    jq -cn '{continue:false, stopReason:"Playbook stopped this teammate'"'"'s work; the lead shuts it down once its part is integrated."}'
+    exit 0 ;;
+  waiting) playbook_state_put "$dir" "idle=1"; exit 0 ;;
+esac
+
+# @nonobvious(forced-by) a teammate only receives a message when its turn ends, so one told to read a message is let go idle for it to arrive
+if [ "$(playbook_state_get "$dir" mail_wake)" = 1 ]; then
+  playbook_state_put "$dir" "mail_wake=" "idle=1"
+  exit 0
+fi
+
+# @nonobvious(must-hold) during a regroup every edit is held, so sending a teammate back to work would only spin it; it waits for the RESUME message
+[ "$(playbook_state_get "$(playbook_live_dir "$stdin")" rg_open)" = 1 ] && { playbook_state_put "$dir" "idle=1"; exit 0; }
+
+pushes="$(playbook_state_int "$dir" pushes 0)"
+[ "$pushes" -lt 3 ] || { playbook_state_put "$dir" "idle=1"; exit 0; }
+
+# @nonobvious(means) the task list is read-only and best effort: a missing, empty or unreadable one means no list, and then only a declaration can end the part
+tdir="${HOME}/.claude/tasks/$(printf '%s' "$team" | tr -cd 'A-Za-z0-9._-')"
+have_list=0 open_n=0 open_names=""
+if [ -n "$team" ] && [ -d "$tdir" ]; then
+  mine="$(jq -rs --arg n "$name" '
+      map(select(type=="object"))
+      | if length == 0 then "none" else
+          "list\n" + ([ .[]
+            | select(((.owner // "") | tostring | sub("@.*$"; "")) == $n)
+            | select(((.status // "pending") | tostring | ascii_downcase) as $s | ($s != "completed" and $s != "deleted" and $s != "cancelled"))
+            | (.subject // .title // .id // "task" | tostring | gsub("[\\n\\r\\t]"; " ") | .[0:60]) ] | join("\n"))
+        end' "$tdir"/*.json 2>/dev/null)"
+  case "$mine" in
+    list*)
+      have_list=1
+      names="$(printf '%s' "$mine" | sed 1d)"
+      if [ -n "$names" ]; then
+        open_n="$(printf '%s\n' "$names" | wc -l | tr -d ' ')"
+        open_names="$(printf '%s\n' "$names" | paste -sd ',' - | sed 's/,/, /g')"
+      fi ;;
+  esac
+fi
+
+if [ "$have_list" = 1 ] && [ "$open_n" -eq 0 ]; then playbook_state_put "$dir" "idle=1"; exit 0; fi
+
+detail=""
+[ "$open_n" -gt 0 ] && detail=": ${open_n} tasks, ${open_names}"
+playbook_state_put "$dir" "pushes=$(( pushes + 1 ))" "idle="
+printf '%s\n' "Playbook: your part still has open items${detail}. Carry on with them. If you are waiting on a colleague, run \`playbook waiting <your name> on <colleague> <what>\`. When your part is done and no regroup is open, run \`playbook part-done <your name>\`." >&2
+exit 2

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# @nonobvious(means) Playbook's hook reads every `playbook …` line before the shell runs it, so a line does nothing here; this command exists so a line never fails as "command not found", and so asking it for help gets an answer
+# @nonobvious(mirrors) CHANNEL_USAGE in hooks/signal
+case " ${2:-} " in " --help "|" -h ") set -- help ;; esac
+case "${1:-}" in
+  ""|help|-h|--help|version|--version)
+    cat <<'USAGE'
+Playbook reads these lines in the Bash tool; each one does nothing itself, and Playbook's hooks record it and show it to the user.
+usage: playbook status | route <lone-wolf|interns|hackathon|workflows|gsd> <reason> | goal <mode> <goal> (offline only) | unease <uneasy|concerned|alarmed> <reason> | decision "<the user's own words>" | rethink <what changes> | weigh <fix|bigger> "<your call on a review>" | done | interface [<name>] | publish <what changed> | part-done <own name> | waiting <own name> on <colleague> <what> | aligned <own name> | resume <reason> (lead only)
+USAGE
+    ;;
+  route|goal|unease|decision|rethink|weigh|done|interface|publish|part-done|waiting|aligned|resume|status) ;;
+  *)
+    printf "playbook: unknown command '%s'. Run \`playbook help\` for the usage.\n" "$1" >&2
+    exit 1 ;;
+esac
+exit 0

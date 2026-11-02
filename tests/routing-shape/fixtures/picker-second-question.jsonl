@@ -1,0 +1,3 @@
+{"type": "system", "subtype": "init", "additional": "PLAYBOOK_OVERLAY present"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "AskUserQuestion", "input": {"questions": [{"question": "Which branch should I use?", "header": "Branch", "multiSelect": false, "options": [{"label": "main", "description": "x"}, {"label": "dev", "description": "y"}]}, {"question": "Goal: add per-module notes to every module", "header": "Mode", "multiSelect": false, "options": [{"label": "Lone wolf", "description": "a"}, {"label": "Workflows (Recommended)", "description": "b"}, {"label": "Interns", "description": "c"}]}]}}]}}
+{"type": "result", "subtype": "success", "total_cost_usd": 0.05}

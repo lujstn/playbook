@@ -1,6 +1,6 @@
 ---
 name: gsd-mode
-description: The 🏗️ gsd route. Front-loads user involvement and research, pre-seeds the GSD stage files so the interactive pass is skipped, and post-processes generated plan frontmatter to force parallel execution. Reached from the playbook engine when work is an MVP in an unknown area requiring durable cross-session state.
+description: The 🏗️ gsd route. Front-loads user involvement and research, pre-seeds the GSD stage files so the interactive pass is skipped, and post-processes generated plan frontmatter to force parallel execution. Reached from the playbook engine for big project development where reliability and scalability matter most and more planning and review time is acceptable, with durable cross-session state; it can start a project or take over part of one later, and is never the primary pick for feature development.
 user-invocable: false
 ---
 
@@ -173,7 +173,7 @@ Everything else in `.planning/` is GSD-owned durable state and stays read-only. 
 ## Integration
 
 **Before this skill:**
-- `playbook:playbook` is the routing engine. It makes the gsd routing decision and announces 🏗️ **Playbook** `gsd` before this skill runs. The overlay, the nine tenets (held in the engine skill) and the North Star stay live throughout.
+- `playbook:playbook` is the routing engine. It routes the work to gsd, through the picker when two or more modes fit, and the route is declared with `playbook route gsd <reason>` before this skill runs. The overlay, the nine tenets (held in the engine skill) and the North Star stay live throughout.
 
 **External dependency:**
 - GSD (`get-shit-done-cc`). Install with `npx get-shit-done-cc@latest`. This is the one mode in the common path that has a prerequisite; the wrapper prompts at the fork, never hard-fails.

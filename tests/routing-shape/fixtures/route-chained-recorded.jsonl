@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","session_id":"s","note":"PLAYBOOK_OVERLAY"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":": playbook route interns six utilities; mkdir -p lib/utils"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b1","is_error":true,"content":"PreToolUse:Bash hook error: Playbook recorded this channel line, but nothing after it ran: run the other commands on their own, without the channel line."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"description":"util one","prompt":"x","model":"sonnet"}}]}}
+{"type":"result","subtype":"success","total_cost_usd":0.1}
