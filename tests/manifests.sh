@@ -41,7 +41,7 @@ assert "! grep -q 'uncertainty' '$root/hooks/hooks.json'" "no uncertainty refere
 assert "jq -e '.hooks.Notification[0].matcher == \"permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input|agent_completed|quota_auto_resume_stale|quota_auto_resume_disabled\"' '$root/hooks/hooks.json'" "Notification matcher covers every state that blocks on the user, plus idle and completed for the log"
 assert "jq -e '.hooks.Notification[0].hooks | map(.command) | any(test(\"notification\"))' '$root/hooks/hooks.json'" "Notification wired to notification"
 assert "jq -e '.hooks.Notification[0].hooks | map(.command) | any(test(\"signal\"))' '$root/hooks/hooks.json'" "Notification also reaches signal (away while the user is wanted)"
-assert "[ \"\$(jq -r '.version' '$root/.claude-plugin/plugin.json')\" = 3.0.0 ]" "plugin version is 3.0.0"
+assert "[ \"\$(jq -r '.version' '$root/.claude-plugin/plugin.json')\" = 3.0.1 ]" "plugin version is 3.0.1"
 assert "! grep -qi 'divide-by-ten\\|time rule\\|ultracode from over-reaching' '$root/.claude-plugin/plugin.json' '$root/.claude-plugin/marketplace.json'" "manifest descriptions drop the time rule and the ultracode restraint"
 assert "jq -e '[.hooks.PreToolUse[] | select(.matcher == \"Agent|Workflow|SendMessage\")] | length == 1' '$root/hooks/hooks.json'" "PreToolUse has exactly one Agent|Workflow|SendMessage entry"
 assert "jq -e '[.hooks.PreToolUse[] | select(.matcher == \"Agent|Workflow|SendMessage\")][0].hooks | map(.command) | any(test(\"dispatch-guard\"))' '$root/hooks/hooks.json'" "PreToolUse Agent|Workflow|SendMessage entry wired to dispatch-guard"

@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "playbook",
-      "description": "Claude Code steering layer: a goal and mode picker, your decisions carried verbatim to every agent, an evidence-based unease score with rethink, judge and ask gates, dispatch and review guards, a Sonnet-builds and Opus-judges model rule, calm compaction, a comment guard, a status line showing the mode, crew messages and unease, and offline notifications.",
-      "version": "3.0.0",
+      "description": "Native, invisible-but-visible Claude Code steering layer: a goal you confirm and your decisions carried to every agent, a picker for how the work runs, an unease score built from evidence, a pause to weigh every review, an always-on model rule, calm compaction, a comment guard that refuses narration before it reaches your file, and offline notifications.",
+      "version": "3.0.1",
       "source": "./",
       "author": {
         "name": "Lucas Johnston Kurilov",
