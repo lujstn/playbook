@@ -11,21 +11,34 @@
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start", "async": false }
       ] }
     ],
+    "SubagentStop": [
+      { "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
+      ] }
+    ],
     "PreToolUse": [
-      { "matcher": "Edit|Write", "hooks": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" comment-guard", "async": false },
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" edit-log", "async": false }
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
       ] },
-      { "matcher": "Agent|Workflow", "hooks": [
+      { "matcher": "Bash|AskUserQuestion|Read", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
+      ] },
+      { "matcher": "Agent|Workflow|SendMessage", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" dispatch-guard", "async": false }
       ] }
     ],
-    "PostToolBatch": [
-      { "matcher": "*", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Read|Agent|SendMessage|AskUserQuestion|Workflow", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
       ] }
     ],
     "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
+      ] }
+    ],
+    "PostToolBatch": [
       { "matcher": "*", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
       ] }
@@ -35,9 +48,20 @@
         { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" take-a-beat", "async": false }
       ] }
     ],
+    "Stop": [
+      { "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
+      ] }
+    ],
     "Notification": [
       { "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input|agent_completed|quota_auto_resume_stale|quota_auto_resume_disabled", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" notification", "async": false }
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" notification", "async": false },
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" signal", "async": false }
+      ] }
+    ],
+    "TeammateIdle": [
+      { "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" team-idle", "async": false }
       ] }
     ]
   }

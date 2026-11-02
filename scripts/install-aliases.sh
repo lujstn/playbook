@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 plugin_root="$(cd "$script_dir/.." && pwd)"
 
 commands_dir="${PLAYBOOK_COMMANDS_DIR:-$HOME/.claude/commands}"
-global_dir="${PLAYBOOK_GLOBAL_DIR:-$HOME/.claude/playbook}"
+global_dir="${PLAYBOOK_GLOBAL_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/playbook}"
 manifest="$global_dir/aliases"
 marker="playbook-managed"
 

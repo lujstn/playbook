@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+stdin="$(cat 2>/dev/null || true)"
+
+home="${XDG_STATE_HOME:-${HOME}/.local/state}/playbook"
+gdir="${PLAYBOOK_GLOBAL_DIR:-$home}"
+
+wrapped_out=""
+if [ -f "${gdir}/statusline-wrapped" ]; then
+  wcmd="$(tr -d '\r' <"${gdir}/statusline-wrapped" 2>/dev/null | awk 'NF{print; exit}')"
+  # @nonobvious(must-hold) a wrapped command that is this script would recurse forever
+  case "$wcmd" in
+    "" | *playbook/bin/statusline*) ;;
+    *) wrapped_out="$(printf '%s' "$stdin" | bash -c "$wcmd" 2>/dev/null || true)" ;;
+  esac
+fi
+
+sid=""
+if command -v jq >/dev/null 2>&1; then
+  sid="$(jq -r '(.session_id // ((.transcript_path // "") | split("/") | last | sub("\\.jsonl$"; ""))) // empty' 2>/dev/null <<<"$stdin" || true)"
+fi
+sid="$(printf '%s' "$sid" | tr -cd 'A-Za-z0-9._-')"
+[ -n "$sid" ] || sid="unknown"
+
+dir="${PLAYBOOK_STATE_DIR:-${home}/sessions}/${sid}"
+pid="$(printf '%s' "${CLAUDE_PID:-}" | tr -cd '0-9')"
+[ -n "$pid" ] && [ -d "${dir}/branch-${pid}" ] && dir="${dir}/branch-${pid}"
+
+line="$(awk '
+  function val(k,   i) { i = index($0, k "="); return (i == 1) ? substr($0, length(k) + 2) : "" }
+  { v = val("ns_state");      if (v != "") st = v
+    v = val("ns_mode");       if (v != "") nsm = v
+    v = val("route_mode");    if (index($0, "route_mode=") == 1) rm = v
+    v = val("route_at");      if (v != "") ra = v + 0
+    v = val("ns_changed_at"); if (v != "") nc = v + 0
+    v = val("score10");       if (v != "") sc = v + 0
+    v = val("crew_msgs");     if (v != "") cm = v + 0
+    if (index($0, "gate=") == 1) gt = val("gate")
+    if (index($0, "wf_optin=") == 1) wo = val("wf_optin") }
+  END {
+    mode = (rm != "" && ra >= nc) ? rm : nsm
+    lvl = (sc >= 150) ? 3 : (sc >= 100) ? 2 : (sc >= 50) ? 1 : 0
+    g = (gt == "ask") ? 3 : (gt == "judge") ? 2 : (gt == "rethink") ? 1 : 0
+    if (g > lvl) lvl = g
+    printf "%s|%s|%d|%d\n", mode, wo, cm, lvl
+  }' "${dir}/state" 2>/dev/null)"
+
+IFS='|' read -r mode optin crew level <<<"$line"
+parts=()
+case "${mode:-}" in
+  lone-wolf) parts+=("🐺 lone-wolf") ;;
+  interns)   parts+=("🐜 interns") ;;
+  hackathon) parts+=("🤝 hackathon") ;;
+  workflows) [ "${optin:-}" = "pending" ] && parts+=("⚙️ workflows (awaiting opt-in)") || parts+=("⚙️ workflows") ;;
+  gsd)       parts+=("🏗️ gsd") ;;
+esac
+# @nonobvious(means) teammates' messages never show in the lead's terminal, so in a hackathon this count is the only sign the crew is talking
+if [ "${mode:-}" = "hackathon" ]; then
+  case "${crew:-0}" in
+    0) parts+=("❌ no crew messages yet") ;;
+    1) parts+=("💬 1 crew message") ;;
+    *) parts+=("💬 ${crew} crew messages") ;;
+  esac
+fi
+case "${level:-0}" in
+  1) parts+=("🟨 uneasy") ;;
+  2) parts+=("🟧 concerned") ;;
+  3) parts+=("🟥 alarmed") ;;
+esac
+
+suffix=""
+for p in ${parts[@]+"${parts[@]}"}; do suffix="${suffix} · ${p}"; done
+
+wrapped_out="${wrapped_out%"${wrapped_out##*[!$'\n']}"}"
+if [ -n "$wrapped_out" ]; then
+  printf '%s%s\n' "$wrapped_out" "$suffix"
+else
+  printf '%s\n' "${suffix# · }"
+fi

@@ -1,100 +1,103 @@
 #!/usr/bin/env bash
-set -euo pipefail
-root="$(cd "$(dirname "$0")/../.." && pwd)"
-source "$root/hooks/lib/playbook-common.sh"
-B="$root/tests/hooks/fixtures/transcript-basic.jsonl"
-T="$root/tests/hooks/fixtures/transcript-beat.jsonl"
-stdin_b="$(printf '{"transcript_path":"%s"}' "$B")"
-stdin_t="$(printf '{"transcript_path":"%s"}' "$T")"
+set -uo pipefail
+source "$(dirname "$0")/payloads.sh"
+FIX="$root/tests/hooks/fixtures"
+B="$FIX/transcript-basic.jsonl"
+T="$FIX/transcript-beat.jsonl"
+tp() { printf '{"transcript_path":"%s"}' "$1"; }
 
-req="$(playbook_original_request "$stdin_b")"
-[ "$req" = "Build me a widget that does X. Original request text." ] \
-  && echo "PASS: original request recovered, system record skipped" \
-  || { echo "FAIL: original request was [$req]"; exit 1; }
-
-M="$root/tests/hooks/fixtures/transcript-multiline.jsonl"
-stdin_m="$(printf '{"transcript_path":"%s"}' "$M")"
-mreq="$(playbook_original_request "$stdin_m")"
-mexp="$(printf 'First paragraph of the ask.\nSecond paragraph with detail.\nThird line.')"
-[ "$mreq" = "$mexp" ] \
-  && echo "PASS: full multi-line original request recovered verbatim, later turn skipped" \
-  || { echo "FAIL: multi-line request was [$mreq]"; exit 1; }
-
-used="$(playbook_context_used "$stdin_b")"
-[ "$used" = "10020" ] && echo "PASS: usage sum = last assistant input+cache" \
-  || { echo "FAIL: used was [$used], expected 10020"; exit 1; }
-
-ws="$(mktemp -d)"
-[ "$(PLAYBOOK_WINDOW=1000000 playbook_window "$ws")" = "1000000" ] \
-  && echo "PASS: playbook_window env override wins" || { echo "FAIL: env window"; exit 1; }
-[ "$(PLAYBOOK_WINDOW=1000000 playbook_window_provenance "$ws")" = "proven" ] \
-  && echo "PASS: env window provenance is proven" || { echo "FAIL: env provenance"; exit 1; }
-[ "$(playbook_window "$ws")" = "200000" ] \
-  && echo "PASS: playbook_window defaults to the assumed 200000" || { echo "FAIL: default window"; exit 1; }
-[ "$(playbook_window_provenance "$ws")" = "assumed" ] \
-  && echo "PASS: default window provenance is assumed" || { echo "FAIL: default provenance"; exit 1; }
-[ "$(PLAYBOOK_WINDOW=notanumber playbook_window "$ws")" = "200000" ] \
-  && echo "PASS: invalid env window falls through to the default" || { echo "FAIL: invalid env"; exit 1; }
-printf 'v=1\nwindow_proven=1000000\n' > "$ws/state"
-[ "$(playbook_window "$ws")" = "1000000" ] \
-  && echo "PASS: playbook_window is sticky from a proven state" || { echo "FAIL: sticky window"; exit 1; }
-[ "$(playbook_window_provenance "$ws")" = "proven" ] \
-  && echo "PASS: ratcheted state window provenance is proven" || { echo "FAIL: sticky provenance"; exit 1; }
-rm -rf "$ws"
-
-pct="$(playbook_percent 700020 1000000)"
-[ "$pct" = "70" ] && echo "PASS: playbook_percent = round(100*used/window)" \
-  || { echo "FAIL: percent was [$pct], expected 70"; exit 1; }
-
-missing="$(playbook_context_used '{"transcript_path":"/no/such/file"}')"
-[ -z "$missing" ] && echo "PASS: silent empty usage on missing transcript" \
-  || { echo "FAIL: expected empty, got [$missing]"; exit 1; }
-
+# --- context meter ----------------------------------------------------------
+eq "usage sum is the last assistant input plus cache" 10020 "$(playbook_context_used "$(tp "$B")")"
+eq "a big transcript reads its tail" 700020 "$(playbook_context_used "$(tp "$T")")"
+eq "a missing transcript is empty" "" "$(playbook_context_used '{"transcript_path":"/no/such/file"}')"
 big="$(mktemp).jsonl"
-printf '{"type":"user","message":{"role":"user","content":"the bounded-read first ask"}}\n' > "$big"
-filler="$(head -c 350000 /dev/zero | tr '\0' 'z')"
-printf '{"type":"system","subtype":"noise","content":"%s"}\n' "$filler" >> "$big"
+printf '{"type":"user","message":{"role":"user","content":"first"}}\n' > "$big"
+printf '{"type":"system","subtype":"noise","content":"%s"}\n' "$(head -c 350000 /dev/zero | tr '\0' 'z')" >> "$big"
 printf '{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":100,"cache_creation_input_tokens":2000,"cache_read_input_tokens":50000,"output_tokens":5},"content":[{"type":"text","text":"done"}]}}\n' >> "$big"
-bstdin="$(printf '{"transcript_path":"%s"}' "$big")"
-bu="$(playbook_context_used "$bstdin")"
-[ "$bu" = "52100" ] && echo "PASS: bounded read finds the final usage record past a 300KB filler" \
-  || { echo "FAIL bounded used: [$bu]"; rm -f "$big"; exit 1; }
-bo="$(playbook_original_request "$bstdin")"
-[ "$bo" = "the bounded-read first ask" ] && echo "PASS: bounded read finds the first user record past a 300KB filler" \
-  || { echo "FAIL bounded orig: [$bo]"; rm -f "$big"; exit 1; }
+eq "the bounded read finds the final usage past a 300KB filler" 52100 "$(playbook_context_used "$(tp "$big")")"
 rm -f "$big"
 
-SB="$root/tests/hooks/fixtures/transcript-subagent-beat.jsonl"
-ns="$(playbook_project_northstar "$(printf '{"transcript_path":"%s"}' "$SB")")"
-[ "$ns" = "Ship a zero-dependency context anchor that survives compaction without writing to the user tree." ] \
-  && echo "PASS: project North Star recovered from dispatch line" \
-  || { echo "FAIL: northstar was [$ns]"; exit 1; }
-[ -z "$(playbook_project_northstar "$stdin_b")" ] \
-  && echo "PASS: no North Star on the main thread (none injected)" \
-  || { echo "FAIL: main thread reported a North Star"; exit 1; }
+# --- window and percent ----------------------------------------------------
+ws="$(mktemp -d)"
+eq "an env window wins" 1000000 "$(PLAYBOOK_WINDOW=1000000 playbook_window "$ws")"
+eq "and is proven" proven "$(PLAYBOOK_WINDOW=1000000 playbook_window_provenance "$ws")"
+eq "the default is the assumed 200000" 200000 "$(playbook_window "$ws")"
+eq "and assumed" assumed "$(playbook_window_provenance "$ws")"
+eq "junk falls through" 200000 "$(PLAYBOOK_WINDOW=junk playbook_window "$ws")"
+printf 'window_proven=1000000\n' > "$ws/state"
+eq "a ratcheted window is sticky" 1000000 "$(playbook_window "$ws")"
+rm -rf "$ws"
+eq "percent rounds" 70 "$(playbook_percent 700020 1000000)"
+eq "percent is empty on junk" "" "$(playbook_percent x 100)"
+eq "percent caps at 100" 100 "$(playbook_percent 900 100)"
 
-main_ab="$(playbook_anchor_block "$stdin_b")"
-case "$main_ab" in
-  "Original request, verbatim:"*"Build me a widget that does X."*) echo "PASS: main-thread anchor labelled original request" ;;
-  *) echo "FAIL: main anchor was [$main_ab]"; exit 1 ;;
-esac
-sub_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"a1"}' "$SB")")"
-{ grep -q "Overall goal (what success means for the whole project):" <<<"$sub_ab" \
-  && grep -q "It does NOT state your task" <<<"$sub_ab" \
-  && ! grep -q "verbatim:" <<<"$sub_ab" \
-  && ! grep -q "Wave 2 Task 3" <<<"$sub_ab" \
-  && ! grep -q "^playbook-northstar:" <<<"$sub_ab"; } \
-  && echo "PASS: subagent anchor carries the North Star only, never a quoted task" \
-  || { echo "FAIL: subagent anchor was [$sub_ab]"; exit 1; }
-nons_ab="$(playbook_anchor_block "$(printf '{"transcript_path":"%s","agent_id":"a1"}' "$T")")"
-[ -z "$nons_ab" ] \
-  && echo "PASS: subagent with no North Star gets an empty anchor, never a guessed task" \
-  || { echo "FAIL: no-NS subagent anchor should be empty, was [$nons_ab]"; exit 1; }
+# --- envelopes --------------------------------------------------------------
+eq "Claude Code envelope" "SessionStart" "$(playbook_emit_context SessionStart 'hi "q"' | jq -r .hookSpecificOutput.hookEventName)"
+eq "the body survives quoting" 'hi "q"' "$(playbook_emit_context SessionStart 'hi "q"' | jq -r .hookSpecificOutput.additionalContext)"
+eq "newlines survive" "a
+b" "$(playbook_emit_context UserPromptSubmit 'a
+b' | jq -r .hookSpecificOutput.additionalContext)"
+eq "Cursor envelope" "x" "$(CURSOR_PLUGIN_ROOT=/c playbook_emit_context SessionStart x | jq -r .additional_context)"
+eq "generic envelope" "x" "$(CLAUDE_PLUGIN_ROOT= playbook_emit_context SessionStart x | jq -r .additionalContext)"
 
-removed=0
-for fn in playbook_dir playbook_anchor playbook_ledger playbook_ensure_dir \
-          playbook_anchor_init playbook_ledger_append playbook_anchor_read \
-          playbook_emit_stop_nudge playbook_declared_window playbook_context_percent; do
-  if declare -F "$fn" >/dev/null 2>&1; then echo "FAIL: $fn still defined"; removed=1; fi
+# --- project dir and rule paths ---------------------------------------------
+eq "the payload cwd names the project" /p "$(playbook_project_dir '{"cwd":"/p"}')"
+eq "CLAUDE_PROJECT_DIR is the fallback" /q "$(CLAUDE_PROJECT_DIR=/q playbook_project_dir '{}')"
+hm="$(mktemp -d)"; proj="$(mktemp -d)"; mkdir -p "$hm/.claude/rules" "$proj/.claude"
+echo > "$hm/.claude/CLAUDE.md"; echo > "$hm/.claude/rules/b.md"; echo > "$proj/CLAUDE.md"; echo > "$proj/.claude/CLAUDE.md"
+eq "rule paths list only what exists, global first" "$hm/.claude/CLAUDE.md
+$hm/.claude/rules/b.md
+$proj/CLAUDE.md
+$proj/.claude/CLAUDE.md" "$(HOME="$hm" playbook_rule_paths "$proj")"
+rm -rf "$hm" "$proj"
+
+# --- the user's words and decisions ---------------------------------------
+iso; d="$(sd w)"
+eq "a meta record is not the user's" 1 "$(playbook_is_human_text '<system-reminder>x' && echo 0 || echo 1)"
+pasted='```
+<pasted_content id="c8e2">
+One test for "serious": a finding is serious only if
+</pasted_content id="c8e2">
+```
+
+I feel like that isn'"'"'t a great definition, take a beat'
+eq "a message that quotes pasted text still counts as the user's" 0 "$(playbook_is_human_text "$pasted" && echo 0 || echo 1)"
+eq "without the pasted part" "I feel like that isn't a great definition, take a beat" "$(playbook_strip_pasted "$pasted" | sed '/^```$/d;/^$/d')"
+eq "so does one that opens with the paste" 0 "$(playbook_is_human_text "$(printf '<pasted_content id="a1">\nsome log\n</pasted_content id="a1">\nwhy does this fail?')" && echo 0 || echo 1)"
+eq "a message that is only pasted text is not" 1 "$(playbook_is_human_text "$(printf '<pasted_content id="a1">\nsome log\n</pasted_content id="a1">')" && echo 0 || echo 1)"
+eq "a continuation summary is not the user's" 1 "$(playbook_is_human_text 'This session is being continued from x' && echo 0 || echo 1)"
+eq "a teammate message is not the user's" 1 "$(playbook_is_human_text 'hi <teammate-message from=a>' && echo 0 || echo 1)"
+eq "plain words are" 0 "$(playbook_is_human_text 'build the thing' && echo 0 || echo 1)"
+playbook_human_message "$d" "Please keep   the OLD importer." >/dev/null
+playbook_human_message "$d" "$pasted" >/dev/null
+playbook_words_found "$d" "isn't a great definition" && pass "the user's own words around a paste are kept" || flunk "the words around a paste were dropped"
+playbook_words_found "$d" "a finding is serious only if" && flunk "pasted text was kept as the user's words" || pass "the pasted text itself is not"
+playbook_words_found "$d" "keep the old importer" && pass "words are found ignoring case and spacing" || flunk "words not found"
+playbook_words_found "$d" "delete the importer" && flunk "invented words were found" || pass "invented words are not found"
+playbook_human_message "$d" "<task-notification>x" && flunk "a non-human prompt counted" || pass "a non-human prompt returns 1"
+big=""; for i in 1 2 3 4 5; do playbook_decision_add "$d" asked "Q$i" "$(head -c 800 /dev/zero | tr '\0' a)" >/dev/null; done
+t="$(playbook_decisions_text "$d" 1000)"
+OUT="$t"; has "a budgeted decisions text points at the file" "The rest are in"
+[ "${#t}" -lt 1300 ] && pass "and respects the budget (${#t})" || flunk "budget ignored (${#t})"
+
+# --- modes, patterns, review names ----------------------------------------
+eq "mode canon strips the recommended tag" interns "$(playbook_mode_canon 'Interns (Recommended)')"
+eq "and joins lone wolf" lone-wolf "$(playbook_mode_canon 'lone wolf')"
+eq "an unknown mode is empty" "" "$(playbook_mode_canon 'bogus')"
+eq "a mode has an emoji" 🤝 "$(playbook_mode_emoji hackathon)"
+playbook_match test "pnpm run test" && pass "the test pattern" || flunk "test pattern"
+playbook_match test "sed -n 1,5p x_test.go" && flunk "sed matched the test pattern" || pass "printing source is not a test"
+playbook_match commit "git add ." && pass "stage counts as a commit" || flunk "commit pattern"
+playbook_match waitme "I am waiting on your Touch ID" && pass "waitme matches a wait on the user" || flunk "waitme"
+eq "review names drop round suffixes" "phase10 review" "$(playbook_review_base 'Phase10 Review (round 3)')"
+
+# --- removed helpers --------------------------------------------------------
+gone=0
+for fn in playbook_scan_tail playbook_original_request playbook_anchor_block playbook_project_northstar \
+          playbook_unease_rank playbook_state_reset playbook_state_healthy playbook_fail_count playbook_fail_append \
+          playbook_northstar_excerpt playbook_dir playbook_ledger playbook_emit_stop_nudge; do
+  if declare -F "$fn" >/dev/null 2>&1; then flunk "$fn is still defined"; gone=1; fi
 done
-[ "$removed" -eq 0 ] && echo "PASS: rejected file, Stop-channel, and declared-window helpers removed" || exit 1
+[ "$gone" -eq 0 ] && pass "the tail scan, original-request recovery, anchor and baseline helpers are gone"
+
+exit $fail

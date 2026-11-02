@@ -18,10 +18,32 @@
 #                                         closest headless proxy for a real ultracode session's
 #                                         standing multi-agent opt-in
 #   TEAMS=1 run.sh ...                    set the agent-teams flag (default: explicitly unset)
+#   PERMS=auto run.sh ...                 run each probe in auto permission mode instead of skipping
+#                                         permissions, for sessions whose classifier refuses the skip
+#                                         flag; it is the user's normal condition
+#   PERMS=scoped run.sh ...               accept edits and allow only read-only and channel Bash.
+#                                         Probes burn their turns on refused commands (a variable, a
+#                                         loop, a second command) and are censored before routing
+#   AWAY=1 run.sh ...                     append "There's no one around to answer questions, so make
+#                                         sensible assumptions and go." to every prompt, the absent-user
+#                                         condition earlier readings used (default: the user is present)
+#   JOBS=<n> run.sh ...                   run up to n probes at once, each in its own copy of the
+#                                         fixture (default 1, the serial behaviour); classification
+#                                         still happens afterwards in prompt-then-rep order
+#
+# The picker: headless Claude Code offers AskUserQuestion only when a permission host can answer
+# it, so every probe loads picker-host.py as its --permission-prompt-tool. It answers each question
+# with the option marked "(Recommended)" and refuses every other permission request, so a probe
+# goes on from its pick to its route line and its first (blocked) dispatch.
+#
+# How the route is read (classify.sh): the attempted picker (an AskUserQuestion whose
+# question starts "Goal:", denied by deny-dispatch.settings.json so the input stays in the
+# transcript), else a `playbook route <mode>` Bash no-op, else the branded marker line.
 #
 # Isolation: working tree is a pristine neutral fixture (reset per run), the plugin
 # is a clone with the test scaffolding stripped out, user settings and other plugins
-# are excluded, and the agent-teams flag is unset (clean default-user condition).
+# are excluded, the agent-teams flag is unset unless TEAMS=1, and CLAUDE_CODE_SUBAGENT_MODEL
+# is always unset (clean default-user condition).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PLAYBOOK="${PLUGIN_SRC:-$(cd "$HERE/../.." && pwd)}"
@@ -29,79 +51,82 @@ K="${1:-1}"; MAX_TURNS="${2:-4}"; shift $(( $# > 2 ? 2 : $# ))
 EFFORT="${EFFORT:-max}"
 ULTRA_LBL=off; [ -n "${ULTRA:-}" ] && ULTRA_LBL=keyword
 TEAMS_LBL=off; [ -n "${TEAMS:-}" ] && TEAMS_LBL=on
+AWAY_LBL=off; [ -n "${AWAY:-}" ] && AWAY_LBL=on
+JOBS="${JOBS:-1}"
+case "$JOBS" in ''|*[!0-9]*|0) echo "ERROR: JOBS must be a positive integer"; exit 1 ;; esac
 
 command -v claude >/dev/null || { echo "SKIP: claude CLI not on PATH"; exit 0; }
 command -v rsync  >/dev/null || { echo "ERROR: rsync required"; exit 1; }
+command -v python3 >/dev/null || { echo "ERROR: python3 required for the picker host"; exit 1; }
 
 BASE="$(mktemp -d)"
-CLONE="$BASE/plugin"; PRISTINE="$BASE/fixture"; WORK="$BASE/work"
+CLONE="$BASE/plugin"; PRISTINE="$BASE/fixture"; WORKROOT="$BASE/work"
 STREAMS="$BASE/streams"; RESULTS="$BASE/results.tsv"
-mkdir -p "$STREAMS"
+mkdir -p "$STREAMS" "$WORKROOT"
 rsync -a --exclude='.git' --exclude='tests/routing-shape' "$PLAYBOOK/" "$CLONE/"
 bash "$HERE/make-fixture.sh" "$PRISTINE" >/dev/null
 
-echo "base=$BASE  K=$K  max_turns=$MAX_TURNS  effort=$EFFORT  ultra=$ULTRA_LBL  teams=$TEAMS_LBL  model=${MODEL:-cli-default}"
+echo "base=$BASE  K=$K  max_turns=$MAX_TURNS  effort=$EFFORT  ultra=$ULTRA_LBL  teams=$TEAMS_LBL  away=$AWAY_LBL  perms=${PERMS:-skip}  jobs=$JOBS  model=${MODEL:-cli-default}"
 echo "cli=$(claude --version 2>/dev/null | head -1)"
-printf 'prompt\trep\tcanary\tmarker\tagree\tbehaviour\tcost\tsubtype\tmap\n' > "$RESULTS"
+printf 'prompt\trep\tcanary\tmarker\tagree\tbehaviour\tcost\tsubtype\tmap\tsource\tshortlist\trefused\n' > "$RESULTS"
 
-PROMPTS=(lone-wolf interns hackathon workflows gsd boundary-a boundary-b)
+PERM_ARGS=(--dangerously-skip-permissions)
+[ "${PERMS:-}" = "auto" ] && PERM_ARGS=(--permission-mode auto)
+[ "${PERMS:-}" = "scoped" ] && PERM_ARGS=(--permission-mode acceptEdits --allowedTools "Read Glob Grep Bash(playbook *) Bash(ls *) Bash(echo *) Bash(cat *)")
+
+PROMPTS=(lone-wolf interns hackathon workflows workflows-feature gsd boundary-a boundary-b)
 [ "$#" -gt 0 ] && PROMPTS=("$@")
-for p in "${PROMPTS[@]}"; do
+
+probe() {
+  local p="$1" r="$2" ptext work sfile t0
   ptext="$(cat "$HERE/prompts/$p.txt")"
+  [ -n "${AWAY:-}" ] && ptext="${ptext}
+
+There's no one around to answer questions, so make sensible assumptions and go."
   [ -n "${ULTRA:-}" ] && ptext="ultracode
 $ptext"
+  work="$WORKROOT/$p.$r"
+  mkdir -p "$work"
+  rsync -a --delete "$PRISTINE/" "$work/"
+  sfile="$STREAMS/$p.$r.jsonl"
+  jq -n --arg h "$HERE/picker-host.py" --arg log "${sfile%.jsonl}.host.jsonl" \
+    '{mcpServers:{picker:{command:"python3",args:["-I",$h],env:{PICKER_HOST_LOG:$log}}}}' > "${sfile%.jsonl}.mcp.json"
+  if [ -n "${TEAMS:-}" ]; then TEAMS_ENV=(env -u CLAUDE_CODE_SUBAGENT_MODEL CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)
+  else TEAMS_ENV=(env -u CLAUDE_CODE_SUBAGENT_MODEL -u CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS); fi
+  t0=$SECONDS
+  ( cd "$work" && "${TEAMS_ENV[@]}" \
+      claude -p "$ptext" ${MODEL:+--model "$MODEL"} \
+        --plugin-dir "$CLONE" --setting-sources project \
+        --settings "$HERE/deny-dispatch.settings.json" \
+        --mcp-config "${sfile%.jsonl}.mcp.json" --strict-mcp-config --permission-prompt-tool mcp__picker__answer \
+        --effort "$EFFORT" --max-turns "$MAX_TURNS" \
+        --output-format stream-json --verbose \
+        "${PERM_ARGS[@]}" < /dev/null ) > "$sfile" 2>"${sfile%.jsonl}.err" || true
+  printf '  done %-11s #%s  %ss\n' "$p" "$r" "$(( SECONDS - t0 ))"
+}
+
+# @nonobvious(must-hold) killing a probe's subshell alone would orphan the claude it spawned
+killtree() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do killtree "$c"; done; kill "$1" 2>/dev/null || true; }
+trap 'for j in $(jobs -p); do killtree "$j"; done; wait 2>/dev/null; exit 130' INT TERM
+
+for p in "${PROMPTS[@]}"; do
   for r in $(seq 1 "$K"); do
-    rsync -a --delete "$PRISTINE/" "$WORK/"
+    # @nonobvious(forced-by) bash 3.2 has no wait -n, so the free slots are polled
+    while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do sleep 0.2; done
+    probe "$p" "$r" &
+  done
+done
+wait
+
+for p in "${PROMPTS[@]}"; do
+  for r in $(seq 1 "$K"); do
     sfile="$STREAMS/$p.$r.jsonl"
-    if [ -n "${TEAMS:-}" ]; then TEAMS_ENV=(env CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)
-    else TEAMS_ENV=(env -u CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS); fi
-    ( cd "$WORK" && "${TEAMS_ENV[@]}" \
-        claude -p "$ptext" ${MODEL:+--model "$MODEL"} \
-          --plugin-dir "$CLONE" --setting-sources project \
-          --settings "$HERE/deny-dispatch.settings.json" \
-          --effort "$EFFORT" --max-turns "$MAX_TURNS" \
-          --output-format stream-json --verbose \
-          --dangerously-skip-permissions < /dev/null ) > "$sfile" 2>"${sfile%.jsonl}.err" || true
     row="$(bash "$HERE/classify.sh" "$sfile")"
     printf '%s\t%s\t%s\n' "$p" "$r" "$row" >> "$RESULTS"
-    printf '  %-11s #%s  marker=%-10s behaviour=%-12s map=%-6s cost=%s\n' \
-      "$p" "$r" "$(cut -f2 <<<"$row")" "$(cut -f4 <<<"$row")" "$(cut -f7 <<<"$row")" "$(cut -f5 <<<"$row")"
+    printf '  %-11s #%s  marker=%-10s via=%-6s behaviour=%-12s map=%-6s shortlist=%s refused=%s cost=%s\n' \
+      "$p" "$r" "$(cut -f2 <<<"$row")" "$(cut -f8 <<<"$row")" "$(cut -f4 <<<"$row")" "$(cut -f7 <<<"$row")" "$(cut -f9 <<<"$row")" "$(cut -f10 <<<"$row")" "$(cut -f5 <<<"$row")"
   done
 done
 
 echo; echo "results: $RESULTS"; echo
-awk -F'\t' -v teams="$TEAMS_LBL" '
-function cell(p,m){ return (c[p SUBSEP m]+0) }
-NR>1 {
-  p=$1; canary=$3; m=$4; beh=$6; cost=$7;
-  tcost+=cost; n++;
-  if(canary!="yes"){ void++; next }
-  if(m=="censored"){ cens++; next }
-  scored++; c[p SUBSEP m]++;
-  if($9=="exact") mapex++; else if($9=="loose") maplo++; else if($9=="wrong") mapwr++;
-  multi=(m=="interns"||m=="hackathon"||m=="workflows"); solo=(beh=="solo");
-  if(multi&&solo) div++; if(m=="lone-wolf"&&!solo) div++;
-  if(m=="malformed") malf++;
-  if(p=="interns"||p=="boundary-b"){ midexp++;
-    if(m=="interns"||m=="hackathon") midhit++;
-    if(m=="lone-wolf"||m=="workflows") poleleak++; }
-}
-END{
-  split("lone-wolf interns hackathon workflows gsd none malformed", COL, " ");
-  split("lone-wolf interns hackathon workflows gsd boundary-a boundary-b", ROW, " ");
-  printf "CONFUSION MATRIX (rows=prompt, cols=announced marker)\n";
-  printf "%-11s %3s %3s %3s %3s %3s %4s %4s\n","", "LW","IN","HK","WF","GSD","none","malf";
-  for(i=1;i<=7;i++){ p=ROW[i];
-    printf "%-11s %3d %3d %3d %3d %3d %4d %4d\n", p,
-      cell(p,"lone-wolf"),cell(p,"interns"),cell(p,"hackathon"),
-      cell(p,"workflows"),cell(p,"gsd"),cell(p,"none"),cell(p,"malformed"); }
-  printf "\nMETRICS (scored=%d, void=%d, censored=%d)\n", scored, void+0, cens+0;
-  if(cens) print "  censored = hit the turn cap before announcing a route; raise MAX_TURNS and re-run those";
-  printf "  middle-occupancy   %d/%d  (interns+boundary-b landing interns/hackathon)\n", midhit+0, midexp+0;
-  printf "  pole-leakage       %d/%d  (same prompts landing lone-wolf/workflows)\n", poleleak+0, midexp+0;
-  printf "  marker!=behaviour  %d/%d  (route announced vs dispatch actually reached)\n", div+0, scored+0;
-  printf "  1:1 mode mapping   exact=%d loose=%d wrong=%d  (announced mode vs mode-exact tool signature)\n", mapex+0, maplo+0, mapwr+0;
-  printf "  malformed markers  %d/%d\n", malf+0, scored+0;
-  printf "  total cost         $%.2f   avg $%.3f/run\n", tcost+0, (n?tcost/n:0);
-  if(teams=="off") print "  note: hackathon handicapped (teams flag off) - fall-back expected, not a pole-jump";
-}' "$RESULTS"
+awk -F'\t' -v teams="$TEAMS_LBL" -f "$HERE/tally.awk" "$RESULTS"

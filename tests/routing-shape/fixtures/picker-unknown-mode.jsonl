@@ -1,0 +1,3 @@
+{"type": "system", "subtype": "init", "additional": "PLAYBOOK_OVERLAY present"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "AskUserQuestion", "input": {"questions": [{"question": "Goal: rename the helper across the toolkit", "header": "Mode", "multiSelect": false, "options": [{"label": "Turbo (Recommended)", "description": "fits because"}, {"label": "Lone wolf", "description": "fits because"}]}]}}]}}
+{"type": "result", "subtype": "success", "total_cost_usd": 0.05}

@@ -1,0 +1,3 @@
+{"type": "system", "subtype": "init", "additional": "PLAYBOOK_OVERLAY present"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Looking at the repo first."}]}}
+{"type": "result", "subtype": "error_max_turns", "total_cost_usd": 0.05}

@@ -1,0 +1,1040 @@
+#!/usr/bin/env bash
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/playbook-common.sh"
+
+stdin="$(cat 2>/dev/null || true)"
+command -v jq >/dev/null 2>&1 || exit 0
+
+jf() { jq -r "$1" 2>/dev/null <<<"$stdin" || true; }
+# @nonobvious(must-hold) a path outside the home folder has no ~ form; "~" plus it would name a different file under the home folder
+tilde() { case "$1" in "$HOME"|"$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+
+event="$(jf '.hook_event_name // empty')"
+case "$event" in
+  PreToolUse|PostToolUse|PostToolUseFailure|Stop|Notification|SubagentStop) ;;
+  *) exit 0 ;;
+esac
+
+tool="$(jf '.tool_name // empty')"
+case "$event" in
+  PreToolUse|PostToolUse|PostToolUseFailure) [ -n "$tool" ] || exit 0 ;;
+esac
+
+# @nonobvious(must-hold) this runs before every Bash call, so an ordinary command must leave before any state work
+if [ "$event" = "PreToolUse" ] && [ "$tool" = "Bash" ]; then
+  rgc="$(jf '.tool_input.command // empty')"; rgr="$(playbook_state_root)"
+  case "$rgc" in
+    *playbook*|*"$rgr"*|*"$(tilde "$rgr")"*) ;;
+    *)
+      rgb="$(playbook_state_root)/$(playbook_session_id "$stdin")"
+      rgp="$(printf '%s' "${CLAUDE_PID:-}" | tr -cd '0-9')"
+      [ -n "$rgp" ] && [ -d "${rgb}/branch-${rgp}" ] && rgb="${rgb}/branch-${rgp}"
+      grep -qxE 'rg_open=1|weigh=(pending|bigger)' "${rgb}/state" 2>/dev/null || exit 0 ;;
+  esac
+fi
+
+live="$(playbook_live_dir "$stdin")"
+[ -n "$live" ] || exit 0
+case "$event:$tool" in
+  PreToolUse:Edit|PreToolUse:Write|PreToolUse:MultiEdit|PreToolUse:NotebookEdit) ;;
+  *) playbook_lock "$live" ;;
+esac
+aid="$(playbook_agent_id "$stdin")"
+dir="$(playbook_state_dir "$stdin")"
+[ -n "$dir" ] || exit 0
+cwd="$(jf '.cwd // empty')"
+
+CHANNEL_USAGE='usage: playbook status | route <lone-wolf|interns|hackathon|workflows|gsd> <reason> | goal <mode> <goal> (offline only) | unease <uneasy|concerned|alarmed> <reason> | decision "<the user'"'"'s own words>" | rethink <what changes> | weigh <fix|bigger> "<your call on a review>" | done | interface [<name>] | publish <what changed> | part-done <own name> | waiting <own name> on <colleague> <what> | aligned <own name> | resume <reason> (lead only)'
+
+# @nonobvious(must-hold) an approved command still runs in the shell, so anything that could chain or expand is never approved: it is cleaned, refused, or left to Claude Code's own permission check
+emit_pre() {
+  local decision="$1" reason="$2" shown="${3:-}" ctx="${4:-}" newcmd="${5:-}"
+  jq -c --arg d "$decision" --arg r "$reason" --arg s "$shown" --arg c "$ctx" --arg n "$newcmd" '
+    {hookSpecificOutput: ({hookEventName:"PreToolUse", permissionDecision:$d, permissionDecisionReason:$r}
+                          + (if $c != "" then {additionalContext:$c} else {} end)
+                          + (if $n != "" then {updatedInput:((.tool_input // {}) + {command:$n})} else {} end))}
+    + (if $s != "" then {systemMessage:$s} else {} end)' <<<"$stdin"
+}
+
+deny() { emit_pre deny "$1"; exit 0; }
+
+CH_CHAINED="" CH_MULTI="" CH_SUB="" CH_CD_ONLY=""
+
+# @nonobvious(means) one command can hold several lines, so it is split where the shell would run a new command; quotes are respected, and a heredoc body is skipped as data, as the shell does, so the commands after its closing line are still read
+split_cmd() {
+  printf '%s' "$1" | awk -v sq="'" 'BEGIN { RS = "\001" }
+    function out(x) { gsub(/^[ \t\n]+|[ \t\n]+$/, "", x); if (x != "") printf "%s\036", x }
+    function skip_body(   e, ln, t) {
+      while (i <= n) {
+        e = index(substr(s, i), "\n"); ln = (e == 0) ? substr(s, i) : substr(s, i, e - 1)
+        i = (e == 0) ? n + 1 : i + e
+        t = ln; if (hstrip) sub(/^\t+/, "", t)
+        if (t == hd) break
+      }
+      hd = ""
+    }
+    {
+      s = $0; n = length(s); seg = ""; q = ""; i = 1; hd = ""
+      while (i <= n) {
+        c = substr(s, i, 1); d = substr(s, i, 2)
+        if (q == "") {
+          if (c == "\\") { seg = seg d; i += 2; continue }
+          if (c == sq || c == "\"") { q = c; seg = seg c; i++; continue }
+          if (substr(s, i, 3) == "<<<") { seg = seg "<<<"; i += 3; continue }
+          if (d == "<<") {
+            j = i + 2; hstrip = 0
+            if (substr(s, j, 1) == "-") { hstrip = 1; j++ }
+            while (substr(s, j, 1) == " " || substr(s, j, 1) == "\t") j++
+            w = ""
+            while (j <= n && substr(s, j, 1) !~ /[ \t\n;&|<>()]/) { w = w substr(s, j, 1); j++ }
+            if (w !~ /^[A-Za-z_"\\]/ && substr(w, 1, 1) != sq) { seg = seg d; i += 2; continue }
+            seg = seg substr(s, i, j - i); i = j
+            gsub(sq, "", w); gsub(/["\\]/, "", w); hd = w
+            continue
+          }
+          if (c == "\n" && hd != "") { out(seg); seg = ""; i++; skip_body(); continue }
+          if (d == "&&" || d == "||") { out(seg); seg = ""; i += 2; continue }
+          if (c == "&" && (substr(s, i - 1, 1) == ">" || substr(s, i - 1, 1) == "<" || substr(s, i + 1, 1) == ">")) { seg = seg c; i++; continue }
+          if (c == ";" || c == "|" || c == "&" || c == "\n") { out(seg); seg = ""; i++; continue }
+        } else {
+          if (q == "\"" && c == "\\") { seg = seg d; i += 2; continue }
+          if (c == q) q = ""
+        }
+        seg = seg c; i++
+      }
+      out(seg)
+    }'
+}
+
+is_channel() { printf '%s' "$1" | grep -qE '^(:[[:space:]]+)?playbook([[:space:]]|$)'; }
+
+# @nonobvious(means) a word that is not a Playbook verb (help, --help, a guess) is left for Playbook's own command to answer with the usage, so it never refuses the rest of the command
+is_help() {
+  local w
+  w="$(trim "$(printf '%s' "$1" | sed -E 's/^(:[[:space:]]+)?playbook//')")"
+  case "${w%%[[:space:]]*}" in
+    route|goal|unease|decision|rethink|weigh|done|interface|publish|part-done|waiting|aligned|resume|status)
+      case " $(printf '%s' "$w" | awk '{print $2}') " in " --help "|" -h ") return 0 ;; esac
+      return 1 ;;
+  esac
+  return 0
+}
+
+cmd_parts() {
+  local s
+  CMD_PARTS=()
+  while IFS= read -r -d $'\036' s; do CMD_PARTS+=("$s"); done < <(split_cmd "$1")
+}
+
+only_channel_lines() {
+  local s
+  cmd_parts "$1"
+  [ "${#CMD_PARTS[@]}" -gt 0 ] || return 1
+  for s in "${CMD_PARTS[@]}"; do is_channel "$s" && ! is_help "$s" || return 1; done
+  return 0
+}
+# @nonobvious(means) a hook's message and a command's output are shown as plain text, so the branded line drops its markdown there
+plain_line() {
+  printf '%s' "$1" | sed -E 's/\*\*Playbook\*\*/Playbook/; s/`([^`]*)` \*(.*)\*$/· \1 · \2/; s/`([^`]*)`$/· \1/; s/`//g; s/\*\*//g'
+}
+allow() {
+  local ctx line q; ctx="$(playbook_event_drain "$dir")"
+  line="$(plain_line "$1")"
+  if [ -n "$CH_CHAINED" ] || [ -n "$CH_MULTI" ]; then
+    jq -cn --arg s "$line" --arg c "$ctx" '(if $c != "" then {hookSpecificOutput:{hookEventName:"PreToolUse", additionalContext:$c}} else {} end) + {systemMessage:$s}'
+  else
+    # @nonobvious(must-hold) the shell runs only Playbook's own command, never Claude's text, so nothing in a reason can expand; its output is the branded line, in place of an empty "(No output)"
+    q="$(printf '%s' "$line" | sed "s/'/'\\\\''/g")"
+    emit_pre allow "Playbook channel" "" "$ctx" ": playbook ${CH_SUB}; printf '%s\\n' '${q}'"
+  fi
+  exit 0
+}
+
+unsafe_text() {
+  case "$1" in
+    *$'\n'*|*$'\r'*|*';'*|*'&'*|*'|'*|*'`'*|*'$'*|*'<'*|*'>'*|*'('*|*')'*|*'\'*|*"'"*|*'"'*) return 0 ;;
+  esac
+  return 1
+}
+
+trim() { printf '%s' "$1" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
+
+# @nonobvious(means) with no crew known (no teammate dispatched by name) there is nothing to check a name against, so it is taken as given
+not_crew() {
+  [ -n "$aid" ] && [ ! -d "${live}/team/$1" ] && [ -n "$(crew_names | grep -v '^lead$')" ] || return 0
+  deny "$1 is not on this crew. Use your own name, one of: $(crew_names | grep -v '^lead$' | paste -sd ',' - | sed 's/,/, /g')"
+}
+
+channel_status() {
+  local me mode rg dec ip ifc
+  me="$(crew_self)"
+  mode="$(playbook_mode "$live")"; [ "$mode" = "hackathon" ] && mode="hackathon team"
+  if [ "$(playbook_state_get "$live" rg_open)" = 1 ]; then
+    rg="regroup open, called by $(playbook_state_get "$live" rg_by), aligned so far: $(playbook_state_get "$live" rg_ok | sed 's/^ *$/nobody/')"
+  else
+    rg="no regroup open"
+  fi
+  dec=""; [ "$me" != "lead" ] && [ -d "${live}/team/${me}" ] && dec=" · you (${me}): $(playbook_state_get "${live}/team/${me}" declared | sed 's/^$/working/')"
+  ip="$(playbook_state_get "$live" iface_path)"
+  if [ -n "$ip" ]; then ifc="interface version $(playbook_state_int "$live" iface_ver 0) at ${ip}, draft at $(iface_draft "$ip")"; else ifc="no interface declared"; fi
+  [ "$(playbook_mode "$live")" = "hackathon" ] || ifc=""
+  allow "📚 **Playbook** status · ${mode:-no mode yet}${ifc:+ · ${ifc}} · ${rg}${dec}"
+}
+
+# @nonobvious(means) a reason written with a ; in it ends the line there, so the words after it would run as a command of their own
+stray_words() {
+  local full s w prev=0
+  full="$(jf '.tool_input.command // empty')"
+  case "$full" in *playbook*) ;; *) return 0 ;; esac
+  cmd_parts "$full"
+  [ "${#CMD_PARTS[@]}" -gt 1 ] || return 0
+  for s in "${CMD_PARTS[@]}"; do
+    if is_channel "$s" && ! is_help "$s"; then prev=1; continue; fi
+    if [ "$prev" = 1 ]; then
+      w="$s"
+      while :; do case "$w" in [A-Za-z_]*=*' '*) w="$(trim "${w#* }")" ;; *) break ;; esac; done
+      w="${w%%[[:space:]]*}"
+      case "$w" in */*|'') ;; *) command -v -- "$w" >/dev/null 2>&1 || deny "Playbook refused this command: \`${s}\` is not a command. A ; ends a \`playbook\` line, so the words after it would run on their own; put the whole reason in quotes, or use commas. Nothing in this command ran." ;; esac
+    fi
+    prev=0
+  done
+}
+
+is_cd() { case "$1" in cd|'cd '*) return 0 ;; esac; return 1; }
+
+# @nonobvious(must-hold) a command that mixes channel lines with other commands runs as written, so another program called playbook earlier on the PATH would run in place of Playbook's own
+other_playbook_check() {
+  local s mixed=0 chan=0 p own
+  for s in "${CMD_PARTS[@]}"; do
+    if is_channel "$s"; then chan=1; else mixed=1; fi
+  done
+  [ "$chan" = 1 ] && [ "$mixed" = 1 ] || return 0
+  own="$(cd "${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}/bin" 2>/dev/null && pwd -P)/playbook"
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ "$(cd "$(dirname "$p")" 2>/dev/null && pwd -P)/$(basename "$p")" = "$own" ] && continue
+    deny "Playbook refused this command: another program called playbook is on the PATH (${p}), and it would run in place of Playbook's own. Run each \`playbook\` line as a Bash call of its own. Nothing in this command ran."
+  done < <(type -ap playbook 2>/dev/null)
+}
+
+# @nonobvious(means) the command runs as written, since Playbook's own command does nothing; a part the hook refuses stops all of it, so nothing runs half-recorded
+handle_bash() {
+  local full s o dec lines="" ctxs="" allch=1 shown q
+  full="$(jf '.tool_input.command // empty')"
+  case "$full" in *playbook*) ;; *) return 0 ;; esac
+  cmd_parts "$full"
+  if [ "${#CMD_PARTS[@]}" -le 1 ]; then
+    is_help "${CMD_PARTS[0]:-}" && return 0
+    CH_CMD="${CMD_PARTS[0]:-}" handle_channel; return 0
+  fi
+  other_playbook_check
+  CH_CD_ONLY=1
+  for s in "${CMD_PARTS[@]}"; do is_channel "$s" || is_cd "$s" || CH_CD_ONLY=""; done
+  [ "$(for s in "${CMD_PARTS[@]}"; do is_channel "$s" && echo; done | wc -l | tr -d ' ')" = 1 ] || CH_CD_ONLY=""
+  for s in "${CMD_PARTS[@]}"; do
+    if ! is_channel "$s" || is_help "$s"; then allch=0; continue; fi
+    o="$(CH_CMD="$s" CH_MULTI=1 handle_channel)"
+    [ -n "$o" ] || { allch=0; continue; }
+    dec="$(jq -r '.hookSpecificOutput.permissionDecision // empty' <<<"$o")"
+    if [ "$dec" = "deny" ]; then
+      shown="$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$o")"
+      case "$shown" in *.) ;; *) shown="${shown}." ;; esac
+      shown="Playbook refused \`${s}\`: ${shown} Nothing in this command ran."
+      [ -n "$lines" ] && shown="${shown} The lines before it were recorded, so leave them out when you run it again: $(printf '%s' "$lines" | paste -sd ';' - | sed 's/;/; /g; s/\.$//')."
+      emit_pre deny "$shown"; exit 0
+    fi
+    lines="${lines}${lines:+$'\n'}$(jq -r '.systemMessage // empty' <<<"$o")"
+    ctxs="${ctxs}${ctxs:+$'\n'}$(jq -r '.hookSpecificOutput.additionalContext // empty' <<<"$o")"
+  done
+  [ -n "$lines" ] || return 0
+  ctxs="$(printf '%s' "$ctxs" | sed '/^$/d')"
+  if [ "$allch" = 1 ]; then
+    q="$(printf '%s\n' "$lines" | sed "s/'/'\\\\''/g; s/^/'/; s/\$/'/" | paste -sd ' ' -)"
+    emit_pre allow "Playbook channel" "" "$ctxs" ": playbook lines; printf '%s\\n' ${q}"
+  else
+    # @nonobvious(forced-by) Playbook's own command prints nothing, so without this context Claude never learns that a line it chained with other commands was recorded
+    ctxs="Playbook recorded: $(printf '%s' "$lines" | paste -sd ';' - | sed 's/;/; /g')${ctxs:+$'\n'}${ctxs}"
+    jq -cn --arg s "$lines" --arg c "$ctxs" '{hookSpecificOutput:{hookEventName:"PreToolUse", additionalContext:$c}, systemMessage:$s}'
+  fi
+  exit 0
+}
+
+handle_channel() {
+  local cmd rest sub arg a1 a2 a3 mode reason words name on level path hash ver goal abs lvl label
+  cmd="$(trim "${CH_CMD:-$(jf '.tool_input.command // empty')}")"
+  # @nonobvious(means) Claude often appends 2>&1 or >/dev/null out of habit, which is the shell's business, not part of the line
+  cmd="$(trim "$(printf '%s' "$cmd" | sed -E 's/[[:space:]]+([0-9]*(>>?|<)&?[[:space:]]*[^[:space:]]+|&>>?[[:space:]]*[^[:space:]]+)//g')")"
+  # @nonobvious(means) the older no-op spelling with a leading colon is read the same way, so a line written from habit is never lost
+  case "$cmd" in ':'[[:space:]]*) cmd="$(trim "${cmd#:}")" ;; esac
+  case "$cmd" in 'playbook '*|'playbook') ;; *) return 0 ;; esac
+  rest="$(trim "${cmd#playbook}")"
+  sub="${rest%%[[:space:]]*}"
+  arg=""; [ "$sub" != "$rest" ] && arg="$(trim "${rest#"$sub"}")"
+  CH_SUB="$sub"
+  case "$sub" in
+    interface) [ -z "$aid" ] || deny "only the lead declares the shared interface; message the lead if it needs declaring" ;;
+    done) [ -z "$aid" ] || deny "only the lead marks the goal done; declare your own part with \`playbook part-done <name>\`" ;;
+    resume) [ -z "$aid" ] || deny "only the lead ends a regroup early; message the lead if it is stuck" ;;
+    route|goal|unease|decision|rethink)
+      if [ -n "$aid" ]; then deny "helpers don't route; your brief is your task"; fi ;;
+    weigh) [ -z "$aid" ] || deny "only the main thread is paused after a review; weigh your own findings in your report" ;;
+    part-done|waiting|aligned|publish) ;;
+    status) channel_status ;;
+    *) deny "unknown playbook command. ${CHANNEL_USAGE}" ;;
+  esac
+
+  if [ "$sub" = "decision" ]; then
+    case "$arg" in
+      \"*\") words="${arg#\"}"; words="${words%\"}"; case "$words" in *'"'*) deny "a decision may not contain double quotes. ${CHANNEL_USAGE}" ;; esac ;;
+      \'*\') words="${arg#\'}"; words="${words%\'}"; case "$words" in *"'"*) deny "a decision may not contain single quotes inside single quotes. ${CHANNEL_USAGE}" ;; esac ;;
+      *) deny "quote the user's words. ${CHANNEL_USAGE}" ;;
+    esac
+    case "$words" in *$'\n'*|*$'\r'*|*'`'*|*'$'*|*'\'*) deny "a decision may not contain backticks, dollar signs, backslashes or newlines; quote the words without them. ${CHANNEL_USAGE}" ;; esac
+    [ -n "$(trim "$words")" ] || deny "empty decision. ${CHANNEL_USAGE}"
+    playbook_words_found "$dir" "$words" || deny "these words are not in the user's own messages"
+    playbook_decision_add "$dir" typed "" "$words"
+    playbook_weigh_signed "$dir"
+    allow "📌 **Playbook** decision recorded: ${words}"
+  fi
+
+  # @nonobvious(means) a reason wrapped in one pair of quotes is text, so a separator inside it is punctuation, not a second command
+  local head inner qc
+  for qc in '"' "'"; do
+    case "$arg" in
+      *"$qc"*"$qc")
+        head="${arg%%"$qc"*}"; inner="${arg#*"$qc"}"; inner="${inner%"$qc"}"
+        case "$inner" in *"$qc"*|*$'\n'*|*$'\r'*) ;; *) arg="$(trim "${head}$(printf '%s' "$inner" | tr ';&|' ',,,' | sed -E 's/,([^ ])/, \1/g; s/ +/ /g')")" ;; esac
+        break ;;
+    esac
+  done
+  # @nonobvious(must-hold) whatever follows a separator must not run under the channel's approval, so the line is recorded up to it and the whole command goes to Claude Code's own permission check; on a line of its own, unsafe characters are dropped from what is recorded and shown
+  case "$arg" in
+    *$'\n'*|*$'\r'*|*';'*|*'&'*|*'|'*) CH_CHAINED=1; arg="$(trim "$(printf '%s\n' "$arg" | head -n1 | sed -E 's/[;&|].*$//')")" ;;
+  esac
+  if unsafe_text "$arg"; then
+    arg="$(trim "$(printf '%s' "$arg" | tr -d "\`\$\\\\<>\"'" | tr '()' '  ' | tr -s ' ')")"
+  fi
+
+  case "$sub" in
+    route)
+      mode="$(playbook_mode_canon "${arg%%[[:space:]]*}")"
+      [ -n "$mode" ] || deny "unknown mode. ${CHANNEL_USAGE}"
+      reason="$(trim "${arg#*[[:space:]]}")"; [ "$reason" = "$arg" ] && reason=""
+      playbook_route_set "$dir" "$mode" "$reason"
+      [ "$mode" = "hackathon" ] || playbook_state_put "$dir" "iface_path=" "iface_hash=" "iface_ver=0" "rg_open=" "rg_ok="
+      [ "$mode" = "workflows" ] && playbook_event_push "$dir" "$PLAYBOOK_WF_MODEL_LINE"
+      if [ "$mode" = "workflows" ] && playbook_offline_on "$dir" && ! playbook_ultracode_on "$(jf '.transcript_path // empty')"; then
+        playbook_event_push "$dir" "$(playbook_offline_optin_line "$(jf '.effort.level // empty')")"
+      fi
+      if playbook_ultracode_on "$(jf '.transcript_path // empty')"; then
+        if [ "$mode" != "workflows" ] && [ -z "$(playbook_state_get "$dir" uc_reminded)" ]; then
+          lvl="$(jf '.effort.level // empty')"
+          playbook_event_push "$dir" "Playbook: ultracode is still on from an earlier workflow, and it pushes towards a workflow on every task. Remind the user once that they can switch back with \`/effort ${lvl:-<their earlier level>}\`."
+          playbook_state_put "$dir" "uc_reminded=1"
+        fi
+      else
+        playbook_state_put "$dir" "uc_reminded="
+      fi
+      label="$mode"; [ "$mode" = "hackathon" ] && label="hackathon team"
+      if [ "$(playbook_state_get "$dir" route_shown)" = 1 ]; then
+        allow "📚 **Playbook** route changed · building with $(playbook_mode_emoji "$mode") ${label}"
+      fi
+      playbook_state_put "$dir" "route_shown=1"
+      allow "📚 **Playbook** session started · building with $(playbook_mode_emoji "$mode") ${label}" ;;
+    goal)
+      playbook_offline_on "$dir" || deny "goal is for offline mode only; confirm the goal with the user in the picker"
+      mode="$(playbook_mode_canon "${arg%%[[:space:]]*}")"
+      [ -n "$mode" ] || deny "unknown mode. ${CHANNEL_USAGE}"
+      goal="$(trim "${arg#*[[:space:]]}")"; [ "$goal" = "$arg" ] && goal=""
+      [ -n "$goal" ] || deny "missing goal. ${CHANNEL_USAGE}"
+      playbook_ns_confirm "$dir" "$goal" "$mode" offline
+      jq -cn --argjson ts "$(playbook_now)" --arg s "Confirmed the North Star from the top recommendation: ${goal} (mode ${mode})" \
+        '{event:"decision", ts:$ts, summary:$s, reason:"the user is offline; the top recommendation was taken"}' \
+        >> "${dir}/offline-log.jsonl" 2>/dev/null || true
+      allow "🎯 **Playbook** North Star set offline: ${goal} · ${mode}" ;;
+    unease)
+      level="${arg%%[[:space:]]*}"
+      case "$level" in uneasy|concerned|alarmed) ;; *) deny "unknown unease level. ${CHANNEL_USAGE}" ;; esac
+      reason="$(trim "${arg#*[[:space:]]}")"; [ "$reason" = "$arg" ] && reason=""
+      playbook_score_floor "$dir" "$level"
+      playbook_score_settle "$dir"
+      allow "🌡️ **Playbook** \`unease: ${level}\` *${reason}*" ;;
+    weigh)
+      kind="${arg%%[[:space:]]*}"; call="$(trim "${arg#"$kind"}")"
+      case "$kind" in fix|bigger) ;; *) deny "say fix or bigger, then your call. ${CHANNEL_USAGE}" ;; esac
+      [ -n "$call" ] || deny "give your call. ${CHANNEL_USAGE}"
+      if [ "$kind" = fix ]; then
+        [ "$(playbook_state_get "$dir" weigh)" = bigger ] && deny "your call was bigger than a fix, so it waits for sign-off from a judge or the user, even if you now see a smaller way: put that to them"
+        playbook_state_put "$dir" "weigh="
+      else
+        playbook_state_put "$dir" "weigh=bigger"
+        playbook_event_push "$dir" "$(playbook_weigh_hold_text "$dir")"
+      fi
+      playbook_offline_on "$dir" && playbook_offline_log "$dir" "Weighed the review (${kind}): ${call}" "Playbook paused after a review came back"
+      allow "⚖️ **Playbook** weighed (${kind}): ${call}" ;;
+    rethink)
+      [ -n "$arg" ] || deny "say what changes. ${CHANNEL_USAGE}"
+      playbook_gate_clear "$dir" rethink
+      allow "🔁 **Playbook** rethink: ${arg}" ;;
+    done)
+      playbook_ns_mark "$dir" done "the user's goal is met"
+      playbook_state_put "$dir" "iface_path=" "iface_hash=" "iface_ver=0" "rg_open=" "rg_ok="
+      allow "✅ **Playbook** goal complete" ;;
+    interface)
+      # @nonobvious(must-hold) the interface is the crew's internal contract, so it lives in Playbook's own state, never in the user's project; any argument only names it
+      name="$(basename -- "${arg%%[[:space:]]*}" 2>/dev/null)"; name="$(printf '%s' "${name%.*}" | tr -cd 'A-Za-z0-9_-')"
+      abs="${live}/interface/${name:-interface}.md"
+      mkdir -p "${live}/interface" 2>/dev/null; [ -f "$abs" ] || : > "$abs"
+      [ -f "$(iface_draft "$abs")" ] || cp -- "$abs" "$(iface_draft "$abs")"
+      hash="$(shasum "$abs" 2>/dev/null | cut -d' ' -f1)"
+      ver="$(playbook_state_int "$live" iface_ver 0)"
+      [ "$(playbook_state_get "$live" iface_path)" = "$abs" ] || ver=$(( ver + 1 ))
+      [ "$ver" -gt 0 ] || ver=1
+      playbook_state_put "$live" "iface_path=${abs}" "iface_hash=${hash}" "iface_ver=${ver}" "rg_open=" "rg_ok="
+      playbook_state_put "$dir" "iface_seen=${ver}"
+      allow "🔌 **Playbook** interface declared (version ${ver}), kept in Playbook's storage outside the project: ${abs}. To change it, edit its draft ${abs%.md}.draft.md, then run \`playbook publish <what changed>\`. Give every teammate both paths in its brief." ;;
+    publish)
+      ip="$(playbook_state_get "$live" iface_path)"
+      [ -n "$ip" ] || deny "no interface is declared; the lead declares it with \`playbook interface\`"
+      [ -z "$CH_CHAINED" ] && { [ -z "$CH_MULTI" ] || [ -n "$CH_CD_ONLY" ]; } || deny "run \`playbook publish\` as a Bash call of its own (a cd before it is fine), since it copies the draft over the interface"
+      [ -n "$arg" ] || deny "say what changed. ${CHANNEL_USAGE}"
+      dr="$(iface_draft "$ip")"
+      [ -f "$dr" ] || cp -- "$ip" "$dr"
+      cmp -s "$dr" "$ip" && deny "the draft ${dr} matches the interface, so there is nothing to publish; make the change in the draft first"
+      cp -- "$dr" "$ip" || deny "could not copy ${dr} over ${ip}"
+      iface_publish "$arg" ;;
+    part-done|waiting)
+      # @nonobvious(means) only teammates go idle through Playbook's idle hook, so the lead declaring either would only add a phantom crew member
+      [ -n "$aid" ] || allow "🤝 **Playbook** the lead needs no declaration: end your turn when you are waiting, and a colleague's message wakes you" ;;
+  esac
+  case "$sub" in
+    part-done)
+      name="${arg%%[[:space:]]*}"; [ -n "$name" ] || deny "name yourself. ${CHANNEL_USAGE}"
+      not_crew "$name"
+      if [ "$(playbook_state_get "$live" rg_open)" = 1 ]; then
+        case " $(playbook_state_get "$live" rg_ok) " in
+          *" ${name} "*) deny "a regroup is open and you have aligned, so wait for the RESUME, then declare part-done. Waiting with nothing to do is fine: \`playbook waiting ${name} on <colleague> the RESUME\`." ;;
+          *) deny "a regroup is open, so the crew still needs you: align with \`playbook aligned ${name}\` first, and declare part-done after the RESUME." ;;
+        esac
+      fi
+      playbook_team_declare "$stdin" "$name" part-done
+      allow "🏁 **Playbook** ${name} says its part is done" ;;
+    waiting)
+      name="${arg%%[[:space:]]*}"
+      a1="$(trim "${arg#"$name"}")"
+      case "$a1" in "on "*) on="$(trim "${a1#on }")" ;; *) deny "say who you are waiting on. ${CHANNEL_USAGE}" ;; esac
+      [ -n "$name" ] && [ -n "$on" ] || deny "${CHANNEL_USAGE}"
+      not_crew "$name"
+      playbook_team_declare "$stdin" "$name" waiting "$on"
+      allow "⏳ **Playbook** ${name} is waiting on ${on}" ;;
+    aligned)
+      if [ -z "$aid" ]; then name=lead; else name="${arg%%[[:space:]]*}"; fi
+      [ -n "$name" ] || deny "name yourself. ${CHANNEL_USAGE}"
+      [ "$(playbook_state_get "$live" rg_open)" = 1 ] || allow "🤝 **Playbook** no regroup is open; carry on"
+      if [ -n "$aid" ] && [ ! -d "${live}/team/${name}" ]; then
+        deny "${name} is not on this crew. Use your own name, one of: $(crew_names | grep -v '^lead$' | paste -sd ',' - | sed 's/,/, /g')"
+      fi
+      ver="$(playbook_state_int "$live" iface_ver 0)"
+      [ "$(playbook_state_int "$dir" iface_seen 0)" -ge "$ver" ] || deny "read the latest version of $(playbook_state_get "$live" iface_path) first (the Read tool, or cat in the shell), then align"
+      [ -n "$aid" ] && playbook_state_put "$dir" "crew_name=${name}"
+      ok="$(playbook_state_get "$live" rg_ok)"
+      case " $ok " in *" $name "*) ;; *) ok="$(trim "$ok $name")" ;; esac
+      playbook_state_put "$live" "rg_ok=${ok}"
+      missing="$(crew_names | not_in "$ok" | paste -sd ',' - | sed 's/,/, /g')"
+      if [ -z "$missing" ]; then
+        regroup_close "everyone aligned on version ${ver}"
+        playbook_event_push "$dir" "Playbook regroup: you are the last to align, so the hold is lifted. Message every colleague once: \`RESUME: interface v${ver} aligned\`."
+        allow "🤝 **Playbook** regroup closed: everyone aligned on version ${ver}"
+      fi
+      allow "🤝 **Playbook** ${name} aligned on version ${ver}; still to align: ${missing}. Message any of them who may not have heard of the regroup." ;;
+    resume)
+      [ "$(playbook_state_get "$live" rg_open)" = 1 ] || allow "🤝 **Playbook** no regroup is open; carry on"
+      [ -n "$arg" ] || deny "say why the regroup ends without everyone. ${CHANNEL_USAGE}"
+      ver="$(playbook_state_int "$live" iface_ver 0)"
+      regroup_close "the lead ended it at version ${ver}: ${arg}"
+      jq -cn --argjson ts "$(playbook_now)" --arg r "$arg" --argjson v "$ver" '{event:"regroup ended by the lead", ts:$ts, version:$v, reason:$r}' >> "${live}/team-log.jsonl" 2>/dev/null || true
+      playbook_event_push "$dir" "Playbook regroup: you ended it without everyone aligned. Message every colleague once: \`RESUME: interface v${ver}\`, with your reason."
+      allow "🤝 **Playbook** regroup ended by the lead: ${arg}" ;;
+  esac
+}
+
+# @nonobvious(means) the crew is every teammate dispatched by name that has not declared part-done, plus the lead
+crew_names() {
+  local t
+  for t in "$live"/team/*/; do
+    [ -d "$t" ] || continue
+    [ "$(playbook_state_get "${t%/}" declared)" = "part-done" ] && continue
+    case "$(basename "$t")" in team-lead|main|lead) continue ;; esac
+    basename "$t"
+  done
+  printf 'lead\n'
+}
+
+crew_self() { playbook_crew_name "$live" "$dir" "$aid"; }
+
+# @nonobvious(means) the count shows the teammates talking among themselves, so nothing from or to the lead counts, and a message to everyone counts once
+crew_talk() {
+  local n me
+  [ -n "$aid" ] || return 0
+  me="$(crew_self)"
+  [ "$me" = "lead" ] && return 0
+  case "$1" in team-lead|main|lead|"$me") return 0 ;; esac
+  n="$(playbook_state_int "$live" crew_msgs 0)"
+  playbook_state_put "$live" "crew_msgs=$(( n + 1 ))" "crew_last=$(crew_self)>$(printf '%s' "$1" | tr -cd 'A-Za-z0-9._-')" "crew_last_at=$(playbook_now)"
+}
+
+# @nonobvious(means) read-only means every command in the line is on this list and nothing is redirected into a file; anything else counts as an edit
+shell_reads_only() {
+  local c seg w
+  case "$1" in *'`'*|*'$('*) return 1 ;; esac
+  # @nonobvious(means) a > inside quotes is part of an argument, such as a grep pattern, not a redirection
+  c="$(printf '%s' "$1" | sed -E "s/'[^']*'/''/g; s/\"[^\"]*\"/''/g; s/[0-9]*>&[0-9]+//g; s/[0-9]*>[[:space:]]*\/dev\/null//g")"
+  case "$c" in *'>'*) return 1 ;; esac
+  printf '%s\n' "$c" | tr ';|&' '\n\n\n' | while IFS= read -r seg; do
+    seg="$(trim "$seg")"
+    while :; do case "$seg" in [A-Za-z_]*=*' '*) seg="$(trim "${seg#* }")" ;; *) break ;; esac; done
+    # @nonobvious(means) a loop keyword only frames the command after it, as in a Monitor wait such as `until [ -f x ]; do sleep 2; done`, so that command is the one checked
+    while :; do case "$seg" in until\ *|while\ *|if\ *|elif\ *|do\ *|then\ *|else\ *|'! '*) seg="$(trim "${seg#* }")" ;; *) break ;; esac; done
+    case "$seg" in done|fi|else|do|then|'for '*) continue ;; esac
+    [ -n "$seg" ] || continue
+    playbook_match test "$seg" && continue
+    w="${seg%%[[:space:]]*}"
+    case "$w" in
+      '['|'[['|test|false|cd|ls|cat|head|tail|grep|egrep|fgrep|rg|wc|pwd|stat|file|jq|sort|uniq|cut|tr|diff|cmp|echo|printf|true|which|type|date|basename|dirname|realpath|tree|awk|less|nl|sleep|wait|playbook|:) ;;
+      sed) case " $seg " in *' -i'*|*' --in-place'*) exit 1 ;; esac ;;
+      find) case " $seg " in *' -delete'*|*' -exec'*|*' -ok'*) exit 1 ;; esac ;;
+      git) case "$(printf '%s' "$seg" | awk '{print $2}')" in status|diff|log|show|ls-files|rev-parse|branch|blame) ;; *) exit 1 ;; esac ;;
+      node) case " $seg " in *' --test'*) ;; *) exit 1 ;; esac ;;
+      npm) case " $seg " in *' test'*|*' run test'*) ;; *) exit 1 ;; esac ;;
+      *) exit 1 ;;
+    esac
+  done
+}
+
+# @nonobvious(must-hold) crews edit through the shell as often as through the Edit tool, so a regroup that held only the Edit tools would hold nobody
+weigh_shell() {
+  local cmd hold
+  hold="$(playbook_weigh_hold_text "$dir")"; [ -n "$hold" ] || return 0
+  cmd="$(jf '.tool_input.command // empty')"
+  only_channel_lines "$cmd" && return 0
+  shell_reads_only "$cmd" && return 0
+  playbook_weigh_tell_any "$dir"; deny "$hold"
+}
+
+regroup_shell() {
+  local cmd ip
+  [ "$(playbook_mode "$live")" = "hackathon" ] || return 0
+  cmd="$(jf '.tool_input.command // empty')"
+  ip="$(playbook_state_get "$live" iface_path)"
+  [ -n "$ip" ] && case "$cmd" in *"$(basename "$(iface_draft "$ip")")"*) return 0 ;; esac
+  shell_reads_only "$cmd" && return 0
+  deny "Playbook regroup: the shared interface ${ip} has changed and the crew is regrouping, so every change to files is held until everyone has aligned, through the shell as much as the Edit tool. Reading files, running tests and messaging are fine. Read the interface, talk it through by message, and once the version you have read is the agreed one, run \`playbook aligned <your name>\`. The hold lifts when the last one aligns, the lead included."
+}
+
+# @nonobvious(means) a teammate only receives messages when its turn ends, so a tagged message is held here and shown at the receiver's next tool call
+mail_post() {
+  local to="$1" msg tag from now r kind last mins recvs
+  msg="$(jf '.tool_input.message // empty | if type=="string" then . else "" end')"
+  tag="$(playbook_msg_tag "$msg")"
+  case "$tag" in SOON|ASAP|URGENT|REGROUP) ;; *) return 0 ;; esac
+  from="$(crew_self)"; now="$(playbook_now)"
+  case "$to" in
+    "*") recvs="$(crew_names)" ;;
+    team-lead|main|lead) recvs="lead" ;;
+    *) recvs="$(printf '%s' "$to" | tr -cd 'A-Za-z0-9._-')" ;;
+  esac
+  mkdir -p "${live}/mail" 2>/dev/null || return 0
+  while IFS= read -r r; do
+    [ -n "$r" ] && [ "$r" != "$from" ] || continue
+    kind="$tag"
+    # @nonobvious(means) an idle receiver gets the message from Claude Code at once, so a nudge would arrive after it had already read it, and an URGENT interrupts nothing and starts no cap
+    if { [ "$r" = "lead" ] && [ "$(playbook_state_get "$live" lead_idle)" = 1 ]; } || { [ "$r" != "lead" ] && [ "$(playbook_state_get "${live}/team/${r}" idle)" = 1 ]; }; then
+      if [ "$r" = "lead" ]; then playbook_state_put "$live" "lead_idle="; else playbook_state_put "${live}/team/${r}" "idle="; fi
+      [ "$tag" = "URGENT" ] && jq -cn --argjson ts "$now" --arg f "$from" --arg t "$r" '{event:"urgent", ts:$ts, from:$f, to:$t, delivered:"at once, the receiver was idle"}' >> "${live}/team-log.jsonl" 2>/dev/null
+      continue
+    fi
+    if [ "$kind" = "URGENT" ]; then
+      if [ "$r" = "lead" ]; then
+        kind="ASAP"
+      else
+        last="$(playbook_state_int "$live" "urg_${from}_${r}" 0)"
+        if [ "$last" -gt 0 ] && [ $(( now - last )) -lt 600 ]; then
+          kind="ASAP"; mins=$(( (now - last) / 60 ))
+          playbook_event_push "$dir" "Playbook: delivered as ASAP, not URGENT: you sent ${r} an URGENT ${mins} minutes ago, and a second within 10 minutes does not stop them again."
+        else
+          playbook_state_put "$live" "urg_${from}_${r}=${now}"
+        fi
+      fi
+      jq -cn --argjson ts "$now" --arg f "$from" --arg t "$r" --arg k "$kind" '{event:"urgent", ts:$ts, from:$f, to:$t, delivered:$k}' >> "${live}/team-log.jsonl" 2>/dev/null || true
+    fi
+    printf '%s|%s\n' "$kind" "$from" >> "${live}/mail/${r}"
+  done <<<"$recvs"
+}
+
+mail_deliver() {
+  local me f lines k s urgent="" ctx
+  me="$(crew_self)"
+  if [ "$me" = "lead" ]; then
+    [ "$(playbook_state_get "$live" lead_idle)" = 1 ] && playbook_state_put "$live" "lead_idle="
+  elif [ -d "${live}/team/${me}" ] && [ "$(playbook_state_get "${live}/team/${me}" idle)" = 1 ]; then
+    playbook_state_put "${live}/team/${me}" "idle="
+  fi
+  f="${live}/mail/${me}"
+  [ -s "$f" ] || return 0
+  lines="$(cat "$f")"; rm -f "$f"
+  while IFS='|' read -r k s; do
+    case "$k" in
+      SOON)    playbook_event_push "$dir" "📨 Read ${s}'s message before your next piece of work." ;;
+      ASAP)    playbook_event_push "$dir" "📨 Stop as soon as you reasonably can and read ${s}'s message." ;;
+      # @nonobvious(means) once the regroup has closed its message is only history, so nobody is told to stop for it
+      REGROUP) [ "$(playbook_state_get "$live" rg_open)" = 1 ] && playbook_event_push "$dir" "📨 Stop as soon as you reasonably can and read ${s}'s regroup message." ;;
+      URGENT)  [ -n "$urgent" ] || urgent="$s" ;;
+    esac
+  done <<<"$lines"
+  [ -d "${live}/team/${me}" ] && playbook_state_put "${live}/team/${me}" "mail_wake=1"
+  [ -n "$urgent" ] || return 0
+  # @nonobvious(forced-by) Claude Code keeps only the stop reason when a hook stops the turn, so anything else waiting to be said goes into it
+  ctx="$(playbook_event_drain "$dir" | tr '\n' ' ' | sed -E 's/ +$//')"
+  jq -cn --arg r "📞 Playbook stopped you to deliver ${urgent}'s urgent message; read it first.${ctx:+ $ctx}" '{continue:false, stopReason:$r}'
+  exit 0
+}
+
+not_in() {
+  local n
+  while IFS= read -r n; do
+    case " $1 " in *" $n "*) ;; *) printf '%s\n' "$n" ;; esac
+  done
+}
+
+file_path_of() { jf '(.tool_input.file_path // .tool_input.notebook_path // empty)' | tr -d '\n\r'; }
+
+is_edit_tool() { case "$1" in Edit|Write|MultiEdit|NotebookEdit) return 0 ;; esac; return 1; }
+
+# @nonobvious(means) the draft sits beside the interface with .draft before its extension, so PROTOCOL.md is drafted in PROTOCOL.draft.md
+iface_draft() {
+  local d b; d="$(dirname "$1")"; b="$(basename "$1")"
+  case "$b" in ?*.*) printf '%s/%s.draft.%s' "$d" "${b%.*}" "${b##*.}" ;; *) printf '%s/%s.draft' "$d" "$b" ;; esac
+}
+
+iface_own() {
+  local ip; ip="$(playbook_state_get "$live" iface_path)"
+  [ -n "$ip" ] && [ -n "$1" ] && { [ "$1" = "$ip" ] || [ "$1" = "$(iface_draft "$ip")" ]; }
+}
+
+# @nonobvious(forced-by) the interface lives outside the project, where Claude Code would ask before every read, so a plain read of it is approved here
+# @nonobvious(means) sets IFR_IFACE when the interface itself, not only its draft, is among what is read
+iface_plain_read() {
+  local cmd="$1" ip dr idir seg w a here=""
+  IFR_IFACE=""
+  ip="$(playbook_state_get "$live" iface_path)"; [ -n "$ip" ] || return 1
+  dr="$(iface_draft "$ip")"; idir="${ip%/*}"
+  case "$cmd" in *"$idir"*|*"$(tilde "$idir")"*) ;; *) return 1 ;; esac
+  # @nonobvious(must-hold) this approval skips Claude Code's own prompt, so anything beyond plain words (substitution, redirection, globs, quotes, expansion) leaves the command to Claude Code
+  case "$cmd" in *[\(\)\<\>\{\}=\*\?\[\]\$\`\'\"\\]*|*$'\n'*) return 1 ;; esac
+  while IFS= read -r seg; do
+    seg="$(trim "$seg")"; [ -n "$seg" ] || continue
+    set -f; set -- $seg; set +f
+    w="$1"; shift
+    case "$w" in
+      cd)
+        [ $# = 1 ] && { [ "${1%/}" = "$idir" ] || [ "${1%/}" = "$(tilde "$idir")" ]; } || return 1
+        here=1; continue ;;
+      cat|head|tail|wc|diff|cmp|nl|ls|stat) ;;
+      *) return 1 ;;
+    esac
+    for a in "$@"; do
+      case "$a" in
+        "$ip"|"$(tilde "$ip")") case "$w" in ls|stat|wc) ;; *) IFR_IFACE=1 ;; esac ;;
+        "$dr"|"$(tilde "$dr")") ;;
+        -*[!A-Za-z0-9]*|-) return 1 ;;
+        -*) ;;
+        *[!0-9]*)
+          [ -n "$here" ] || return 1
+          if [ "$a" = "${ip##*/}" ]; then case "$w" in ls|stat|wc) ;; *) IFR_IFACE=1 ;; esac; elif [ "$a" != "${dr##*/}" ]; then return 1; fi ;;
+        *) case "$w" in head|tail) ;; *) return 1 ;; esac ;;
+      esac
+    done
+  done < <(printf '%s\n' "$cmd" | tr ';|&' '\n\n\n')
+}
+
+iface_shell_read() {
+  iface_plain_read "$(jf '.tool_input.command // empty')" || return 0
+  emit_pre allow "Playbook keeps the crew's interface"; exit 0
+}
+
+crew_has_teammates() { [ "$(crew_names | grep -vc '^lead$')" -gt 0 ]; }
+
+iface_publish() {
+  local ip ver me what="$1"
+  ip="$(playbook_state_get "$live" iface_path)"; me="$(crew_self)"
+  ver=$(( $(playbook_state_int "$live" iface_ver 0) + 1 ))
+  playbook_state_put "$live" "iface_hash=$(shasum "$ip" 2>/dev/null | cut -d' ' -f1)" "iface_ver=${ver}"
+  playbook_state_put "$dir" "iface_seen=${ver}"
+  if ! crew_has_teammates || [ "$(playbook_mode "$live")" != "hackathon" ]; then
+    allow "🔌 **Playbook** interface version ${ver} published: ${what}"
+  fi
+  if [ "$(playbook_state_get "$live" rg_open)" = 1 ]; then
+    playbook_state_put "$live" "rg_ok=${me}" "rg_reset=${ver}" "rg_reset_by=${me}"
+    playbook_state_put "$dir" "rg_reset_noted=${ver}"
+    allow "🔌 **Playbook** interface version ${ver} published during the regroup: ${what}. Every approval so far is cleared and you count as aligned; message every colleague once that version ${ver} is the one to align on."
+  fi
+  playbook_state_put "$live" "rg_open=1" "rg_id=$(playbook_now)-${ver}" "rg_by=${me}" "rg_ok=${me}" "rg_how=" "rg_reset="
+  playbook_state_put "$dir" "rg_noted=$(playbook_state_get "$live" rg_id)"
+  allow "🔌 **Playbook** interface version ${ver} published: ${what}. This calls everyone to regroup, so the whole crew's edits are held, yours included, and you count as aligned. Message every colleague once now, the lead included: \`REGROUP: ${what}\`."
+}
+
+# @nonobvious(means) a regroup ends for everyone at once, but a teammate reads a colleague's RESUME only when its own turn ends, so each crew member is told at its next step
+regroup_close() {
+  local id; id="$(playbook_state_get "$live" rg_id)"
+  playbook_state_put "$live" "rg_open=" "rg_ok=" "rg_how=$1"
+  playbook_state_put "$dir" "rg_closed_noted=${id}"
+}
+
+# @nonobvious(must-hold) the hash, not the tool, decides a change, so an interface rewritten through Bash still counts
+iface_touch() {
+  local ip path ver hash me changed=0 teammates
+  ip="$(playbook_state_get "$live" iface_path)"
+  [ -n "$ip" ] || return 0
+  me="$(crew_self)"
+  ver="$(playbook_state_int "$live" iface_ver 0)"
+  hash="$(shasum "$ip" 2>/dev/null | cut -d' ' -f1)"
+  if [ -n "$hash" ] && [ "$hash" != "$(playbook_state_get "$live" iface_hash)" ]; then
+    ver=$(( ver + 1 )); changed=1
+    playbook_state_put "$live" "iface_hash=${hash}" "iface_ver=${ver}"
+  fi
+  if [ "$event" = "PostToolUse" ]; then
+    # @nonobvious(means) teammates often read the interface with cat in the shell, so a plain read of it counts, but a command that merely names it does not
+    if [ "$tool" = "Bash" ]; then
+      if iface_plain_read "$(jf '.tool_input.command // empty')" && [ -n "$IFR_IFACE" ]; then playbook_state_put "$dir" "iface_seen=${ver}"; fi
+    elif [ "$(file_path_of)" = "$ip" ]; then
+      case "$tool" in Read|Edit|Write|MultiEdit|NotebookEdit) playbook_state_put "$dir" "iface_seen=${ver}" ;; esac
+    fi
+  fi
+  # @nonobvious(means) a change to the interface is how a crew member calls everyone to regroup; before anyone is dispatched it is still the lead drafting
+  teammates="$(crew_names | grep -vc '^lead$')"
+  if [ "$changed" = 1 ] && [ "$teammates" -gt 0 ] && [ "$(playbook_mode "$live")" = "hackathon" ]; then
+    playbook_event_push "$dir" "Playbook: the shared interface ${ip} was changed directly, so it counts as published as version ${ver}. Next time edit $(iface_draft "$ip") and run \`playbook publish <what changed>\`, so typos and wording are fixed before anyone is held."
+    if [ "$(playbook_state_get "$live" rg_open)" != 1 ]; then
+      playbook_state_put "$live" "rg_open=1" "rg_id=$(playbook_now)-${ver}" "rg_by=${me}" "rg_ok=" "rg_how=" "rg_reset="
+    elif [ -n "$(playbook_state_get "$live" rg_ok)" ]; then
+      playbook_state_put "$live" "rg_ok=" "rg_reset=${ver}" "rg_reset_by=${me}"
+      playbook_state_put "$dir" "rg_reset_noted=${ver}"
+      playbook_event_push "$dir" "Playbook regroup: the interface changed while the crew was aligning, so every approval so far is cleared and everyone must align on version ${ver}. If this is the agreed version, message each colleague that it is written."
+    fi
+  fi
+  regroup_notice
+  return 0
+}
+
+# @nonobvious(means) each crew member hears about a regroup once, in the result of its next step, so the hold rarely shows as a refused edit
+regroup_notice() {
+  local id me ip rs
+  id="$(playbook_state_get "$live" rg_id)"
+  [ -n "$id" ] || return 0
+  if [ "$(playbook_state_get "$live" rg_open)" != 1 ]; then
+    if [ "$(playbook_state_get "$dir" rg_noted)" = "$id" ] && [ "$(playbook_state_get "$dir" rg_closed_noted)" != "$id" ]; then
+      playbook_state_put "$dir" "rg_closed_noted=${id}"
+      playbook_event_push "$dir" "Playbook regroup closed: $(playbook_state_get "$live" rg_how). The hold is lifted, so edits are free again."
+    fi
+    return 0
+  fi
+  if [ "$(playbook_state_get "$dir" rg_noted)" = "$id" ]; then
+    rs="$(playbook_state_get "$live" rg_reset)"
+    if [ -n "$rs" ] && [ "$(playbook_state_get "$dir" rg_reset_noted)" != "$rs" ]; then
+      playbook_state_put "$dir" "rg_reset_noted=${rs}"
+      playbook_event_push "$dir" "Playbook regroup: $(playbook_state_get "$live" rg_reset_by) put version ${rs} of the interface in place, so every approval so far is cleared. Read it, and once it is the agreed one, run \`playbook aligned <your name>\`."
+    fi
+    return 0
+  fi
+  playbook_state_put "$dir" "rg_noted=${id}" "rg_reset_noted=$(playbook_state_get "$live" rg_reset)"
+  me="$(crew_self)"; ip="$(playbook_state_get "$live" iface_path)"
+  if [ "$(playbook_state_get "$live" rg_by)" = "$me" ]; then
+    playbook_event_push "$dir" "Playbook regroup: your change to the shared interface ${ip} calls everyone to regroup, so the whole crew's edits are held, yours included. Message every colleague once now, the lead included: \`REGROUP: <what changed and why>\`. Then talk it through by message; nobody publishes again until everyone has agreed, when its owner puts the agreed version in the draft and publishes it. Once the version you have read is the agreed one, run \`playbook aligned <your name>\`."
+  else
+    playbook_event_push "$dir" "Playbook regroup: the shared interface ${ip} has changed and a colleague has called everyone to regroup, so the whole crew's edits are held, the lead's included. Read the interface, talk it through by message with the colleagues it affects, and do not publish a change yourself until everyone has agreed; its owner then publishes the agreed version. Waiting with nothing to do is fine. Once the version you have read is the agreed one, run \`playbook aligned <your name>\`."
+  fi
+}
+
+failure_text() {
+  jq -r '
+    def s: if type=="string" then . elif type=="object" then ((.error // .stderr // .stdout // .output // .content // "") | if type=="string" then . else tojson end) else "" end;
+    ((.error // empty | s), (.tool_response | s)) | select(length>0)' 2>/dev/null <<<"$stdin" | head -n 40 | tr '\n' ' ' | cut -c1-400
+}
+
+bash_failed() {
+  local ec txt
+  [ "$event" = "PostToolUseFailure" ] && return 0
+  ec="$(jf '(.tool_response | if type=="object" then (.exit_code // .exitCode // .returncode // .returnCode // empty) else empty end) | tostring')"
+  case "$ec" in ''|0|null) ;; *[!0-9-]*) ;; *) return 0 ;; esac
+  [ "$(jf '(.tool_response | if type=="object" then (.is_error // .isError // false) else false end) | tostring')" = "true" ] && return 0
+  txt="$(jf '(.tool_response | if type=="object" then (.stderr // "") else "" end) | tostring' | head -c 12)"
+  case "$txt" in "Exit code "[1-9]*) return 0 ;; esac
+  return 1
+}
+
+cap_body() {
+  if [ -f "${dir}/offline" ]; then
+    printf 'Playbook subagent cap: that refusal is a stale per-process counter, not a limit on the work. This session is offline, so keep going at the same bar: the Workflow tool draws on a separate pool, so route parallel work through it. Log the refusal for the morning and do not raise unease.'
+  else
+    printf 'Playbook subagent cap: that refusal is a stale per-process counter, not a limit on the work, and /clear does not reset it. Stop here and tell the user that a fresh session with a short handover is the cleanest way on; if they would rather keep this conversation, they can /rename it and reopen it with claude -r <label> in a new terminal window, and nothing is lost. Do not quietly fall back to solo work, narrow the task, or raise unease.'
+  fi
+}
+
+is_judge_call() {
+  local d st bg
+  d="$(jf '.tool_input.description // empty' | tr 'A-Z' 'a-z')"
+  st="$(jf '.tool_input.subagent_type // empty')"
+  bg="$(jf '.tool_input.run_in_background // false')"
+  [ "$bg" = "true" ] && return 1
+  case "$d" in judge:*) return 0 ;; esac
+  [ "$st" = "codex:codex-rescue" ]
+}
+
+# @nonobvious(means) the recommended label per question, or the first label when none is marked, which is what a user who takes the recommendation would pick
+recommended_answers() {
+  jq -c '[ (.tool_input.questions // [])[] | {q:(.question // ""),
+      a:( ([ (.options // [])[] | .label // "" | select(test("\\(recommended\\)"; "i")) ] + [ (.options // [])[0].label // "" ])[0] )} ]' 2>/dev/null <<<"$stdin"
+}
+
+goal_from() {
+  local q="${1:-}" a="${2:-}"
+  # @nonobvious(means) a label that restates "Goal: … · Mode: …" is the goal the user clicked, so it wins over the question's longer wording
+  case "$a" in
+    "Goal:"*) printf '%s' "${a#Goal:}" | sed -E 's/[[:space:]]+(·|\|)[[:space:]].*$//; s/^[[:space:]]+|[[:space:]]+$//g' ;;
+    *) printf '%s' "${q#Goal:}" | sed -E 's/[[:space:]]+(·|\|)[[:space:]].*$//; s/[[:space:]]+(which|what)[^.?!]*\?$//I; s/[[:space:]]*[.]$//; s/^[[:space:]]+|[[:space:]]+$//g' ;;
+  esac
+}
+
+handle_ask() {
+  local pairs q a goal mode src answered=0 afk tid by_user=1 taken="" ov
+  afk="$(jf '.tool_response.afkTimeoutMs // empty')"
+  tid="$(jf '.tool_use_id // empty')"
+  if [ -n "$tid" ] && [ "$(playbook_state_get "$dir" auto_ask_id)" = "$tid" ]; then by_user=0; playbook_state_put "$dir" "auto_ask_id="; fi
+  [ -n "$afk" ] && by_user=0
+  pairs="$(jq -c '
+    def flat: if type=="array" then map(tostring) | join(", ") else tostring end;
+    ( (.tool_response | if type=="object" then (.answers // null) else null end)
+      // (.tool_input.answers // null) ) as $m
+    | if ($m | type) == "object" then [ $m | to_entries[] | {q:.key, a:(.value | flat)} ]
+      else
+        ( .tool_response | if type=="string" then . elif type=="object" then (.content // .text // .result // "" | if type=="string" then . else tojson end) else "" end ) as $s
+        | [ $s | scan("\"([^\"]+)\"=\"([^\"]*)\"") | {q:.[0], a:.[1]} ]
+      end' 2>/dev/null <<<"$stdin")"
+  # @nonobvious(must-hold) a goal picker opens on work the user has just asked for, so it never proceeds without them, even when Claude Code's idle timeout closes it
+  if [ -n "$afk" ] && jq -e '[ (.tool_input.questions // [])[] | .question // "" | select(startswith("Goal:")) ] | length > 0' >/dev/null 2>&1 <<<"$stdin"; then
+    taken="$(jq -r 'map(.q + ": " + .a) | join("; ")' <<<"${pairs:-[]}" 2>/dev/null)"
+    playbook_offline_log "$dir" "The goal picker closed unanswered after $(( afk / 1000 ))s; the work waits for the user" "a new piece of work never starts without the user's pick"
+    playbook_notify_bg action "Playbook is waiting for your pick" "$(jq -r '[ (.tool_input.questions // [])[] | .question // "" | select(startswith("Goal:")) ][0]' 2>/dev/null <<<"$stdin")"
+    playbook_event_push "$dir" "Playbook: the goal picker closed unanswered after $(( afk / 1000 ))s, but new work never starts without the user's pick${taken:+ (before going idle they had selected ${taken})}. Do not start it or take the recommendation: say in one line that the picker is waiting for them, end your turn, and ask again when they reply."
+    return 0
+  fi
+  # @nonobvious(means) any other question that closed on Claude Code's idle timeout has no answer from the user, so the recommended option is taken in their absence and a judge oversees from here
+  if [ -n "$afk" ]; then
+    pairs="$(jq -c --argjson got "${pairs:-[]}" '. as $rec | [ $rec[] | . as $r | (($got | map(select(.q == $r.q)) | .[0].a) // $r.a) as $a | {q:$r.q, a:$a} ]' <<<"$(recommended_answers)" 2>/dev/null)"
+    playbook_offline_set "$dir" 1 b
+  fi
+  [ -n "$pairs" ] || return 0
+  while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    q="$(jq -r '.q' <<<"$row")"; a="$(jq -r '.a' <<<"$row")"
+    [ -n "$a" ] || continue
+    case "$q" in "Goal:"*) src=picker ;; "Oversight:"*) src=oversight ;; *) src=asked ;; esac
+    if [ "$by_user" = 1 ]; then
+      answered=1
+      playbook_decision_add "$dir" "$src" "$q" "$a"
+    else
+      taken="${taken}${taken:+; }${q}: ${a}"
+      playbook_offline_log "$dir" "Took the recommended answer without the user: ${q} = ${a}" \
+        "$([ -n "$afk" ] && printf 'the question closed unanswered after %ss' "$(( afk / 1000 ))" || printf 'a judge oversees and the user is away')"
+    fi
+    if [ "$src" = "picker" ]; then
+      mode="$(playbook_mode_canon "$a")"
+      goal="$(goal_from "$q" "$a")"
+      if [ -n "$mode" ] && [ -n "$goal" ]; then
+        playbook_ns_confirm "$dir" "$goal" "$mode" "$([ "$by_user" = 1 ] && printf picker || printf offline)"
+      fi
+    elif [ "$src" = "oversight" ] && [ "$by_user" = 1 ]; then
+      ov="$(playbook_oversight_apply "$dir" "$a")"
+      case "$ov" in
+        online) playbook_event_push "$dir" "Playbook oversight: the user oversees this. Questions wait for them." ;;
+        autonomous) playbook_event_push "$dir" "Playbook oversight: autonomous development. A judge takes every decision or blocker, and the user is not alerted. Playbook answers later questions with the recommended option; before acting on one the user might reverse, consult a judge. ${PLAYBOOK_SCOPE_RULE}" ;;
+        "judge now") playbook_event_push "$dir" "Playbook oversight: a judge oversees this in the background and the user may be away. Playbook answers later questions with the recommended option and pushes them to the user's phone; before acting on one the user might reverse, consult a judge. ${PLAYBOOK_SCOPE_RULE}" ;;
+        judge*) playbook_event_push "$dir" "Playbook oversight: the user wants ${ov#judge after } to answer each question, then a judge takes over. Later questions are pushed to their phone instead of shown; wait that long for a typed reply, then take the recommended option with a judge's view. ${PLAYBOOK_SCOPE_RULE}" ;;
+      esac
+    fi
+  done < <(jq -c '.[]' <<<"$pairs" 2>/dev/null)
+  if [ -n "$afk" ]; then
+    playbook_notify_bg action "Playbook went ahead without you" "$taken"
+    playbook_event_push "$dir" "Playbook: the question closed unanswered after $(( afk / 1000 ))s, so the user is away. Playbook took the recommended answers (${taken}) and a judge now oversees: later questions are answered with the recommended option and pushed to the user's phone. Before acting on anything the user might reverse, consult a judge. ${PLAYBOOK_SCOPE_RULE}"
+  fi
+  [ "$answered" = 1 ] && { playbook_user_answered "$dir"; playbook_weigh_signed "$dir"; }
+  return 0
+}
+
+# @nonobvious(must-hold) an open dialog blocks the whole run while the user is away, so with a judge overseeing no question is ever shown: it is answered now, or held for the user's window and pushed to their phone
+offline_ask() {
+  local wait window rec qs head
+  [ -z "$aid" ] || return 0
+  playbook_offline_on "$dir" || return 0
+  wait="$(playbook_offline_get "$dir" wait)"; window="$(playbook_offline_get "$dir" window)"
+  rec="$(recommended_answers)"
+  qs="$(jq -r 'map(.q + " -> " + .a) | join("; ")' <<<"$rec" 2>/dev/null)"
+  head="$(jq -r '.[0].q // "A question"' <<<"$rec" 2>/dev/null)"
+  if [ "$wait" = "a" ] && [ -n "$window" ]; then
+    playbook_notify_bg action "Playbook needs you within ${window} min" "$qs"
+    playbook_offline_log "$dir" "Held a question for the user's ${window}-minute window: ${qs}" "the user asked to oversee for ${window} minutes before a judge"
+    deny "Playbook offline: the user asked for ${window} minutes before a judge takes over, so this question is not shown as a dialog; it has been pushed to their phone. Ask it in your reply too, so they can answer at the terminal. Start \`sleep $(( window * 60 ))\` with run_in_background, and carry on with work that does not depend on the answer. If the user has not replied when it ends, take the recommended option (${qs}), consult a judge if they might reverse it, and record a picker choice with \`playbook goal <mode> <goal line>\`. ${PLAYBOOK_SCOPE_RULE}"
+  fi
+  playbook_state_put "$dir" "auto_ask_id=$(jf '.tool_use_id // empty')"
+  [ "$(playbook_offline_get "$dir" quiet)" = "1" ] || playbook_notify_bg info "Playbook answered for you" "$qs"
+  jq -c --argjson rec "$rec" '
+    {hookSpecificOutput:{hookEventName:"PreToolUse", permissionDecision:"allow",
+      permissionDecisionReason:"Playbook offline: a judge oversees, so the recommended options were taken",
+      updatedInput:((.tool_input // {}) + {answers:(reduce $rec[] as $r ({}; . + {($r.q): $r.a}))}),
+      additionalContext:"Playbook offline: a judge oversees and the user may be away, so Playbook answered with the recommended options and logged them. Before acting on an answer the user might reverse, consult a judge. ${PLAYBOOK_SCOPE_RULE}"},
+     systemMessage:("📴 Playbook answered for you: " + ($rec | map(.q + " → " + .a) | join("; ")))}' <<<"$stdin"
+  exit 0
+}
+
+emit_post() {
+  local ctx
+  ctx="$(playbook_event_drain "$dir")"
+  [ -n "$ctx" ] && playbook_emit_context "$event" "$ctx"
+  return 0
+}
+
+case "$event" in
+  PreToolUse)
+    if [ "$tool" = "Bash" ]; then
+      stray_words
+      [ "$(playbook_state_get "$live" rg_open)" = 1 ] && regroup_shell
+      [ -z "$aid" ] && weigh_shell
+      handle_bash; iface_shell_read; exit 0
+    fi
+    if [ "$tool" = "AskUserQuestion" ]; then offline_ask; exit 0; fi
+    if [ "$tool" = "Read" ]; then iface_own "$(file_path_of)" && emit_pre allow "Playbook keeps the crew's interface"; exit 0; fi
+    is_edit_tool "$tool" || exit 0
+    if [ -z "$aid" ]; then
+      hold="$(playbook_weigh_hold_text "$dir")"; [ -n "$hold" ] && { playbook_weigh_tell_any "$dir"; deny "$hold"; }
+      case "$(playbook_gate "$dir")" in
+        rethink) deny "Playbook unease gate: stop and reconsider before editing. State what changes with \`playbook rethink <what changes>\`, then edit." ;;
+        judge)   deny "Playbook unease gate (concerned): consult a judge before more edits. Dispatch a fresh Opus Agent in the foreground whose description starts \`judge:\`, or codex:codex-rescue, with the evidence and the user's decisions." ;;
+        ask)
+          if playbook_offline_on "$dir"; then
+            deny "Playbook unease gate (alarmed): the user is offline. Push a notification, wait the declared window, then consult an outside judge (codex:codex-rescue or a foreground \`judge:\` Agent) before more edits."
+          else
+            deny "Playbook unease gate (alarmed): consult a judge before more edits: a fresh Opus Agent in the foreground whose description starts \`judge:\`, or codex:codex-rescue, with the evidence and the user's decisions. If the user is here, you may ask them in AskUserQuestion instead."
+          fi ;;
+      esac
+    fi
+    ip="$(playbook_state_get "$live" iface_path)"
+    if [ -n "$ip" ] && [ "$(file_path_of)" = "$ip" ] && [ "$(playbook_mode "$live")" = "hackathon" ] && crew_has_teammates; then
+      deny "Playbook: the shared interface changes only by publishing, so typos and wording are fixed before anyone is held. Make your change in its draft, $(iface_draft "$ip"), then run \`playbook publish <what changed>\`."
+    fi
+    if [ "$(playbook_state_get "$live" rg_open)" = 1 ] && [ "$(playbook_mode "$live")" = "hackathon" ] && [ "$(file_path_of)" != "$(iface_draft "$ip")" ]; then
+      deny "Playbook regroup: the shared interface $(playbook_state_get "$live" iface_path) has changed and the crew is regrouping, so every edit is held until everyone has aligned. Read it, talk it through by message, and once the version you have read is the agreed one, run \`playbook aligned <your name>\`. The hold lifts when the last one aligns."
+    fi
+    iface_own "$(file_path_of)" && emit_pre allow "Playbook keeps the crew's interface"
+    exit 0 ;;
+
+  PostToolUse|PostToolUseFailure)
+    iface_touch
+    if [ "$tool" = "SendMessage" ]; then
+      to="$(jf '.tool_input.to // empty')"
+      [ -n "$to" ] && playbook_team_message "$stdin" "$to"
+      if [ -n "$to" ] && [ "$event" = "PostToolUse" ] && [ "$(playbook_mode "$live")" = "hackathon" ]; then
+        crew_talk "$to"; mail_post "$to"
+      fi
+    fi
+    [ "$(playbook_mode "$live")" = "hackathon" ] && mail_deliver
+    if [ -n "$aid" ]; then emit_post; exit 0; fi
+
+    failed=0; [ "$event" = "PostToolUseFailure" ] && failed=1
+    playbook_tick "$dir"
+    # @nonobvious(means) a tool that ran after a permission prompt was answered, so the user is back; the wait itself stayed paused
+    if [ "$(playbook_state_get "$dir" away_src)" = "permission" ]; then playbook_state_put "$dir" "away=0" "away_src="; fi
+    case "$tool" in
+      Bash)
+        cmd="$(jf '.tool_input.command // empty')"
+        if only_channel_lines "$cmd"; then :; else
+          # @nonobvious(means) a background launch returns before the command has run, so it is neither a pass nor a failure
+          if [ "$(jf '.tool_input.run_in_background // false')" = "true" ] || jq -en --arg c "$cmd" '$c | test("(^|[^&])&\\s*$")' >/dev/null 2>&1; then
+            playbook_score_settle "$dir"; emit_post; exit 0
+          fi
+          if bash_failed; then failed=1; else failed=0; fi
+          body=""; [ "$failed" = "1" ] && body="$(failure_text)"
+          playbook_bash_result "$dir" "$cmd" "$failed" "$body"
+        fi ;;
+      Edit|Write|MultiEdit|NotebookEdit)
+        if [ "$failed" = "1" ]; then playbook_tool_result "$dir" 1 "$(failure_text)"
+        else playbook_edit_done "$dir" "$(file_path_of)"; fi ;;
+      Agent)
+        if [ "$failed" = "0" ] && is_judge_call; then
+          playbook_judge_returned "$dir"
+          playbook_event_push "$dir" "Playbook: the judge has returned, so the score is now $(playbook_score_text "$dir"). Act on its view; the user's decisions still outrank it."
+        elif [ "$failed" = "0" ] && playbook_is_review "$(jf '.tool_input.description // empty')"; then
+          if [ "$(jf '.tool_response.isAsync // false')" = "true" ]; then
+            playbook_review_note "$dir" "$(jf '.tool_response.agentId // empty')"
+          else
+            rid="$(jf '.tool_use_id // empty')"; rid="${rid:-$(playbook_now)-$$}"
+            playbook_weigh_arm "$dir" "$rid"
+          fi
+          playbook_tool_result "$dir" 0 ""
+        elif [ "$failed" = "1" ]; then
+          body="$(failure_text)"
+          case "$body" in
+            *"Subagent spawn limit reached"*)
+              if [ "$(playbook_state_get "$dir" cap_notice)" != "1" ]; then
+                playbook_state_put "$dir" "cap_notice=1"
+                playbook_event_push "$dir" "$(cap_body)"
+              fi ;;
+          esac
+          playbook_tool_result "$dir" 1 "$body"
+        else
+          playbook_tool_result "$dir" 0 ""
+        fi ;;
+      Workflow)
+        if [ "$failed" = "0" ] && playbook_is_review "$(jf '[.tool_response.workflowName // "", .tool_response.summary // ""] | join(" ")')"; then
+          playbook_review_note "$dir" "$(jf '.tool_response.taskId // empty')"
+        fi
+        playbook_tool_result "$dir" "$failed" "$([ "$failed" = 1 ] && failure_text)" ;;
+      AskUserQuestion)
+        handle_ask
+        playbook_tool_result "$dir" "$failed" "$([ "$failed" = 1 ] && failure_text)" ;;
+      *)
+        playbook_tool_result "$dir" "$failed" "$([ "$failed" = 1 ] && failure_text)" ;;
+    esac
+    playbook_score_settle "$dir"
+    playbook_weigh_tell_any "$dir" && playbook_event_push "$dir" "$PLAYBOOK_WEIGH_TEXT"
+    emit_post
+    exit 0 ;;
+
+  Stop)
+    [ -z "$aid" ] || exit 0
+    [ "$(playbook_mode "$live")" = "hackathon" ] && playbook_state_put "$live" "lead_idle=1"
+    msg="$(jf '.last_assistant_message // empty')"
+    if [ -n "$msg" ] && playbook_match waitme "$msg"; then playbook_state_put "$dir" "away=1"; fi
+    # @nonobvious(means) a route line printed in the reply instead of run still names the mode Claude chose, so it is recorded as if run
+    line="$(printf '%s\n' "$msg" | sed -nE 's/^[[:space:]`]*(:[[:space:]]+)?playbook[[:space:]]+route[[:space:]]+//p' | tail -n1)"
+    mode="$(playbook_mode_canon "${line%%[[:space:]]*}")"
+    if [ -n "$mode" ]; then
+      reason="$(trim "$(printf '%s' "${line#*[[:space:]]}" | tr -d '`')")"; [ "$reason" = "$line" ] && reason=""
+      playbook_route_set "$dir" "$mode" "$reason"
+    fi
+    exit 0 ;;
+
+  SubagentStop)
+    rid="$(jf '.agent_id // empty')"
+    playbook_review_known "$live" "$rid" && playbook_weigh_arm "$live" "$rid"
+    exit 0 ;;
+
+  Notification)
+    kind="$(jf '.notification_type // empty')"
+    case "$kind" in
+      permission_prompt) playbook_state_put "$dir" "away=1" "away_src=permission" ;;
+      idle_prompt) playbook_state_put "$dir" "away=1" "away_src=" ;;
+    esac
+    exit 0 ;;
+esac
+exit 0

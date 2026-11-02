@@ -16,6 +16,22 @@ esac
 path="$(field '.tool_input.file_path // ""')"
 [ -n "$path" ] || exit 0
 
+# @nonobvious(deliberately-missing) scratch and temp locations are never project code, so nothing there is guarded
+case "$path" in
+  /private/tmp | /private/tmp/* | /tmp | /tmp/*) exit 0 ;;
+esac
+tmp_root="${TMPDIR:-}"
+if [ -n "$tmp_root" ]; then
+  tmp_root="$(cd "$tmp_root" 2>/dev/null && pwd -P)" || tmp_root=""
+  path_dir="$(cd "$(dirname -- "$path")" 2>/dev/null && pwd -P)" || path_dir=""
+  case "$tmp_root" in
+    "" | / | "$HOME") ;;
+    *)
+      case "$path/" in "$tmp_root"/*) exit 0 ;; esac
+      case "$path_dir/" in "$tmp_root"/*) exit 0 ;; esac ;;
+  esac
+fi
+
 if [ "$tool" = "Write" ]; then
   inserted="$(field '.tool_input.content // ""')"
   oldtext=""

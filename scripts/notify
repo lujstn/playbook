@@ -17,7 +17,7 @@ Usage: notify [--level info|action|critical] [--link <url>]
   --link <url>      attach a tappable URL to the notification
 
 Back-compat: --category=action and --category=info are accepted as aliases.
-Config: project .claude/playbook/ first, then global ~/.claude/playbook/.
+Config: project .claude/playbook/ first, then global ~/.local/state/playbook/.
   notify-provider (pushover|ntfy); pushover-token + pushover-user; ntfy-topic.
 EOF
   exit 64
@@ -79,7 +79,7 @@ case "$PROVIDER" in
   ntfy)
     TOPIC="$(playbook_ntfy_topic "$PWD")"
     if [ -z "$TOPIC" ]; then
-      echo "ERROR: no ntfy topic configured. Save it to ~/.claude/playbook/ntfy-topic (global) or .claude/playbook/ntfy-topic (this project)." >&2
+      echo "ERROR: no ntfy topic configured. Save it to ~/.local/state/playbook/ntfy-topic (global) or .claude/playbook/ntfy-topic (this project)." >&2
       exit 4
     fi
     SERVER="$(playbook_ntfy_server "$PWD")"
@@ -99,7 +99,7 @@ case "$PROVIDER" in
     TOKEN="$(playbook_pushover_token "$PWD")"
     USER_KEY="$(playbook_pushover_user "$PWD")"
     if [ -z "$TOKEN" ] || [ -z "$USER_KEY" ]; then
-      echo "ERROR: Pushover credentials missing. Save pushover-token and pushover-user under ~/.claude/playbook/ (global) or .claude/playbook/ (this project)." >&2
+      echo "ERROR: Pushover credentials missing. Save pushover-token and pushover-user under ~/.local/state/playbook/ (global) or .claude/playbook/ (this project)." >&2
       exit 4
     fi
 
@@ -136,8 +136,7 @@ case "$PROVIDER" in
         RECEIPT="$(printf '%s' "$response" | sed -n 's/.*"receipt":"\([^"]*\)".*/\1/p' 2>/dev/null || true)"
       fi
       if [ -n "$RECEIPT" ]; then
-        mkdir -p "${PWD}/.claude/playbook"
-        printf '%s\n' "$RECEIPT" > "${PWD}/.claude/playbook/last-receipt"
+        printf '%s\n' "$RECEIPT" > "$(playbook_global_dir)/last-receipt"
       fi
     fi
     if [ -n "$RECEIPT" ]; then
@@ -148,7 +147,7 @@ case "$PROVIDER" in
     ;;
 
   *)
-    echo "ERROR: no notification provider configured. Save 'pushover' or 'ntfy' to ~/.claude/playbook/notify-provider (global) or .claude/playbook/notify-provider (this project)." >&2
+    echo "ERROR: no notification provider configured. Save 'pushover' or 'ntfy' to ~/.local/state/playbook/notify-provider (global) or .claude/playbook/notify-provider (this project)." >&2
     exit 4
     ;;
 esac

@@ -6,41 +6,279 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 tool="$(jq -r '.tool_name // empty' 2>/dev/null <<<"$stdin" || true)"
 case "$tool" in
-  Agent | Workflow) ;;
+  Agent | Workflow | SendMessage) ;;
   *) exit 0 ;;
 esac
 
 [ "${PLAYBOOK_DISPATCH_GUARD:-}" = "off" ] && exit 0
 
+lib="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/hooks/lib/playbook-common.sh"
+[ -f "$lib" ] || exit 0
+# shellcheck source=lib/playbook-common.sh
+. "$lib" 2>/dev/null || exit 0
+
 block() {
-  {
-    echo "Playbook dispatch guard: this ${1} carries no North Star."
-    echo "Add one line to the ${2} and redispatch:"
-    echo "playbook-northstar: <one line stating what success means for the whole project>"
-    echo "or declare a deliberately narrow dispatch with: playbook-northstar: none (task-only)"
-    echo "Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
-  } >&2
+  printf '%s\n' "$1" >&2
   exit 2
 }
 
+field() { jq -r "$1" 2>/dev/null <<<"$stdin" || true; }
+
+norm_goal() {
+  printf '%s' "${1:-}" | tr 'A-Z' 'a-z' | tr -s '[:space:]' ' ' | sed -E 's/^ +//; s/[ .,;:!?]+$//'
+}
+
+# @nonobvious(forced-by) a printf pipe into grep -q SIGPIPEs past the pipe buffer and pipefail turns allow into block; here-strings have no writer process
+ns_lines() {
+  grep -E '^[[:space:]]*playbook-northstar:[[:space:]]*[^[:space:]]' <<<"${1:-}" 2>/dev/null \
+    | sed -E 's/^[[:space:]]*playbook-northstar:[[:space:]]*//; s/[[:space:]]+$//'
+  sed -nE "s/.*playbook-northstar:[[:space:]]*([^\"'\`\\\\]*[^\"'\`\\\\[:space:]]).*/\\1/p" <<<"${2:-}" 2>/dev/null
+}
+
+# @nonobvious(means) an agent( call owns the script text up to the next agent(; an options object declared with a model key counts, passed by name or spread
+agent_calls_missing_model() {
+  local flat segs seg id k=0 miss=0 where lbl
+  flat="$(printf '%s' "${1:-}" | tr '\n\r\t' '   ')"
+  segs="$(awk '
+    { s=$0; re="(^|[^A-Za-z0-9_$.])agent[ ]*\\("
+      if (!match(s, re)) next
+      s=substr(s, RSTART+RLENGTH)
+      while (1) {
+        if (match(s, re)) { print substr(s, 1, RSTART-1); s=substr(s, RSTART+RLENGTH) }
+        else { print s; break }
+      } }' <<<"$flat")"
+  [ -n "$segs" ] || return 1
+  while IFS= read -r seg; do
+    k=$(( k + 1 ))
+    if grep -qE '(^|[^A-Za-z0-9_$.])model[[:space:]]*(:|,|\})' <<<"$seg"; then continue; fi
+    ok=0
+    for id in $( { grep -oE '\.\.\.[[:space:]]*[A-Za-z_$][A-Za-z0-9_$]*' <<<"$seg" | sed -E 's/\.\.\.[[:space:]]*//'
+                   grep -oE ',[[:space:]]*[A-Za-z_$][A-Za-z0-9_$]*[[:space:]]*[,)]' <<<"$seg" | sed -E 's/^,[[:space:]]*//; s/[[:space:]]*[,)]$//'; } ); do
+      if grep -qE "(const|let|var)[[:space:]]+${id//\$/\\$}[[:space:]]*=[[:space:]]*\{([^}]*[^A-Za-z0-9_$.])?model[[:space:]]*(:|,|\})" <<<"$flat"; then ok=1; break; fi
+    done
+    if [ "$ok" = 0 ] && [ "$miss" = 0 ]; then
+      miss=1
+      where="$(awk -v k="$k" '
+        { s=$0; re="(^|[^A-Za-z0-9_$.])agent[ \t]*\\("
+          while (match(s, re)) { n++; if (n == k) { print NR; exit } s=substr(s, RSTART+RLENGTH) } }' <<<"${1:-}")"
+      lbl="$(sed -nE "s/.*label[[:space:]]*:[[:space:]]*[\"'\`]([^\"'\`]+)[\"'\`].*/\\1/p" <<<"$seg" | head -n1)"
+      MISSING_AT="the agent() call${where:+ at script line ${where}}${lbl:+ (label ${lbl})}"
+    fi
+  done <<<"$segs"
+  [ "$miss" = 1 ]
+}
+
+# @nonobvious(means) a goal line built from a script constant or a workflow arg is compared as resolved; one that can't be resolved is skipped, since the helper block carries the confirmed goal anyway
+resolve_tpl() {
+  local line="${1:-}" m id val n=0
+  while [[ "$line" =~ \$\{[[:space:]]*([A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?)[[:space:]]*\} ]]; do
+    m="${BASH_REMATCH[0]}"; id="${BASH_REMATCH[1]}"
+    n=$(( n + 1 )); [ "$n" -le 8 ] || return 1
+    case "$id" in
+      args.*) val="$(jq -r --arg k "${id#args.}" '.[$k] // empty | strings' 2>/dev/null <<<"$args" || true)" ;;
+      *.*) return 1 ;;
+      *) val="$(tr '\n\r\t' '   ' <<<"$script" | sed -nE "s/.*(const|let|var)[[:space:]]+${id}[[:space:]]*=[[:space:]]*[\"'\`]([^\"'\`\$]*)[\"'\`].*/\\2/p" | head -n1)" ;;
+    esac
+    [ -n "$val" ] || return 1
+    line="${line//"$m"/$val}"
+  done
+  case "$line" in *'${'*) return 1 ;; esac
+  printf '%s' "$line"
+}
+
+workflow_script() {
+  local s p n d f
+  s="$(field '.tool_input.script // empty')"
+  [ -n "$s" ] && { printf '%s' "$s"; return 0; }
+  p="$(field '.tool_input.scriptPath // empty')"
+  if [ -n "$p" ] && [ -f "$p" ]; then cat "$p" 2>/dev/null; return 0; fi
+  n="$(field '.tool_input.name // empty' | tr -cd 'A-Za-z0-9._-')"
+  [ -n "$n" ] || return 0
+  d="$(field '.cwd // empty')"
+  for f in "${d:+$d/.claude/workflows/}$n.js" "${d:+$d/.claude/workflows/}$n.mjs" \
+           "${HOME}/.claude/workflows/$n.js" "${HOME}/.claude/workflows/$n.mjs"; do
+    case "$f" in /*) [ -f "$f" ] && { cat "$f" 2>/dev/null; return 0; } ;; esac
+  done
+  return 0
+}
+
+live="$(playbook_live_dir "$stdin")"
+[ -n "$live" ] || exit 0
+playbook_lock "$live"
+
+aid="$(playbook_agent_id "$stdin")"
+subagent="$(field '.tool_input.subagent_type // empty')"
+exempt=0 gsd=0
 if [ "$tool" = "Agent" ]; then
-  subagent="$(jq -r '.tool_input.subagent_type // empty' 2>/dev/null <<<"$stdin" || true)"
   case "$subagent" in
-    gsd-* | Explore | Plan | claude-code-guide | statusline-setup) exit 0 ;;
+    Explore | Plan | claude-code-guide | statusline-setup) exempt=1 ;;
+    gsd-*) gsd=1 ;;
   esac
-  prompt="$(jq -r '.tool_input.prompt // empty' 2>/dev/null <<<"$stdin" || true)"
-  # @nonobvious(forced-by) a printf pipe into grep -q SIGPIPEs past the pipe buffer and pipefail turns allow into block; the here-string has no writer process
-  grep -qE '^[[:space:]]*playbook-northstar:[[:space:]]*[^[:space:]]' <<<"$prompt" && exit 0
-  block "Agent dispatch" "prompt"
 fi
 
-if [ "$tool" = "Workflow" ]; then
-  script="$(jq -r '.tool_input.script // empty' 2>/dev/null <<<"$stdin" || true)"
-  args="$(jq -r 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end' 2>/dev/null <<<"$stdin" || true)"
-  # @nonobvious(deliberately-missing) name and scriptPath invocations carry no visible content to check, so they fail open
-  { [ -z "$script" ] && [ -z "$args" ]; } && exit 0
-  grep -qF 'playbook-northstar' <<<"${script}"$'\n'"${args}" && exit 0
-  block "Workflow launch" "script's agent prompts"
+script="" args="" prompt="" model="" label="" desc="" wfname="" MISSING_AT="a Workflow agent() call"
+case "$tool" in
+  Agent)
+    prompt="$(field '.tool_input.prompt // empty')"
+    model="$(field '.tool_input.model // empty')"
+    desc="$(field '.tool_input.description // empty')"
+    label="${desc:-${subagent:-agent}}" ;;
+  Workflow)
+    script="$(workflow_script)"
+    args="$(field 'if .tool_input.args == null then empty else (.tool_input.args | tostring) end')"
+    wfname="$(field '.tool_input.name // empty')"
+    if [ -z "$wfname" ] && [ -n "$script" ]; then
+      wfname="$(tr '\n\r\t' '   ' <<<"$script" | sed -nE "s/.*meta[^{]*\\{[^}]*name[[:space:]]*:[[:space:]]*[\"'\`]([^\"'\`]+)[\"'\`].*/\\1/p" | head -n1)"
+    fi
+    label="${wfname:-workflow}" ;;
+  SendMessage)
+    prompt="$(field '.tool_input.message // empty | if type=="string" then . else tojson end')" ;;
+esac
+
+# @nonobvious(means) each tag interrupts the receiver differently, so a message carries one, and REGROUP and RESUME follow the regroup they belong to
+tag_check() {
+  local msg tag me T='(SOON|ASAP|URGENT|REGROUP|RESUME)'
+  msg="$(field '.tool_input.message // empty | if type=="string" then . else "" end')"
+  if printf '%s' "$msg" | head -n1 | grep -Eq "^[[:space:]]*${T}[[:space:]]*[:/+,&-]?[[:space:]]*${T}([^A-Za-z]|\$)"; then
+    block "Use one tag per message: SOON, ASAP, URGENT, REGROUP or RESUME. Each means something different."
+  fi
+  tag="$(playbook_msg_tag "$msg")"
+  case "$tag" in
+    REGROUP)
+      me="$(playbook_crew_name "$live" "$(playbook_state_dir "$stdin")" "$aid")"
+      if [ "$(playbook_state_get "$live" rg_open)" != 1 ] || [ "$(playbook_state_get "$live" rg_by)" != "$me" ]; then
+        block "REGROUP is only for calling a regroup: publish your change with \`playbook publish <what changed>\` first, then send it."
+      fi ;;
+    RESUME)
+      [ "$(playbook_state_get "$live" rg_open)" = 1 ] && block "The regroup is still open; RESUME goes out once everyone has aligned." ;;
+    URGENT)
+      [ "$(field '.tool_input.to // empty')" = "*" ] && block "URGENT is for one colleague. To stop everyone, publish a change to the interface with \`playbook publish <what changed>\` and send REGROUP." ;;
+  esac
+  return 0
+}
+
+unease_hold() {
+  local J
+  J="a fresh Opus Agent in the foreground whose description starts \`judge:\`, or codex:codex-rescue"
+  case "$(playbook_gate "$live")" in
+    rethink) block "Playbook unease gate (uneasy): stop and reconsider before dispatching more helpers. State what changes with \`playbook rethink <what changes>\`, then dispatch." ;;
+    judge)   block "Playbook unease gate (concerned): new dispatches are held until a judge has been consulted: ${J}, with the evidence and the user's decisions." ;;
+    ask)
+      if playbook_offline_on "$live"; then
+        block "Playbook unease gate (alarmed): the user is offline. Push a notification, wait the declared window, then consult an outside judge (${J}) before more dispatches."
+      else
+        block "Playbook unease gate (alarmed): new dispatches are held until a judge has answered (${J}, with the evidence and the user's decisions). If the user is here, you may ask them in AskUserQuestion instead."
+      fi ;;
+  esac
+}
+
+dispatch_line() {
+  local m="${model:-models per agent}"
+  jq -cn --arg s "📚 Playbook dispatch: ${label} · ${m}" '{systemMessage:$s}'
+}
+
+# @nonobvious(means) GSD steers its own agents from its planning files, so they skip the goal and review guards, but an unanswered unease level still holds them
+[ "$gsd" = 1 ] && [ -z "$aid" ] && unease_hold
+
+if [ "$exempt" = 0 ] && [ "$gsd" = 0 ]; then
+  if [ "$tool" = "Agent" ] && [ -z "$model" ]; then
+    block "Playbook dispatch guard: this Agent call sets no model. Sonnet builds and checks, Opus plans and judges. Add an explicit model (sonnet, opus or haiku) and redispatch. Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
+  fi
+  if [ "$tool" = "Workflow" ] && [ -n "$script" ] && agent_calls_missing_model "$script"; then
+    block "Playbook dispatch guard: ${MISSING_AT} sets no model. Sonnet builds and checks, Opus plans and judges. Give every agent() call a model key (an options object declared with one counts, passed by name or spread) and relaunch. Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
+  fi
+
+  if [ "$tool" = "Agent" ]; then
+    tname="$(field '.tool_input.name // empty')"
+    tteam="$(field '.tool_input.team_name // empty')"
+    if { [ -n "$tname" ] || [ -n "$tteam" ]; } && [ "$(playbook_mode "$live")" != "hackathon" ]; then
+      block "Playbook dispatch guard: Teams are for hackathon only (the user's decision C). Dispatch this as an unnamed background helper: drop name and team_name and set run_in_background: true; it reports once, when it finishes, and a follow-up goes to its agentId with SendMessage."
+    fi
+  fi
+
+  judge=0
+  case "$(printf '%s' "$desc" | tr 'A-Z' 'a-z')" in judge:*) judge=1 ;; esac
+  [ "$tool" = "Agent" ] && [ "$subagent" = "codex:codex-rescue" ] && judge=1
+
+  [ "$tool" = "SendMessage" ] && [ "$(playbook_mode "$live")" = "hackathon" ] && tag_check
+  [ -z "$aid" ] && [ "$tool" != "SendMessage" ] && [ "$judge" = 0 ] && unease_hold
+  if [ -z "$aid" ] && [ "$tool" != "SendMessage" ] && [ "$judge" = 0 ]; then
+    hold="$(playbook_weigh_hold_text "$live")"; [ -n "$hold" ] && block "$hold"
+  fi
+
+  nsstate="$(playbook_ns_state "$live")"
+  goal="$(playbook_ns_carried "$live")"
+  if [ -n "$goal" ]; then
+    want="$(norm_goal "$goal")"
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in *'${'*) line="$(resolve_tpl "$line")" || continue ;; esac
+      case "$(norm_goal "$line")" in none | "none (task-only)" | "none (task only)") continue ;; esac
+      if [ "$(norm_goal "$line")" != "$want" ]; then
+        block "Playbook dispatch guard: this brief carries a different North Star. Current goal: ${goal}. Replace the playbook-northstar line with the current goal, or confirm a new goal with the user in the picker first. Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
+      fi
+    done <<<"$(ns_lines "$prompt" "${script}"$'\n'"${args}")"
+  elif [ "$tool" != "SendMessage" ] && [ "$judge" = 0 ] && ! playbook_route_live "$live"; then
+    why=""
+    [ "$nsstate" = "stale" ] && why=" The goal is stale: $(playbook_ns_goal "$live")."
+    [ "$nsstate" = "done" ] && why=" The last goal is complete: $(playbook_ns_goal "$live")."
+    block "Playbook dispatch guard: No confirmed goal.${why} Run the picker (AskUserQuestion whose question starts \`Goal: … · Mode:\`, options are the top four modes ranked), or, when only one mode makes sense, declare it with \`playbook route <mode> <reason>\`. Set PLAYBOOK_DISPATCH_GUARD=off to disable this guard."
+  fi
+
+  optin_pass=0
+  if [ "$tool" = "Workflow" ] && [ -z "$aid" ]; then
+    if playbook_optin_ok "$live" "$(playbook_transcript_path "$stdin")"; then
+      optin_pass=1
+    else
+      [ "$(playbook_state_get "$live" wf_optin)" = "ok" ] || playbook_state_put "$live" "wf_optin=pending"
+      turn="$(playbook_state_get "$live" turn_at)"
+      fails="$(playbook_state_int "$live" wf_optin_fails 0)"
+      if [ "$(playbook_state_get "$live" turn_kw)" = "1" ] && [ "$(playbook_state_get "$live" wf_optin_fail_turn)" != "$turn" ]; then
+        fails=$(( fails + 1 ))
+        playbook_state_put "$live" "wf_optin_fails=${fails}" "wf_optin_fail_turn=${turn}"
+      fi
+      off="Set PLAYBOOK_OPTIN_CHECK=off to skip this check."
+      playbook_offline_on "$live" && block "$(playbook_offline_optin_line "$(field '.effort.level // empty')") ${off}"
+      case "$fails" in
+        0) block "Playbook workflows opt-in: Claude Code has no record of the user opting this turn into workflows. Settle the plan with them first, then ask them to reply \"use ultracode\", typed rather than pasted, and launch the Workflow in that turn. ${off}" ;;
+        1) block "Playbook workflows opt-in: the user's \"ultracode\" did not register with Claude Code. Ask them to type \"use ultracode\" again as a message of its own, not pasted, and launch the Workflow in that turn. ${off}" ;;
+        *) lvl="$(field '.effort.level // empty')"
+           block "Playbook workflows opt-in: \"use ultracode\" has not registered with Claude Code twice. Ask the user to run \`/effort ultracode\` instead, and warn them that it stays on for the whole session and pushes towards a workflow on every task, so they should switch back with \`/effort ${lvl:-<their earlier level>}\` once the workflow is done. Launch once they have run it. ${off}" ;;
+      esac
+    fi
+  fi
+
+  rid=""
+  case "$tool" in
+    Workflow) rid="$wfname" ;;
+    Agent) [ "$judge" = 1 ] || rid="$desc" ;;
+  esac
+  if [ -n "$rid" ] && playbook_is_review "$rid"; then
+    scope="$(playbook_review_scope "$live")"
+    base="$(playbook_review_base "$rid")"
+    n=$(( $(playbook_review_rounds "$live" "$scope" "$base") + 1 ))
+    if [ "$n" -ge 3 ] && ! playbook_review_cleared "$live" "$scope" "$base" "$n"; then
+      playbook_state_put "$live" "review_hold=$(printf '%s\t%s\t%s' "$scope" "$base" "$n")"
+      block "Playbook dispatch guard: ${PLAYBOOK_REVIEW_LINE4} This round is held until the user answers or a judge (an Agent whose description starts \`judge:\`) returns."
+    fi
+    playbook_review_bump "$live" "$scope" "$base" >/dev/null
+    if [ "$n" -ge 3 ]; then
+      playbook_score_add "$live" review_repeat "round ${n} of the same review"
+      playbook_score_settle "$live"
+    fi
+  fi
 fi
 
+# @nonobvious(must-hold) a fresh teammate reuses a finished one's name, so it must not inherit that one's part-done
+if [ "$tool" = "Agent" ] && [ -n "${tname:-}" ]; then
+  playbook_team_declare "$stdin" "$tname" ""
+fi
+
+if [ "$tool" = "Agent" ] && [ -z "$aid" ]; then
+  playbook_dispatch_count "$live"
+  playbook_score_settle "$live"
+fi
+
+[ "${optin_pass:-0}" = 1 ] && playbook_state_put "$live" "wf_optin=ok" "wf_optin_fails=0" "wf_optin_fail_turn="
+[ "$tool" = "SendMessage" ] || dispatch_line
 exit 0

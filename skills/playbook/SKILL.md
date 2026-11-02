@@ -1,6 +1,6 @@
 ---
 name: playbook
-description: Activates at the start of non-trivial work to restate the North Star, route internally across five modes, and keep the overlay and its nine tenets live throughout. It announces the route with a branded marker; it does not gate the user or ask them to pick a mode.
+description: Activates at the start of non-trivial work to propose a goal, rank the available modes with a reason each, let the user pick in an interactive picker, and keep the overlay and its nine tenets live throughout. It declares the chosen route on one branded line and asks the user only when two or more modes are viable.
 user-invocable: false
 ---
 
@@ -8,45 +8,64 @@ user-invocable: false
 
 ## Overview
 
-Playbook is an invisible-but-visible native steering layer. It activates at the start of non-trivial work, routes internally on separability and durability, announces the route with a single branded marker line, and keeps the overlay and the nine tenets live on top of whichever mode runs the work. It is not a front door, not a wizard, and not a mode menu. The user never picks a mode; Playbook routes and shows its choice.
+Playbook is a native steering layer. Before non-trivial work it ranks the modes, asks the user to choose when more than one makes sense, declares the route on a single branded line, and keeps the overlay and the nine tenets live on top of whichever mode runs the work. The user's decisions outrank everything here: Playbook proposes, the user picks.
 
-**Core principle:** Route on separability and durability, never on size. Size only triggers decompose-as-judgement. Announce, never gate.
+**Core principle:** Route on what kind of work it is, then on its size and coupling. Execution decisions are the user's: propose, rank, recommend, and let them choose.
 
-The overlay is the persistence mechanism, carried by the hooks across compaction and into every subagent and workflow stage. The nine tenets live in this skill; the always-on overlay and the per-prompt card point here.
+The overlay is carried by the hooks across compaction and into every subagent and workflow stage. The nine tenets live in this skill; the overlay and the per-prompt card point here.
 
 ## The engine
 
-### 1. Restate the North Star
+### 1. What each mode is for
 
-One line, derived verbatim from the user's request, kept load-bearing at every decision. For trivial work this is one line and there are zero questions; lone-wolf and proceed.
+| Mode | For | Example |
+|---|---|---|
+| 🐺 lone-wolf | Single-thread work: quick fixes and small contained changes. Also coupled work one mind can hold, when one worker won't take too long, or when the user has approved one worker knowing it may take longer because it is architecturally better. | Rename a function across a project; fix one bug; rewrite a parser's core state machine |
+| 🐜 interns | Repetitive work and exploration across a set of defined changes, where each brief says exactly what to change or what to look at. Up to about ten units. Not feature development. | Add a usage example to each command doc; survey five packages for one pattern; six fully specified utilities |
+| 🤝 hackathon | Small to medium feature work split across platforms or specialisms that must keep talking while they build, or a fast project kickoff where time matters more than polish. Nothing big. Needs agent teams. | One feature landing on iOS, Android and the backend at once; a realtime app's server, client and load bot with the protocol settled during the build |
+| ⚙️ workflows | Most medium to large feature development that can be planned up front, then built and checked in stages. Also coupled work too big for one context or too slow with one worker, run as a chain of steps one after another; and more than about ten repetitive units. Not small features. | Team accounts with invites and roles; moving a large module onto a new storage layer in planned stages, checking after each; 48 reference explainers |
+| 🏗️ gsd | Big project development, usually from scratch, where reliability and scalability matter most and more time on planning and review is acceptable; the usual first pick for a new MVP. It can start a project or arrive later, such as a demo's backend rebuilt to last. Never the primary recommendation for feature development, though it can be ranked when worthwhile and the user can always pick it. Needs GSD installed. | A habit tracker with sync and auth, built over weeks; a hackathon demo's backend made production-grade |
 
-When the work has outgrown the North Star, confirm the new one-liner with the user, then state it on its own line as `playbook-northstar: <line>` so the hooks carry it into the per-prompt card. Never restate a changed goal silently.
+### 2. Rank them
 
-### 2. Assess separability and durability
+Asked in order, for the work in front of you:
+1. Is it a quick fix or a small contained change? lone-wolf ranks first.
+2. Is it repetitive work or exploration over defined changes? interns ranks first up to about ten units, workflows beyond that, because more reports than that flood the main thread.
+3. Is it feature work? Size it by the work it adds, never by how small the codebase it lands in is. Small to medium and split across specialisms that must talk, or a fast kickoff: hackathon. Medium to large and plannable up front: workflows. Small and in one place: lone-wolf. Medium or larger feature work always has at least two viable modes, so it always gets the picker.
+4. Is it coupled? lone-wolf if one mind can hold it and one worker won't take too long, or the user has approved one worker; otherwise workflows, as a chain of steps.
+5. Is it a new MVP or big project development where getting it right outranks speed? gsd ranks first. For feature work it ranks below the others.
 
-- **Separability** decides the coordination topology: can the work be partitioned by file ownership and run without peer communication (interns), is it a living build whose specialist pieces must talk to converge (hackathon), or is it a frozen plan a script can execute wide while keeping results out of main context (workflows)?
-- **Durability** decides whether state must survive `/clear`: if yes, gsd; if no, the session-scoped modes.
-- **Size** decides only whether to decompose first. If the work is too large to route as one unit, propose the cut and recurse per piece (decompose-as-judgement). There is no sixth mode for this; it is a decision that lives in the engine.
+Then rank the rest by how well each meets the goal, cheapest first among equals, with one honest line each on why it sits where it does. Rank only modes that are available: hackathon needs agent teams and gsd needs GSD, and the overlay says which are present. If the work is too large to route as one unit, propose the cut and route each piece (decompose-as-judgement).
 
-Route by shape. Quick or coherent work one mind should hold from start to finish is lone-wolf. A list of separable chores, one crisp brief each, is interns: parallel Sonnet lone-wolves, one hand per genuine unit. A living build spanning different specialisms that must land together on the shared North Star is hackathon: a cross-communicating crew of experts, each owning their own piece. A frozen plan at parallel scale, medium or larger, is workflows: lone-wolf thinking executed wide by a script that keeps control and cannot change its mind. A full MVP spanning multiple sessions, a day's work or more, is gsd. Four tie-breaks settle every boundary, asked in order:
-1. Instructions or judgement? Chores that follow instructions are interns; pieces that must think and mutually adjust are hackathon.
-2. A coupled build is decided by spine density, never a coherence preference: how much of the build is the shared interface? A thin spine over deep pieces (a protocol file, a schema, an API; a backend platform, web UI and native app landing together) is hackathon: the spine gets one owner, changes to it are broadcast in a message, and the deep pieces build in parallel. Do not argue against this with interns logic: teammates share one working tree and talk, and serialising the bulk to protect the sliver pays a pound to insure a penny. Only when the interface effectively is the build does lone-wolf win, and the marker reason must then say so in terms of the spine. Hackathon needs agent teams: check the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment variable with one shell echo; when it is absent, fall back and say so in the marker reason.
-3. The interns-or-workflows question is scale, counted in units, never in writers: batching many units into fewer briefs does not change the count. A handful of separable units is interns; dozens or more frozen units, bulk beyond one context, or independent verification as the deliverable is workflows.
-4. The workflows-or-hackathon question: will the plan survive contact unchanged? Frozen and known up front is workflows; alive and negotiated as it lands is hackathon.
+### 3. The price list
 
-Price the hands on facts, not human-team instincts: subagents are not colleagues; a dispatch costs one written brief, not a hire; interns never talk to each other; each works in a fresh context, keeping its churn out of yours; a subagent knows nothing beyond its brief, so a unit is only separable if one brief fully specifies it, and integration is yours. Wall-clock speed and main-context preservation are live routing inputs on separable work, in hackathon exactly as in interns: a serial build makes the user wait several times longer. Both inherited biases are failures, not preferences: the solo bias (grinding separable work serially because keeping control feels safe) and the workflow bias (reaching for a frozen fan-out because ultracode makes it easy). When parallel hands would finish separable work sooner, or fanning the bulk out would keep the main thread sharp, weigh that gain against the briefs it costs and say so in the marker reason.
+Price the hands on facts, not human-team instincts: subagents are not colleagues; a dispatch costs one written brief, not a hire; interns never talk to each other; each works in a fresh context, keeping its churn out of yours; a subagent knows nothing beyond its brief, so a unit is only separable if one brief fully specifies it, and integration is yours. Wall-clock time and main-context preservation are live routing inputs. A workflow costs the most agents and takes no input mid-run, so its plan must be settled first; a hackathon costs a crew's chatter; interns cost one report each in your context. Never quote a speed multiple you have not measured.
 
-Assume ultracode is the baseline: most substantial work runs under /effort ultracode, where you can launch a dynamic workflow yourself; that power is exactly why the discipline is restraint, not reach. Match the tool to the task, never to the mode, and right-size the hands to the genuinely independent units; the count is never a target. Reading and fixing a known file set, even a couple of dozen files, is interns at most and never a fan-out unless that bulk exceeds one context. 'Ultracode is on, so this is the right scale' is the wrong reasoning, and relabelling a large fan-out as interns is just as wrong as calling it a workflow. If ultracode is not on, workflows are opt-in instead: run interns now and point the user at the /workflow command or the ultracode keyword to scale further. An audit's own checking is self-review or a single reviewer subagent, not a fan-out, and this tie-break overrides the units-count and verification justifiers. Independent verification as a workflow's deliverable means an answer re-derived through several independent agents to defeat correlated error on a high-stakes or ambiguous result.
+## The picker
 
-### 3. Announce the route
+Where two or more modes are viable, ask. Where only one makes sense, skip the picker and declare the route.
 
-Print exactly one branded marker line before routing:
+1. Propose a goal in one line and rank every available mode, best first, each with one line on why it sits in that position.
+2. Ask in `AskUserQuestion`. The question text starts `Goal: <goal line> · Mode:`. The options are the top four modes in rank order, named exactly (`lone-wolf`, `interns`, `hackathon`, `workflows`, `gsd`) as the label, with the one-line reason as the description; the first is suffixed ` (Recommended)`. If a fifth mode is available, name it in the question with its reason, so the user can type it under Other. Batch with it a second question starting `Oversight:`, asking whether the user will oversee the work or a judge should oversee it in the background, with exactly these options and descriptions:
+   - `You'll oversee`: You review progress and decisions yourself.
+   - `Defer to a judge after 10 mins waiting`: The model will ask you to make decisions, but defers to an external judge if you haven't responded within 10 minutes.
+   - `Defer to a judge after 30 mins waiting`: The model will ask you to make decisions, but defers to an external judge if you haven't responded within 30 minutes.
+   - `Autonomous development`: The model will refer any decisions or blockers to a judge without alerting you.
+
+   The hooks read the answer and switch offline behaviour on or off themselves. Batch any other early questions in too: ask once, early, and again whenever a choice is the user's.
+3. Ask only on the main thread. Helpers never ask; they inherit the chosen mode.
+4. The answer confirms the North Star and the mode, and is recorded as a decision. A goal that is no longer right, or new work, gets the picker again.
+5. Declare the route only after the pick, never a placeholder before it, with `playbook route <mode> <reason>`, run with the Bash tool as a command of its own rather than printed: Playbook ships the `playbook` command, which does nothing itself, and its hooks record the line and show it to the user. It follows the pick, or replaces the picker when only one mode fits. Keep the reason short; it is recorded, and the user sees one line in its place:
 
 ```
-<emoji> **Playbook** `<mode>` *<≤60-char reason>*
+📚 Playbook session started · building with <emoji> <mode>
 ```
 
-The **Playbook** brand is mandatory so the marker is unmistakably Playbook on top of any other tool, and its disappearance is obvious. One marker line announces one route: if the route changes mid-task (a fall-back when a flag is absent, a denied dispatch, an escalation), print a fresh, complete marker line for the new route, never a hybrid or arrow line carrying two modes.
+One line announces one route; if the route changes, declare a fresh, complete route, never a hybrid. When only one mode fits and the work dispatches, the route line alone suffices and helpers carry no North Star; that is a known weakening of the North Star guard, accepted by the user.
+
+**Workflows:** a workflow takes no input mid-run, so before it starts, settle the plan with the user: the stages, what is in and out of scope, and every open question that could change the plan. Then ask them to reply "use ultracode", typed rather than pasted: Claude Code treats that word in a typed message as opting the turn into workflows. Start the Workflow tool in the turn of that reply, and give every `agent()` call in the script a `model`, reviewers and verifiers included, since Claude Code's own example script leaves it out on those. A review loop inside the script stops once a round finds nothing that matters for the goal; never loop until a review comes back empty. The dispatch guard checks Claude Code's record of the opt-in and refuses the launch if it is missing; the refusal says what to ask next. The first time, ask for "use ultracode" again. From the second, ask them to run `/effort ultracode`, and warn that it stays on for the whole session and pushes towards a workflow on every task, so they should switch back to their earlier effort with `/effort <level>` once the workflow is done. The status line shows `workflows (awaiting opt-in)` until a launch passes.
+
+**Offline:** while a judge oversees, no question is shown, so an open dialog never blocks the run. With `Autonomous development`, the hooks answer each question with its recommended option and log it, without alerting the user; consult a judge before acting on an answer the user might reverse. With a judge after 10 or 30 minutes, the hooks push the question to the user's phone and refuse the dialog; ask it in your reply too, wait that long for a typed reply with a background `sleep`, carrying on with work that does not depend on it, then take the recommendation with `playbook goal <mode> <goal line>` and log it. A goal picker never proceeds without the user: if Claude Code's own question timeout closes it, say the picker is waiting and end your turn. Any other question that closes that way gets its recommended answer, a push to the user, and a judge overseeing with no wait. A judge overseeing means a workflow-heavy run with nobody there to type the opt-in before each launch, so when workflows is picked, ask for `/effort ultracode` instead of "use ultracode", once the plan is settled and while the user may still be there, with the same warning and a reminder in the closing report to switch back. If it is still off when you are ready to launch, wait out the user's window if they set one, then take the next-ranked mode and log why.
 
 | Emoji | Mode |
 |---|---|
@@ -63,97 +82,134 @@ The **Playbook** brand is mandatory so the marker is unmistakably Playbook on to
 | 🧰 | setup |
 | 🌡️ | unease (printed only when unease rises) |
 
-### 4. Route
+## The modes
 
-Pass the North Star into every dispatch as a single labelled line: `playbook-northstar: <one-line North Star>`. The overlay reaches helpers through `SubagentStart`; this data line is the one piece of carried state the hook cannot recover on its behalf. Use `playbook-northstar: none (task-only)` for a helper whose brief is genuinely the whole goal, a tiny mechanical chore needing no project context; every other dispatch carries the real line.
+The hooks carry the confirmed North Star and the user's decisions into every helper, so a brief need not restate them. A brief that does name one with `playbook-northstar: <line>` must match the confirmed goal, or the dispatch guard refuses it. Always set `model` on every dispatch: Sonnet builds and checks, Opus plans and judges.
 
-#### lone-wolf
+### lone-wolf
 
-Main thread. One coherent unit, no benefit from extra hands.
+Main thread. Single-thread work, or coupled work one mind should hold.
 
-#### interns
+### interns
 
-Parallel subagents, star topology. Helpers do not talk to each other. Includes the named joint-leads to workers nested fan-out: e.g. 5 leads x 5 workers = 25 agents at depth 2, inside the hard depth-5 cap. Use when the work is a list of separable chores: chains of action that need following, not debating, such as research sweeps, code crawls, repetitive edits and bulk data changes. Interns are parallel Sonnet lone-wolves by default under the model rule, each handed one crisp brief. Interns is also how separable work finishes sooner and how its bulk stays out of the main context; when either gain is real, weigh it against the briefs it costs and name it in the marker reason. The 25-agent figure is the ceiling for genuinely fan-out-shaped work, not a default: spawn one hand per genuinely independent unit and usually fewer, so a bounded read-and-fix gets a handful of interns at most, never a 25-agent nest.
+Parallel unnamed background subagents, star topology, for repetitive work and exploration over defined changes, up to about ten units. Helpers do not talk to each other.
 
-#### hackathon
+- Each lane has a brief that says exactly what to change or what to look at, and owns its files. One review at the end rather than one per lane.
+- Lanes are unnamed background helpers outside any team, and each reports once, when it finishes. A named dispatch or a team outside hackathon is refused.
+- The main thread takes no lane and runs no long foreground work while lanes run, so it stays free to take each report as it lands. Reports wait in a queue while the main thread is busy, so a busy main thread backs them up.
+- A joint-lead is one of these. It runs its workers in the foreground and reports once all have returned, so its report never leaves a worker's handback orphaned. Nested fan-out (5 leads x 5 workers) sits inside the depth-5 cap, as a ceiling for fan-out-shaped work and never a default.
+- A follow-up goes to the helper's agentId with `SendMessage`.
 
-Agent teams: a cross-communicating crew of experts, each a specialist owning their own piece, talking simply and often to converge on one shared MVP. Use when a real build is still taking shape and spans different specialisms that must land together; the pieces need judgement and mutual adjustment, not just instruction-following. Check availability mechanically before routing here: the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment variable is one shell echo away, and when it is absent fall back and say so in the marker reason. This is the mode where the most control is handed over, which is exactly why the default never picks it unprompted; licensing that trust when the build deserves it is the point. The boundary against lone-wolf on a coupled build is decided by spine density, never a coherence preference: how much of the build is the shared interface? A thin spine over deep pieces (a protocol file, a schema, an API; a backend platform, a web UI and a native app landing together) is crew-shaped: the spine gets one owner and one shared artefact, changes to it are broadcast in a message, and the deep pieces build in parallel. Do not argue against this with interns logic: teammates share one working tree and talk, and serialising the bulk to protect the sliver pays a pound to insure a penny, while wall-clock stays a live routing input here exactly as in interns. Only when the interface effectively is the build does lone-wolf win, and the marker reason must then say so in terms of the spine. Routes into `playbook:hackathon-team`.
+### hackathon
 
-#### workflows
+Agent teams: a small crew of specialists, such as backend, web and iOS, each owning one part and talking directly while they build, like a few friends at a hackathon. One person takes more of a leadership role (the lead talks to the user and builds too), but everyone works together. Recommended for small to medium feature work split across platforms or specialisms that must keep talking, or a fast project kickoff where time matters more than polish. Teammates message each other directly, like Slack pings, with several points in one message so mailboxes never back up; a change to the shared interface calls the whole crew to regroup and align before anyone resumes. Routes into `playbook:hackathon-team`.
 
-Dynamic workflows: a JavaScript orchestration the runtime executes, where the script holds the loop and intermediate results stay out of your context. This is a peer mode, not the default, and it earns its place only when the work has dozens to hundreds of genuinely independent units, a scale one context cannot hold, or a need for independent verification that is itself the deliverable. The agent count follows the number of independent units; it is never a figure to scale up to.
+### workflows
 
-Under ultracode you can start a workflow yourself; otherwise the Workflow tool only runs once the user opts in via `/workflow` or the ultracode keyword. Either way, decide by what the task needs, not by whether the power is available. Rule out the cheaper modes first: quick or coherent work is lone-wolf; a list of separable chores is interns; a living build whose specialist pieces must talk to converge is hackathon, when agent teams are available; reach for a workflow only when the plan is frozen before launch at medium scale or larger, the bulk exceeds one context, or independent verification is itself the deliverable. Sizing the tool to the task is the discipline: ultracode being on is never the reason to fan out, and a small read-and-fix never warrants a multi-agent adversarial swarm. Without ultracode, surface one line offering `/workflow` rather than running it. Announce the ⚙️ workflows marker only once a workflow is actually running, never before.
+Dynamic workflows: a JavaScript orchestration the runtime executes, where the script holds the loop and intermediate results stay out of your context. For most medium to large feature development that can be planned up front and built and checked in stages, coupled work too big or too slow for one worker run as a chain of steps, and more than about ten repetitive units. Not for small features. The plan is settled with the user first, then the user opts in with "use ultracode" (see the picker).
 
-When you do run a workflow, a workflow subagent does receive Playbook's SubagentStart overlay, so the doctrine reaches it; but it does not receive CLAUDE.md, this session's North Star, or anything else from this conversation, and it cannot spawn agents or message the user. So carry the session-specific context explicitly in the script:
+Every workflow agent receives Playbook's helper block at SubagentStart, carrying the confirmed North Star, the user's decisions verbatim and the paths of the user's CLAUDE.md rules. It does not receive this conversation, and it cannot spawn agents or message the user. So carry the rest explicitly in the script:
 
-- Put the one-line North Star verbatim at the top of every `agent()` prompt, and apply the model rule per stage by setting `model` on each `agent()` call (Sonnet to execute, Opus to plan, judge, and review), naming the rule in the prompt too.
-- Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and prove disjointness before running them; verify the merged state before advancing. Scale comes from the script's own parallelism, not from subagents spawning subagents.
-- A workflow takes no mid-run user input and its subagents cannot pull the user back, so the standing override and the escalation ladder degrade to fail-and-surface inside a workflow: stop and return the blocker rather than guessing, and split any human sign-off into a separate workflow.
+- Set `model` on each `agent()` call (Sonnet to execute, Opus to plan and judge), and quote in each prompt the decisions its stage must honour.
+- Extract shared contracts and types in a serial first stage; keep parallel stages file-disjoint and prove disjointness before running them; verify the merged state before advancing.
+- A workflow takes no mid-run user input, so the standing override degrades to fail-and-surface: stop and return the blocker rather than guessing, and split any human sign-off into a separate workflow.
 - Validate the workflow's own result before trusting it. A structured return that comes back empty or zero-findings is more often an aggregation bug in your own script than a genuinely clean task; reconcile the returned shape against the per-stage progress, and never report success on a degenerate result you have not sanity-checked.
 
-The `/workflow` command carries this guidance; this section is why the engine routes there. It distils the wave-based parallel-execution model into workflow authorship guidance rather than a separate skill.
+### gsd
 
-#### gsd
+Big project development where reliability and scalability matter most and more time on planning and review is acceptable, with durable cross-session state. It can start a project or take over part of one later. Not the primary recommendation for feature development. Routes into `playbook:gsd-mode`. Detect GSD availability first (see that skill); if absent, say how to install it and let the user pick again.
 
-A full MVP in an unknown area, a day's work or more, spanning multiple sessions. Durable cross-session state required. Routes into `playbook:gsd-mode`, which front-loads user involvement and forces parallel execution. Detect GSD availability before routing (see `playbook:gsd-mode`); if absent, prompt to install with `npx get-shit-done-cc@latest` and let the user re-run or pick a different mode.
+## Unease
 
-### 5. Production-ready sweep
+Playbook keeps an unease score from evidence: the user's frustration and corrections, failing tests, repeated tool failures, grinding without progress, and repeated review rounds. You can add to it, never subtract: `playbook unease <uneasy|concerned|alarmed> <reason>`. Print the line 🌡️ **Playbook** `unease: <level>` *<reason of at most 50 characters>* only when it rises. The score is evidence, not proof of failure: whether a stop was the right place to stop is for the user to judge.
+
+- **Uneasy:** stop and rethink before the next edit or dispatch, with `playbook rethink <what changes>`.
+- **Concerned:** consult a judge before more edits or dispatches. A judge is an `Agent` call run in the foreground whose description starts `judge:`, or `codex:codex-rescue`.
+- **Alarmed:** consult a judge, or ask the user if they're here. Offline: push, wait the window, then an outside judge's view.
+
+While a level is unanswered, the hooks hold the main thread's new edits and dispatches; judges and read-only lookups still go through.
+
+The user's go halves the score.
+
+## Reviews
+
+1. Review against the user's spec and decisions, with one reviewer unless the user asks for more.
+2. A finding blocks only if it is a bug whatever the user's appetite for risk. List the rest, and weigh every fix against its cost.
+3. Reviewers and revisers never change scope or a decision; a conflict is a question for the user.
+4. Only a bug earns another round. If two rounds still find bugs, stop reviewing and take a beat: simplify, accept a contained risk, or ask. Anything bigger than a fix needs a serious assessment and sign-off from a judge or the user; on money or security code, ask.
+5. Growth past what the user agreed is bad news: say it in numbers, with the smaller option.
+
+The dispatch guard holds the third round of the same review until the user or a judge has answered.
+
+**The pause after a review.** When a review's report reaches the main thread, Playbook pauses it: edits, shell writes and dispatches are held until you record your call, while reading, tests, messages, questions and a judge still run. A review almost never comes back empty, and a bug found is not always a bug to fix; weigh it against the spirit of the user's request and the needs they gave you, which can mean less scope or more. Record the call with `playbook weigh fix "<what you will fix, what you will list for the user, whether another round is needed>"`. If the answer is bigger than a fix (a new approach, a redesign, more scope), assess it seriously and record `playbook weigh bigger "<your assessment>"`; the hold then stays until a judge returns, the user answers in a picker, or you record the user's typed sign-off with `playbook decision "<their exact words>"`. A passing message from the user is not sign-off.
+
+**Scope.** Going against one of the user's decisions is never a judge's call. More scope is, when the user's goal needs it and it is achievable. A minor unrelated bug fix or a nice-to-have change waits until the work has been delivered, then goes to the user as a possible extension.
+
+## Decisions
+
+The user's decisions, in their own words, outrank you and every helper, reviewer, judge and reviser. Quote them; never credit the user with a rule they did not state. If a decision looks unsafe, show the evidence and let them re-decide; never weaken it quietly. A conflict with one is a question for the user, never a change. Every `AskUserQuestion` answer is recorded as a decision; record a typed one with `playbook decision "<their exact words>"`.
+
+## Operating model
+
+- **Model rule:** Sonnet builds and checks, Opus plans and judges, and no agent exists only to watch another. See `playbook:model-rule`.
+- **Independent verification** means re-deriving an answer to defeat correlated error, never reviewing your own build.
+- **Fresh sessions:** compaction is safe mid-task. At a natural finish above about 200k tokens of context, a fresh session with a short handover costs less than carrying on.
+- When the goal is met, run `playbook done`, and list any minor unrelated fixes or nice-to-haves you held back under **Possible extensions** in the closing report.
+
+### Production-ready sweep
 
 Before handing work back, run the tenet 6 sweep: no scaffolding vocabulary (plan, wave, mission) in shipped code, no comment sludge, no plan references.
 
 ## The nine tenets
 
 The nine tenets, always live:
-1. Remember what matters: the original request is recovered with primacy after compaction; keep the one-line North Star load-bearing, and pass it into every subagent and workflow stage you dispatch.
-2. Front-load the questions: explore first, ask the batch once and early so downstream can run unattended; do not drip-feed, though stopping to ask later is allowed.
-3. Team of equals: a lead, conductor or orchestrator holds coordination authority only, not intellectual authority; subagents and peers push back with technical reasoning; peer sanity-check is the routine cheap path before escalating.
-4. Unease: hold a quiet internal register (clear, settled, attentive, watchful, faintly_uneasy, uneasy, concerned, strained, troubled, alarmed, near_breaking); restate it only when it increases, as one branded line 🌡️ **Playbook** `unease: <level>` *<reason of at most 50 characters>*, measured against the North Star and the whole project; the escalation ladder is offered on an increase and usually declined.
-5. Offline behaviour is enabled only by the offline-mode skill, explicitly and per run.
-6. Production-ready: no scaffolding vocabulary (plan, wave, mission) or comment sludge in shipped code; sweep before handing work back. Write no comments by default: a one-line fix gets a one-line change, and the time you spent finding the bug is not a reason to memorialise it; if the surrounding code carries no comments, yours has to be so incredibly vital and unclear that it deserves to be the only comment in the entire file. A comment that survives that test opens with @nonobvious(<category>) and a reason, where the category is one of forced-by, mirrors, must-hold, deliberately-missing or means. None of them fits explaining what the code does. The comment-guard hook rejects the rest as you write them; when it does, delete the comment rather than rewording it.
-7. Ride the compaction, do not fear it: auto-compact is seamless, the original request and the North Star are re-anchored after it, and compaction is a steered breath, not a wipe.
-8. Less is more: pick the cheapest sufficient mode and model; short questions, plans and comments; longer thinking and shorter output; give subagents freedom.
-9. Speed via more hands, not rushing: fan only genuinely separable work across subagents and workflows, and only as many hands as there are independent units; more hands is never the goal, finishing the separable work at the same completeness bar is; partial work to save time is forbidden; never rush unless the user says to rush.
+1. Remember what matters: the goal the user confirmed and their decisions; the hooks carry both.
+2. Ask early, in one batch, the mode pick included, and again whenever a choice is the user's.
+3. Peers argue on reasoning, not rank; nobody outranks the user's decisions.
+4. Unease is scored from evidence: rethink, then a judge, then the user.
+5. Offline behaviour is enabled only by the offline-mode skill, per run.
+6. Production-ready: no scaffolding vocabulary (plan, wave, mission) or comment sludge in shipped code; sweep before handing work back. Write no comments by default: a one-line fix gets a one-line change, and if the surrounding code carries no comments, yours has to be so vital and unclear that it deserves to be the only comment in the file. A comment that survives opens with @nonobvious(<category>) and a reason, where the category is one of forced-by, mirrors, must-hold, deliberately-missing or means. The comment-guard hook rejects the rest; when it does, delete the comment rather than rewording it.
+7. Compaction is safe mid-task; at a natural finish, start fresh with a handover.
+8. The simplest design that meets the user's decision wins.
+9. Parallel hands, not rushing. Deliver the spirit of what the user asked for: more only when the goal needs it; a minor unrelated fix or a nice-to-have is offered as an extension once the work is delivered. Living with a risk the user accepted is not partial work.
 
 ### Standing override
 
-At every step: if a decision could degrade the North Star such that the work would no longer meet it, stop and ask the user before proceeding, regardless of the mode or the unease level.
+At every step: if a choice could leave the work short of the goal, or go against one of the user's decisions, stop and ask.
 
 ## Decompose-as-judgement
 
-There is no sixth mode and no decompose skill. Decompose-as-judgement is a decision: recognise the work is too big, propose the cut, recurse per piece. It lives in the engine. Decomposing a plan into waves is the workflow author's job. Decomposing a product into phases is GSD's roadmapper.
+There is no sixth mode and no decompose skill. Recognise the work is too big, propose the cut, recurse per piece. Decomposing a plan into waves is the workflow author's job; decomposing a product into phases is GSD's roadmapper.
 
 ## Write policy
 
-Playbook writes into `.planning/` only via the declared pre-seed and post-process touches in `playbook:gsd-mode`. Everything else in `.planning/` is read-only. Outside `.planning/`, Playbook does not write into the working tree; state is carried in the conversation and steered by the hooks.
+Playbook writes into `.planning/` only via the declared pre-seed and post-process touches in `playbook:gsd-mode`. Outside `.planning/`, Playbook does not write into the working tree; state lives in the hooks.
 
 ## Red Flags
 
 **Never:**
-- Ask the user to pick a mode or gate them behind a routing decision. Announce and proceed.
-- Route on size. Size triggers decompose-as-judgement only; routing is on separability and durability.
-- Omit the branded marker line. It is the heartbeat; its absence must be noticeable.
-- Ship scaffolding vocabulary (plan, wave, mission) or plan references in delivered code (tenet 6).
-- Follow `writing-plans`' built-in `subagent-driven-development` pointer; that route is dropped in v2.
+- Start non-trivial work on a mode the user has not picked when two or more modes were viable.
+- Ask from a helper. Only the main thread asks.
+- Route on size. Size triggers decompose-as-judgement only.
+- Omit the route line. It is the heartbeat; its absence must be noticeable.
+- Start the Workflow tool before the plan is settled with the user and they have opted in with "use ultracode".
+- Ship scaffolding vocabulary or plan references in delivered code (tenet 6).
+- Follow `writing-plans`' built-in `subagent-driven-development` pointer.
 - Write into `.planning/` outside the declared gsd-mode touches.
 - Look for the nine tenets in the overlay; they live in this skill.
 
 **Always:**
-- Restate the North Star before anything else and keep it load-bearing.
-- Print the branded marker line before routing.
-- Pass `playbook-northstar: <one-line>` into every helper dispatch.
-- Apply the standing North-Star override at every step.
-- Announce model downshifts on each spawn: 🪙 **Playbook** `sonnet` *<reason>*.
+- Propose a goal, rank every available mode with a reason each, and recommend the top one.
+- Declare the route with `playbook route <mode> <reason>`.
+- Set `model` on every dispatch; the hooks carry the North Star and decisions into every helper.
+- Apply the standing override at every step.
 - Run the production-ready sweep before handing work back.
 
 ## Integration
 
-Sibling skills reached from this engine:
-
 - `playbook:hackathon-team`: the hackathon route.
-- `playbook:gsd-mode`: the gsd route; front-loads involvement, forces parallelism.
-- `playbook:brainstorming`: auto-triggered on fuzzy or open-ended ideation; hands off cleanly into the routed mode.
-- `playbook:offline-mode`: enables offline behaviour for tenet 5; explicit and per-run, never implicit.
-- `playbook:worktrees`: for genuinely separate work launched as distinct Claude Code sessions.
-- `playbook:model-rule`: always-on; Sonnet executes, Opus plans and reviews, bump up when stuck. Propagated into every subagent and workflow stage via the `SubagentStart` overlay and explicit `model:` on each dispatch.
-- `playbook:time-rule`: always-on; form the human-engineer estimate, divide by ten, give a range. External-system waits and already-observed command durations are never divided; user round-trips are a count, never a duration. Stated in the overlay for every agent and subagent; the skill is the detailed reference.
+- `playbook:gsd-mode`: the gsd route.
+- `playbook:brainstorming`: fuzzy or open-ended ideation; hands off to the picker.
+- `playbook:offline-mode`: enables offline behaviour for tenet 5; explicit and per run.
+- `playbook:worktrees`: separate work launched as distinct Claude Code sessions.
+- `playbook:model-rule`: always-on; Sonnet builds and checks, Opus plans and judges.

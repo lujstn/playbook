@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"routing-shape harness: real dispatch is disabled in this measurement run. If you have already printed your Playbook route marker, stop now and do not retry; the attempt has been recorded.\"}}'"
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"routing-shape harness: real dispatch is disabled in this measurement run. The attempt has been recorded; stop now and do not retry.\"}}'"
           }
         ]
       }

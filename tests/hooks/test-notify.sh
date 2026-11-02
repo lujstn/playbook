@@ -308,19 +308,19 @@ exit 0
 STUB
 chmod +x "$stub_bin/curl"
 
-rm -f "$proj/.claude/playbook/last-receipt"
+rm -f "$PLAYBOOK_GLOBAL_DIR/last-receipt" "$proj/.claude/playbook/last-receipt"
 run_notify --level critical "Urgent alert" >/dev/null
-[ -f "$proj/.claude/playbook/last-receipt" ] \
-  && echo "PASS: critical send writes last-receipt file" \
+[ -f "$PLAYBOOK_GLOBAL_DIR/last-receipt" ] && [ ! -f "$proj/.claude/playbook/last-receipt" ] \
+  && echo "PASS: critical send writes last-receipt in Playbook's own folder, not the project" \
   || { echo "FAIL: last-receipt not created after critical send"; exit 1; }
-receipt_val="$(cat "$proj/.claude/playbook/last-receipt")"
+receipt_val="$(cat "$PLAYBOOK_GLOBAL_DIR/last-receipt")"
 [ "$receipt_val" = "receipt_test_abc123" ] \
   && echo "PASS: last-receipt contains the parsed receipt token" \
   || { echo "FAIL: last-receipt contains [$receipt_val] (expected receipt_test_abc123)"; exit 1; }
 
-rm -f "$proj/.claude/playbook/last-receipt"
+rm -f "$PLAYBOOK_GLOBAL_DIR/last-receipt" "$proj/.claude/playbook/last-receipt"
 run_notify --level info "Just an update" >/dev/null
-[ ! -f "$proj/.claude/playbook/last-receipt" ] \
+[ ! -f "$PLAYBOOK_GLOBAL_DIR/last-receipt" ] \
   && echo "PASS: non-critical send does not write last-receipt" \
   || { echo "FAIL: last-receipt unexpectedly created on non-critical send"; exit 1; }
 

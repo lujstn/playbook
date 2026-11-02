@@ -1,137 +1,102 @@
 #!/usr/bin/env bash
-set -euo pipefail
-root="$(cd "$(dirname "$0")/../.." && pwd)"
-H="$root/hooks/take-a-beat"
-SS="$root/hooks/session-start"
-export CLAUDE_PLUGIN_ROOT="$root"
-unset CURSOR_PLUGIN_ROOT COPILOT_CLI 2>/dev/null || true
-GLOBAL_TMP="$(mktemp -d)"; export PLAYBOOK_GLOBAL_DIR="$GLOBAL_TMP"
-trap 'rm -rf "$GLOBAL_TMP"' EXIT
-source "$root/hooks/lib/playbook-common.sh"
+set -uo pipefail
+source "$(dirname "$0")/payloads.sh"
 
-B="$root/tests/hooks/fixtures/transcript-basic.jsonl"          # used 10020
-T="$root/tests/hooks/fixtures/transcript-beat.jsonl"           # used 700020
-AC="$root/tests/hooks/fixtures/transcript-assumed-calm.jsonl"  # used 170000
+# --- keys and values --------------------------------------------------------
+iso; d="$SANDBOX/k"
+playbook_state_put "$d" "a=1" "b=x=y"
+eq "a value may contain '='" "x=y" "$(st "$d" b)"
+playbook_state_put "$d" "a=2"
+eq "a put replaces its key" 2 "$(st "$d" a)"
+eq "and keeps the others" "x=y" "$(st "$d" b)"
+playbook_state_put "$d" "b="
+eq "a blank put clears a key" "" "$(st "$d" b)"
+eq "a missing key reads empty" "" "$(st "$d" nope)"
+eq "int falls back on junk" 7 "$(playbook_state_int "$d" b 7)"
+eq "no torn temp files survive" 0 "$(ls -A "$d" | grep -c '\.tmp$')"
 
-pass() { echo "PASS: $1"; }
-fail() { echo "FAIL: $1"; exit 1; }
-sd()   { playbook_state_dir "{\"session_id\":\"$1\"}"; }        # state dir for a session id
+# --- session ids ------------------------------------------------------------
+eq "the session id is read from the payload" abc "$(playbook_session_id '{"session_id":"abc"}')"
+eq "falling back on the transcript name" tr1 "$(playbook_session_id '{"transcript_path":"/x/tr1.jsonl"}')"
+eq "unknown otherwise" unknown "$(playbook_session_id '{}')"
+eq "unsafe characters are stripped" "abc" "$(playbook_session_id '{"session_id":"a/../bc"}' | tr -d '.')"
 
-# --- 1. State lifecycle at SessionStart -------------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-printf '{"hook_event_name":"SessionStart","source":"startup","session_id":"life","transcript_path":"%s"}' "$B" | bash "$H" >/dev/null
-d="$(sd life)"
-[ -f "$d/state" ] || fail "SessionStart did not create a state file"
-[ "$(playbook_state_int "$d" last_anchor_used 999)" = "10020" ] || fail "baseline not seeded to current usage at SessionStart"
-[ "$(playbook_state_int "$d" calm_fired 9)" = "0" ] || fail "calm_fired not zeroed at SessionStart"
-[ "$(playbook_state_int "$d" fail_snapshot 9)" = "0" ] || fail "fail_snapshot not zeroed at SessionStart"
-pass "SessionStart seeds the state lifecycle (baseline=used, calm/snapshot zeroed)"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- one state dir per live process ----------------------------------------
+iso
+sleep 60 & p1=$!
+sleep 60 & p2=$!
+export PLAYBOOK_OWNER_COMM=sleep
+S='{"session_id":"proc"}'
+base="$(CLAUDE_PID=$p1 playbook_live_dir "$S")"
+eq "the first process owns the session dir" "$SANDBOX/proc" "$base"
+playbook_state_put "$base" "score10=40" "ns_goal=carry me"
+: > "$base/offline"; echo '{}' > "$base/offline-log.jsonl"
+eq "the same process gets the same dir" "$base" "$(CLAUDE_PID=$p1 playbook_live_dir "$S")"
+br="$(CLAUDE_PID=$p2 playbook_live_dir "$S")"
+eq "a second live process gets its own branch dir" "$base/branch-$p2" "$br"
+eq "with a copy of the state" 40 "$(playbook_state_int "$br" score10 0)"
+eq "and the goal" "carry me" "$(st "$br" ns_goal)"
+eq "and a one-time notice flag" 1 "$(st "$br" branch_notice)"
+eq "the offline flag is not copied" 0 "$([ -f "$br/offline" ] && echo 1 || echo 0)"
+eq "nor the offline log" 0 "$([ -f "$br/offline-log.jsonl" ] && echo 1 || echo 0)"
+playbook_state_put "$br" "score10=90"
+eq "the branch diverges without touching its parent" 40 "$(playbook_state_int "$base" score10 0)"
+eq "the branch is stable on the next call" "$br" "$(CLAUDE_PID=$p2 playbook_live_dir "$S")"
+kill $p1 2>/dev/null; wait $p1 2>/dev/null
+iso
+sleep 0.2 & dead=$!; wait $dead 2>/dev/null
+mkdir -p "$SANDBOX/proc2"; echo "$dead" > "$SANDBOX/proc2/owner"
+playbook_state_put "$SANDBOX/proc2" "score10=33"
+eq "a dead owner means a resume: the newcomer takes over" "$SANDBOX/proc2" "$(CLAUDE_PID=$p2 playbook_live_dir '{"session_id":"proc2"}')"
+eq "and the state carries on" 33 "$(playbook_state_int "$SANDBOX/proc2" score10 0)"
+eq "ownership moves to the newcomer" "$p2" "$(cat "$SANDBOX/proc2/owner")"
+kill $p2 2>/dev/null; wait $p2 2>/dev/null
+unset PLAYBOOK_OWNER_COMM
 
-# --- 2. Pulse fires at delta then throttles ---------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd pulse)"; playbook_state_reset "$d" 600000
-out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"pulse","transcript_path":"%s"}' "$T" | PLAYBOOK_WINDOW=1000000 bash "$H")"
-grep -q "Playbook pulse" <<<"$out" || fail "pulse did not fire once the delta exceeded the threshold"
-out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"pulse","transcript_path":"%s"}' "$T" | PLAYBOOK_WINDOW=1000000 bash "$H")"
-[ -z "$out" ] || fail "pulse repeated instead of throttling: [$out]"
-pass "pulse fires once at the token delta then throttles"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- agent dirs -------------------------------------------------------------
+iso
+live="$(playbook_live_dir '{"session_id":"ag"}')"
+eq "a helper's state sits under the live dir" "$live/agents/h1" "$(playbook_state_dir '{"session_id":"ag","agent_id":"h1"}')"
+eq "the main thread's is the live dir" "$live" "$(playbook_state_dir '{"session_id":"ag"}')"
+eq "an agent id is made path-safe" "$live/agents/x" "$(playbook_state_dir '{"session_id":"ag","agent_id":"../x"}' | sed 's/\.\.//')"
+eq "team state is keyed under the live dir" "$live/team/web" "$(playbook_team_dir '{"session_id":"ag"}' web)"
 
-# --- 3. Spike at 3 failures (first two silent, consumed, fourth silent) ------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd spike)"; playbook_state_reset "$d" 0
-for i in 1 2; do
-  out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"spike","transcript_path":"%s"}' "$T" | bash "$H")"
-  [ -z "$out" ] || fail "failure $i fired before the threshold: [$out]"
-done
-[ "$(playbook_fail_count "$d")" = "2" ] || fail "failures not counted (expected 2)"
-out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"spike","transcript_path":"%s"}' "$T" | bash "$H")"
-grep -q "Playbook unease floor" <<<"$out" || fail "the failure streak did not assert a floor at the third failure"
-grep -q "several tool calls have failed" <<<"$out" || fail "the floor assertion did not carry the tool-failures evidence"
-[ "$(playbook_state_get "$d" floor_level)" = "uneasy" ] || fail "the failure streak did not set the floor to uneasy"
-[ "$(playbook_state_get "$d" floor_reason)" = "tool-failures" ] || fail "the floor did not record the tool-failures detector"
-[ "$(playbook_state_get "$d" floor_clean_streak)" = "0" ] || fail "the floor trip did not zero the clean streak"
-[ "$(playbook_fail_count "$d")" = "0" ] || fail "failures not consumed after the floor trip"
-out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"spike","transcript_path":"%s"}' "$T" | bash "$H")"
-[ -z "$out" ] || fail "fourth failure asserted a floor: failures should have been consumed"
-pass "a floor at 3 failures: first two silent, failures consumed, fourth silent"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- events -----------------------------------------------------------------
+iso; d="$SANDBOX/ev"; mkdir -p "$d"
+playbook_event_push "$d" "one"; playbook_event_push "$d" "two"; playbook_event_push "$d" "one"
+eq "events drain once, deduplicated, in order" "one
 
-# --- 4. Clean-batch reset breaks the streak ---------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd clean)"; playbook_state_reset "$d" 100
-printf '{"hook_event_name":"PostToolUseFailure","session_id":"clean","transcript_path":"%s"}' "$T" | bash "$H" >/dev/null
-printf '{"hook_event_name":"PostToolUseFailure","session_id":"clean","transcript_path":"%s"}' "$T" | bash "$H" >/dev/null
-printf '{"hook_event_name":"PostToolBatch","session_id":"clean","transcript_path":"%s"}' "$B" | bash "$H" >/dev/null
-[ "$(playbook_state_int "$d" fail_snapshot 9)" = "2" ] || fail "first batch did not record the failure snapshot"
-printf '{"hook_event_name":"PostToolBatch","session_id":"clean","transcript_path":"%s"}' "$B" | bash "$H" >/dev/null
-[ "$(playbook_fail_count "$d")" = "0" ] || fail "a clean batch did not truncate the failures file"
-[ "$(playbook_state_int "$d" fail_snapshot 9)" = "0" ] || fail "a clean batch did not zero the snapshot"
-out="$(printf '{"hook_event_name":"PostToolUseFailure","session_id":"clean","transcript_path":"%s"}' "$T" | bash "$H")"
-[ -z "$out" ] || fail "streak not broken: one failure after a clean batch fired a spike"
-pass "a clean batch between failures breaks the streak"
-rm -rf "$PLAYBOOK_STATE_DIR"
+two" "$(playbook_event_drain "$d")"
+eq "and are gone after" "" "$(playbook_event_drain "$d")"
+for i in 1 2 3 4 5 6; do playbook_event_push "$d" "e$i"; done
+for i in 1 2 3 4; do ( playbook_event_drain "$d" > "$SANDBOX/drain.$i" ) & done; wait
+eq "four concurrent drains deliver the queue exactly once" 1 "$(cat "$SANDBOX"/drain.* | grep -c '^e1$')"
 
-# --- 5. Compact reset (seed 622000 -> 0, next small batch pulse-silent) ------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd compact)"; playbook_state_reset "$d" 622000
-printf '{"hook_event_name":"SessionStart","source":"compact","session_id":"compact","transcript_path":"%s"}' "$B" | bash "$H" >/dev/null
-[ "$(playbook_state_int "$d" last_anchor_used 9)" = "0" ] || fail "compact SessionStart did not reset the baseline to 0"
-out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"compact","transcript_path":"%s"}' "$B" | bash "$H")"
-[ -z "$out" ] || fail "the first small post-compact batch was not pulse-silent: [$out]"
-pass "compact resets the baseline to 0; the first small post-compact batch is pulse-silent"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- the lock ---------------------------------------------------------------
+iso; d="$SANDBOX/lk"; mkdir -p "$d"
+bump() { ( source "$root/hooks/lib/playbook-common.sh"; playbook_lock "$d"; n=$(playbook_state_int "$d" n 0); sleep 0.01; playbook_state_put "$d" "n=$((n+1))" ) ; }
+for i in 1 2 3 4 5 6 7 8; do bump & done; wait
+eq "eight concurrent read-modify-writes lose nothing under the lock" 8 "$(playbook_state_int "$d" n 0)"
+eq "and release the lock" 0 "$([ -d "$d/.lock" ] && echo 1 || echo 0)"
 
-# --- 6. Silence on unwired events, both hooks -------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-for ev in Stop SubagentStop PostToolUse PreCompact; do
-  for hook in "$H" "$SS"; do
-    if out="$(printf '{"hook_event_name":"%s","session_id":"unwired","transcript_path":"%s"}' "$ev" "$T" | bash "$hook" 2>/dev/null)"; then :; else
-      fail "$ev on $(basename "$hook") exited non-zero"; fi
-    [ -z "$out" ] || fail "$ev on $(basename "$hook") produced output: [$out]"
-  done
-done
-pass "unwired events (Stop/SubagentStop/PostToolUse/PreCompact) stay silent and exit 0 on both hooks"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- gc ---------------------------------------------------------------------
+iso
+mkdir -p "$SANDBOX/old" "$SANDBOX/new"; touch -t 202001010000 "$SANDBOX/old"
+playbook_state_gc
+eq "state older than a week is collected" 0 "$([ -d "$SANDBOX/old" ] && echo 1 || echo 0)"
+eq "recent state is kept" 1 "$([ -d "$SANDBOX/new" ] && echo 1 || echo 0)"
 
-# --- 7. Corrupt state self-heals silently -----------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd corrupt)"; mkdir -p "$d"
-printf 'v=1\nlast_anchor_used=NOTANUMBER\ncalm_fired=0\nfail_snapshot=0\n' > "$d/state"
-out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"corrupt","transcript_path":"%s"}' "$T" | PLAYBOOK_WINDOW=1000000 bash "$H")"
-[ -z "$out" ] || fail "corrupt state did not heal silently: [$out]"
-[ "$(playbook_state_int "$d" last_anchor_used 9)" = "700020" ] || fail "corrupt heal did not rebaseline to current usage (bias to silence)"
-pass "corrupt state self-heals silently and rebaselines to current usage"
-rm -rf "$PLAYBOOK_STATE_DIR"
+# --- /clear -----------------------------------------------------------------
+iso; d="$(sd rs)"
+playbook_ns_confirm "$d" g interns picker; playbook_decision_add "$d" a q a >/dev/null
+say rs "hello there"
+playbook_state_put "$d" score10=90 gate=judge calm_fired=1 away=1
+playbook_conversation_reset "$d"
+eq "a reset zeroes the score" 0 "$(score_of "$d")"
+eq "clears the goal state" "" "$(playbook_ns_state "$d")"
+eq "clears the gate" "" "$(playbook_gate "$d")"
+eq "re-arms the calm note" 0 "$(playbook_state_int "$d" calm_fired 9)"
+eq "forgets the user's words" 0 "$([ -e "$d/human.jsonl" ] && echo 1 || echo 0)"
+eq "forgets the decisions" 0 "$([ -e "$d/decisions.jsonl" ] && echo 1 || echo 0)"
 
-# --- 8. Main / subagent state isolation via agent_id ------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-printf '{"hook_event_name":"PostToolUseFailure","session_id":"iso","transcript_path":"%s"}' "$T" | bash "$H" >/dev/null
-printf '{"hook_event_name":"PostToolUseFailure","session_id":"iso","agent_id":"helperA","transcript_path":"%s"}' "$T" | bash "$H" >/dev/null
-dm="$(sd iso)"
-da="$(playbook_state_dir '{"session_id":"iso","agent_id":"helperA"}')"
-[ "$dm" != "$da" ] || fail "main and subagent resolved to the same state dir"
-[ "$(playbook_fail_count "$dm")" = "1" ] || fail "main failure count wrong (expected 1)"
-[ "$(playbook_fail_count "$da")" = "1" ] || fail "subagent failure count wrong (expected 1)"
-pass "main and subagent throttle state are isolated by agent_id"
-rm -rf "$PLAYBOOK_STATE_DIR"
-
-# --- 9. Ratchet proves the window on usage over 200k ------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd ratchet)"; playbook_state_reset "$d" 700020
-printf '{"hook_event_name":"PostToolBatch","session_id":"ratchet","transcript_path":"%s"}' "$T" | bash "$H" >/dev/null
-[ "$(playbook_state_get "$d" window_proven)" = "1000000" ] || fail "ratchet did not write window_proven on usage over 200000"
-pass "ratchet writes window_proven=1000000 once usage exceeds 200000"
-rm -rf "$PLAYBOOK_STATE_DIR"
-
-# --- 10. Negative-delta self-heal -------------------------------------------
-export PLAYBOOK_STATE_DIR="$(mktemp -d)"
-d="$(sd neg)"; playbook_state_reset "$d" 500000
-out="$(printf '{"hook_event_name":"PostToolBatch","session_id":"neg","transcript_path":"%s"}' "$B" | bash "$H")"
-[ -z "$out" ] || fail "a usage figure below the baseline was not silent: [$out]"
-[ "$(playbook_state_int "$d" last_anchor_used 9)" = "10020" ] || fail "negative delta did not rebaseline to current usage"
-pass "negative delta (a silent compaction) self-heals silently and rebaselines"
-rm -rf "$PLAYBOOK_STATE_DIR"
-
-echo "test-state.sh: all cases passed"
+exit $fail

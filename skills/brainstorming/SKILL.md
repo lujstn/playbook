@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off into the engine's routed mode. Does not write a design-doc artefact unless asked, and never starts building inside brainstorming.
+description: Auto-triggers on fuzzy, open-ended, or ideation-first prompts ("let's explore", "what should we build", "I'm not sure how to approach", "help me think through") and on /brainstorming. Explores options, surfaces trade-offs, asks sharp batched questions, paints the picture, and converges to a clear shape before handing off to the engine's mode picker. Does not write a design-doc artefact unless asked, and never starts building inside brainstorming.
 ---
 
 # Brainstorming
@@ -37,7 +37,7 @@ Once enough signal exists, describe what the chosen direction actually looks lik
 
 ### 4. Converge
 
-Drive towards a clear enough shape that the routing engine can take over. The shape does not need to be a detailed spec; it needs to be specific enough that "separable or not" and "durable or not" can be answered. State the convergence explicitly: "the shape is X; routing to the engine now."
+Drive towards a clear enough shape that the picker can take over. The shape does not need to be a detailed spec; it needs to be specific enough that "separable or not" and "durable or not" can be answered. State the convergence explicitly: "the shape is X; proposing the goal and modes now."
 
 ## Red Flags
 
@@ -50,6 +50,6 @@ Drive towards a clear enough shape that the routing engine can take over. The sh
 
 ## Integration
 
-After convergence, hand off into `playbook:playbook` (the routing engine). The engine receives the clarified shape and routes on separability and durability as usual. The North Star derived during brainstorming travels forward as the session North Star.
+After convergence, hand off to the picker in `playbook:playbook`. Propose the goal as one line and rank the available modes, each with one line on why it sits in that position, the top one marked `(Recommended)`, and ask in `AskUserQuestion` as `Goal: <goal line> · Mode:`. Batch it with any questions brainstorming still has open, rather than asking twice. Brainstorming never declares a route or confirms a goal for the user; their pick does, and the route is declared after it. If only one mode makes sense, declare the route and proceed.
 
 If the user wants to capture the outcome as a document, offer to write one after convergence, not during. Writing mid-explore interrupts the thinking before the shape is clear.
