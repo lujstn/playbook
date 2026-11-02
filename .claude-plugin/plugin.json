@@ -1,7 +1,7 @@
 {
   "name": "playbook",
-  "description": "Claude Code steering layer: you pick the goal and the mode in a picker, your decisions reach every agent verbatim and outrank every reviewer, an unease score built from hook evidence forces a rethink, then a judge, then you, guards hold unconfirmed dispatches and runaway review rounds, a pause after every review to weigh its findings against the spirit of your request, an always-on Sonnet-builds and Opus-judges model rule, teammates kept working until their part is done, calm compaction, a comment guard that refuses narration before it reaches your file, a status line showing the mode, crew messages and unease, and offline notifications via Pushover or ntfy.",
-  "version": "3.0.0",
+  "description": "Native, invisible-but-visible Claude Code steering layer: a one-line goal you confirm, kept in front of every agent along with your decisions in your own words, a picker that ranks five ways to run the work and lets you choose, an unease score built from what actually happens that makes Claude rethink, get a judge's view or ask you, a pause after every review so findings are weighed rather than blindly obeyed, an always-on Sonnet-builds and Opus-judges model rule, calm compaction that stops agents fearing the context limit, a comment guard that refuses narration in any language before it reaches your file, and offline notifications via Pushover or ntfy.",
+  "version": "3.0.1",
   "author": {
     "name": "Lucas Johnston Kurilov",
     "email": "lucas@buildin.london"
